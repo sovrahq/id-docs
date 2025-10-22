@@ -4,9 +4,9 @@
 1. [Introducción](#introducción)
 2. [Configuración Inicial](#configuración-inicial)
 3. [Endpoints](#endpoints)
-   - 3.1 [Verificación del Workspace](#verificación-del-workspace)
-   - 3.2 [Creación y Gestión de Credenciales](#creación-y-gestión-de-credenciales)
-   - 3.3 [Creación y Gestión de Verificación](#creación-y-gestión-de-verificación)
+   - 3.1 [Verificación del Workspace](#31-verificación-del-workspace)
+   - 3.2 [Creación y Gestión de Credenciales](#32-creación-y-gestión-de-credenciales)
+   - 3.3 [Creación y Gestión de Verificación](#33-creación-y-gestión-de-verificación)
 4. [Referencia Completa de Campos](#referencia-completa-de-campos)
 5. [Ejemplos y Referencias](#ejemplos-y-referencias)
 
@@ -106,7 +106,7 @@ La API de Sovra ID proporciona endpoints para la gestión de credenciales verifi
 
 **Autenticación:** API Key en header `x-api-key`
 
-### 3.1 Verificación del Workspace
+## 3.1 Verificación del Workspace
 
 #### GET `/workspaces/status`
 
@@ -164,7 +164,9 @@ x-api-key: TU_API_KEY
 
 ---
 
-### 3.2 Creación y Gestión de Credenciales
+**Si el `did` ya se encuentra creado, el workspace se encuentra listo para crear y verificar credenciales.**
+
+## 3.2 Creación y Gestión de Credenciales
 
 #### POST `/credentials/workspace/{workspace_id}`
 
@@ -595,7 +597,7 @@ true
 
 ---
 
-### 3.3 Creación y Gestión de Verificación
+## 3.3 Creación y Gestión de Verificación
 
 #### POST `/verifications/workspace/{workspace_id}`
 

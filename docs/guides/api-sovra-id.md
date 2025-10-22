@@ -11,7 +11,6 @@ Con esta guía aprenderás a:
 - Consultar los detalles de cualquier credencial emitida.
 - Gestionar el estado de las credenciales (suspender, revocar o activar).
 - Crear verificaciones para validar credenciales de terceros.
-- Monitorear el estado de las verificaciones en tiempo real.
 
 ## **Estructura de la Guía**
 
@@ -22,8 +21,8 @@ La documentación está organizada en los siguientes pasos:
     2. Verificación de la cuenta
 2. **Endpoints** 
     1. **Verificación del Workspace** - Consulta del estado del workspace.
-    2. **Creación y gestión de credenciales** - Estructura de datos, ejemplos de solicitud, consulta de detalles y control de estados
-    3. **Verificación** - Creación y configuración de verificaciones
+    2. **Creación y gestión de Credenciales** - Estructura de datos, ejemplos de solicitud, consulta de detalles y control de estados
+    3. **Creación de gestión de Verificación** -  Estructura de datos, ejemplos de solicitud y consulta de detalles.
 
 Cada sección incluye ejemplos prácticos, códigos de respuesta y tablas de referencia para facilitar la integración con tu aplicación.
 
@@ -106,13 +105,13 @@ x-api-key: TU_API_KEY
 ```json
 [
   {
-    "id": "c7b8ef84-cfcf-461c-afec-64aaaaaaaaaaa",
+    "id": "c7b8ef84-cfcf-461c-afec-64abcfedth",
     "workspace_number": 1,
     "name": "Integration 01",
     "description": "Workspace por defecto de Integration 01",
     "status": true,
     "is_default": false,
-    "did": "did:quarkid:EiaaaaaSOpt50p8vSx2L2aaaaaaaaa",
+    "did": "did:quarkid:EiaaaaaSOpt50p8vSx2L264abcfegdthg",
     "metadata": {
       "created_at": "2025-10-15T16:19:04.571Z",
       "created_by": "system",
@@ -121,7 +120,7 @@ x-api-key: TU_API_KEY
     "webhook_url": "https://id.api.sandbox.sovra.io/api/webhooks",
     "webhook_secret": "538aaa1212aaaaaaa",
     "branding": null,
-    "apikey": "219a8CqHinSVL/Xaaaaaaaaaa",
+    "apikey": "219a8CqHinSVL/X64abcfegdthg",
     "created_at": "2025-10-15T16:19:04.006Z",
     "updated_at": "2025-10-15T16:21:40.850Z"
   }
@@ -254,6 +253,51 @@ Content-Type: application/json
   }
 }
 ```
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
+| `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
+| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
+| `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |
+| `outputDescriptor.id` | string | Identificador único del descriptor de salida | Manual | Al crear (body) |
+| `outputDescriptor.schema` | string | URL del schema que define la estructura de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display` | object | Configuración de visualización de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.title` | object | Título principal de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.subtitle` | object | Subtítulo de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.description` | object | Descripción detallada de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties` | array | Array de propiedades que se mostrarán en la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].path` | array | Ruta JSONPath para acceder al valor en la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].fallback` | string | Valor por defecto si no se encuentra el campo | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].label` | string | Etiqueta que se mostrará para la propiedad | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].schema` | object | Definición del tipo de dato de la propiedad | Manual | Al crear (body) |
+| `outputDescriptor.styles` | object | Define los estilos visuales de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.styles.text` | object | Configuración de color del texto | Manual | Al crear (body) |
+| `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
+| `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
+
+Puedes extender el `credential.@context` se puede hacer con propiedades personalizadas como:
+
+```json
+  "@context": [
+        "..."
+      {
+        "participantType": {
+          "@id": "https://example.org/vocab#participantType",
+          "@type": "xsd:string"
+        }
+      }
+    ]
+
+```
+*Imagen Nº1* - **Propiedad Personalizada**
+![Propiedad personalizada](../../assets/images/property_new.png)
+
+*Imagen Nº2* - **Diseño de Credenciales**
+![Diseño de Credenciales](../../assets/images/design_credential.png)
+Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)
+
 
 **Respuesta Exitosa (201):**
 ```json
@@ -338,6 +382,15 @@ Content-Type: application/json
 }
 ```
 
+**Campos nuevos**
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
+| `invitation_wallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitation_wallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
+| `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
+| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
 
 #### GET `/api/credentials/{id}`
 
@@ -445,6 +498,19 @@ Content-Type: application/json
 }
    
 ```
+**Campos nuevos**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `credential.credentialSubject.id` | string | DID del portador de la credencial | Automática | Al asociar |
+| `credential.proof` | object | Prueba criptográfica de la credencial | Automática | Al asociar |
+| `credential.proof.type` | string | Tipo de firma criptográfica utilizada | Automática | Al asociar |
+| `credential.proof.created` | string (ISO 8601) | Fecha y hora de creación de la prueba | Automática | Al asociar |
+| `credential.proof.proofValue` | string | Valor de la prueba criptográfica | Automática | Al asociar |
+| `credential.proof.proofPurpose` | string | Propósito de la prueba (assertionMethod) | Automática | Al asociar |
+| `credential.proof.verificationMethod` | string | Método de verificación utilizado | Automática | Al asociar |
+| `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
+| `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
 
 **Campos de Respuesta por Etapa del Ciclo de Vida**
 
@@ -500,7 +566,91 @@ Esta organización te permite entender qué información estará disponible en c
 
 **Notas sobre los momentos de existencia:**
 
-- **Al crear (body)**: Campos que deben enviarse en el cuerpo de la solicitud POST
-- **Al crear (respuesta)**: Campos que se generan automáticamente y se devuelven en la respuesta de creación
-- **Al asociar**: Campos que aparecen únicamente después de que el usuario escanea el QR y asocia la credencial a su wallet
+- **Al crear (request)**: Campos que deben enviarse en el cuerpo de la solicitud POST
+- **Al crear (response)**: Campos que se generan automáticamente y se devuelven en la respuesta de creación
+- **Al asociar (response)**: Campos que aparecen únicamente después de que el usuario escanea el QR y asocia la credencial a su wallet
 
+
+####  GET `/public/credentials/status/{credential_id}`
+
+Verifica el estado de una credencial
+
+**Headers:**
+```
+x-api-key: TU_API_KEY
+```
+
+**Parámetros de URL:**
+- `credential_id` (string): ID único de la credencial
+
+**Respuesta Exitosa (200) - Credencial Activa:**
+```json
+{
+  "verifiableCredential": []
+}
+```
+
+**Campos de Respuesta - Credencial Activa:**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `verifiableCredential` | array | Array vacío cuando la credencial está activa |
+
+**Respuesta de Error (404):**
+```json
+{
+  "error": "Credential not found"
+}
+```
+
+**Respuesta Exitosa (200) - Credencial Revocada/Suspendida:**
+```json
+{
+  "verifiableCredential": [
+    {
+      "claim": {
+        "id": "https://id.api.sandbox.sovra.io/api/public/credentials/541ffd6d-8702-4489-b7df-76233e24e685",
+        "currentStatus": "revoked",
+        "statusReason": "blocked credential"
+      }
+    }
+  ]
+}
+```
+
+**Campos de Respuesta - Credencial Revocada/Suspendida:**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `verifiableCredential` | array | Array de credenciales verificables |
+| `verifiableCredential[].claim` | object | Información del reclamo de la credencial |
+| `verifiableCredential[].claim.id` | string | ID de la credencial |
+| `verifiableCredential[].claim.currentStatus` | string | Estado actual de la credencial |
+| `verifiableCredential[].claim.statusReason` | string | Motivo del cambio de estado |
+
+
+####  PUT `/credentials/{credential_id}/workspace/{workspace_id}/status/{status}`
+
+Cambia el estado de una credencial (revocar, suspender o activar).
+
+**Headers:**
+```
+x-api-key: TU_API_KEY
+```
+
+**Parámetros de URL:**
+- `credential_id` (string): ID único de la credencial
+- `workspace_id` (string): ID del workspace
+- `status` (string): Nuevo estado (`revoked`, `suspend`, `active`)
+
+**Cuerpo de la Solicitud (Opcional):**
+```json
+{
+  "reason": "Motivo del cambio de estado"
+}
+```
+
+**Respuesta Exitosa (200):**
+```json
+true
+```

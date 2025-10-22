@@ -48,7 +48,9 @@ Cada sección incluye ejemplos prácticos, códigos de respuesta y tablas de ref
 
 Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el entorno **Sandbox**. Este entorno te permite probar todas las funcionalidades sin afectar datos de producción.
 
- [Acceder a Sovra Sandbox](https://id.sandbox.sovra.io/auth/signin)
+- [Acceder a Aplicación - Sovra Sandbox](https://id.sandbox.sovra.io/auth/signin){:target="_blank"}
+- [Acceder a Swagger - Sovra Sandbox API](https://id.sandbox.sovra.io/auth/signin){:target="_blank"}
+- [Descargar JSON Postman](../../resources/api_sovra_id.postman_collection.json){:target="_blank"}
 
 ### Pasos para crear cuenta
 
@@ -592,7 +594,249 @@ true
 
 ### 3.3 Creación y Gestión de Verificación
 
-[Contenido futuro para verificaciones]
+#### POST `/verifications/workspace/{workspace_id}`
+
+Crea una nueva verificación de credencial.
+
+**Headers:**
+```
+x-api-key: TU_API_KEY
+Content-Type: application/json
+```
+
+**Parámetros de URL:**
+- `workspace_id` (string): ID del workspace donde crear la verificación
+
+**Cuerpo de la Solicitud:**
+```json
+{
+  "inputDescriptors": [
+    {
+      "id": "VerifiableCredential",
+      "name": "VerifiableCredential",
+      "constraints": {
+        "fields": [
+          {
+            "path": ["$.credentialSubject.givenName"],
+            "filter": { "type": "string" }
+          },
+          {
+            "path": ["$.credentialSubject.familyName"],
+            "filter": { "type": "string" }
+          },
+          {
+            "path": ["$.credentialSubject.participantType"],
+            "filter": { "type": "string" }
+          }
+        ]
+      }
+    }
+  ],
+  "issuer": {
+    "name": "Sovra ID",
+    "styles": {
+      "thumbnail": {
+        "uri": "https://storage.googleapis.com/sovra_brand/Logo.png",
+        "alt": "Sovra Logo"
+      },
+      "hero": {
+        "uri": "https://storage.googleapis.com/sovra_brand/BG.png",
+        "alt": "Background"
+      },
+      "background": {
+        "color": "#0b1f45"
+      },
+      "text": {
+        "color": "#ffffff"
+      }
+    }
+  }
+}
+```
+
+**Respuesta Exitosa (201):**
+```json
+{
+  "id": "093adec6-c86e-4a7a-81c0-fa2a121212a",
+  "presentation_wallet": {
+    "presentationId": "string",
+    "presentationContent": "string"
+  },
+  "inputDescriptors": [
+    {
+      "id": "VerifiableCredential",
+      "name": "VerifiableCredential",
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$.credentialSubject.givenName"
+            ],
+            "filter": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "issuer": {
+    "name": "string",
+    "styles": {
+      "thumbnail": {
+        "uri": "string",
+        "alt": "string"
+      },
+      "hero": {
+        "uri": "string",
+        "alt": "string"
+      },
+      "background": {
+        "color": "string"
+      },
+      "text": {
+        "color": "string"
+      }
+    }
+  }
+}
+```
+
+
+**Campos de Solicitud (Body):**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (requests) |
+| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (requests) |
+| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (requests) |
+| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (requests) |
+| `issuer.name` | string | Nombre del emisor | Manual | Al crear (requests) |
+| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (requests) |
+| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (requests) |
+| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (requests) |
+| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (requests) |
+| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (requests) |
+
+**Campos de Respuesta - Verificación:**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la verificación | Automática | Al crear (responses) |
+| `presentation_wallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
+| `presentation_wallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
+| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (requests) |
+| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (requests) |
+| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (requests) |
+| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (requests) |
+| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (requests) |
+| `issuer.name` | string | Nombre del emisor | Manual | Al crear (requests) |
+| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (requests) |
+| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (requests) |
+| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (requests) |
+| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (requests) |
+| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (requests) |
+
+#### GET `/verifications/{id}`
+
+Obtiene los detalles de una verificación específica.
+
+**Headers:**
+```
+x-api-key: TU_API_KEY
+Content-Type: application/json
+```
+
+**Parámetros de URL:**
+- `id` (string): ID de la verificación
+
+**Respuesta Exitosa (200):**
+```json
+{
+  "id": "6addd52a-30a5-4540-9992-33638562b9c2",
+  "presentation_wallet": {
+    "presentationId": "string",
+    "presentationContent": "string"
+  },
+  "inputDescriptors": [
+    {
+      "id": "VerifiableCredential",
+      "name": "VerifiableCredential",
+      "constraints": {
+        "fields": [
+          {
+            "path": [
+              "$.credentialSubject.givenName"
+            ],
+            "filter": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "issuer": {
+    "name": "string",
+    "styles": {
+      "thumbnail": {
+        "uri": "string",
+        "alt": "string"
+      },
+      "hero": {
+        "uri": "string",
+        "alt": "string"
+      },
+      "background": {
+        "color": "string"
+      },
+      "text": {
+        "color": "string"
+      }
+    }
+  },
+  "role": "VERIFIER",
+  "verified": true,
+  "holder_did": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
+  "verifier_did": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A"
+}
+```
+
+**Campos de Respuesta - Consulta de Verificación:**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la verificación | Automática | Al crear (responses) |
+| `presentation_wallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
+| `presentation_wallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
+| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (request) |
+| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (request) |
+| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (request) |
+| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (request) |
+| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (request) |
+| `issuer.name` | string | Nombre del emisor | Manual | Al crear (request) |
+| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (request) |
+| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (request) |
+| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (request) |
+| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (request) |
+| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (request) |
+| `role` | string | Rol del usuario en la verificación (VERIFIER) | Automática | Al verificar |
+| `verified` | boolean | Estado de verificación de la credencial | Automática | Al verificar |
+| `holder_did` | string | DID del portador de la credencial | Automática | Al verificar |
+| `verifier_did` | string | DID del verificador | Automática | Al verificar |
 
 ---
 
@@ -681,4 +925,4 @@ Puedes extender el `credential.@context` con propiedades personalizadas:
 *Imagen Nº2* - **Diseño de Credenciales**
 ![Diseño de Credenciales](../../assets/images/design_credential.png)
 
-Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)
+Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/){:target="_blank"}

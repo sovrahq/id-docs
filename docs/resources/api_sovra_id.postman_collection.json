@@ -1,0 +1,270 @@
+{
+	"info": {
+		"_postman_id": "3fe32f2a-ef29-45e1-b7fc-b5b259c0e620",
+		"name": "Sovra ID",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "44641457",
+		"_collection_link": "https://typebold.postman.co/workspace/0a108991-e20e-4f53-8781-9bef9222d93b/collection/44641457-3fe32f2a-ef29-45e1-b7fc-b5b259c0e620?action=share&source=collection_link&creator=44641457"
+	},
+	"item": [
+		{
+			"name": "Workspace",
+			"item": [
+				{
+					"name": "Workspace Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseURL}}/api/workspaces/status",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"workspaces",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Credentials",
+			"item": [
+				{
+					"name": "Create Credential",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"credential\": {\n    \"@context\": [\n      \"https://www.w3.org/2018/credentials/v1\",\n      \"https://www.w3.org/2018/credentials/examples/v1\",\n      \"https://w3id.org/security/bbs/v1\",\n      {\n        \"participantType\": {\n          \"@id\": \"https://example.org/vocab#participantType\",\n          \"@type\": \"xsd:string\"\n        }\n      }\n    ],\n    \"type\": [\n      \"VerifiableCredential\"\n    ],\n    \"expirationDate\": \"2027-10-15\",\n    \"credentialSubject\": {\n      \"givenName\": \"Test Name\",\n      \"familyName\": \"Test Family Name\",\n      \"participantType\": \"Test Participant Type\"\n    }\n  },\n  \"outputDescriptor\": {\n    \"id\": \"credential_output\",\n    \"schema\": \"https://example.com/schema\",\n    \"display\": {\n      \"title\": {\n        \"text\": \"Credential Title\"\n      },\n      \"subtitle\": {\n        \"text\": \"Credential Subtitle\"\n      },\n      \"description\": {\n        \"text\": \"Credential Description\"\n      },\n      \"properties\": [\n        {\n          \"path\": [\n            \"$.credentialSubject.givenName\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Nombre(s)\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.credentialSubject.familyName\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Apellido(s)\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.credentialSubject.participantType\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Type of participant\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.expirationDate\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Expiration\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        }\n      ]\n    },\n    \"styles\": {\n      \"text\": {\n        \"color\": \"#ffffff\"\n      },\n      \"hero\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n        \"alt\": \"Your Background Alt Text\"\n      },\n      \"background\": {\n        \"color\": \"#0b1f45\"\n      },\n      \"thumbnail\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n        \"alt\": \"Your Logo Alt Text\"\n      }\n    }\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/credentials/workspace/{workspace_id}",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"credentials",
+								"workspace",
+								"{workspace_id}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Credential by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseURL}}/api/credentials/{credential_id}",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"credentials",
+								"{credential_id}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Credential Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Credencial revocada\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/credentials/{credential_id}/workspace/{workspace_id}/status/suspend",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"credentials",
+								"{credential_id}",
+								"workspace",
+								"{workspace_id}",
+								"status",
+								"suspend"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Credential Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseURL}}/api/public/credentials/status/{credential_id}",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"public",
+								"credentials",
+								"status",
+								"{credential_id}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Verifications",
+			"item": [
+				{
+					"name": "Create Verifications",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"inputDescriptors\": [\n    {\n      \"id\": \"VerifiableCredential\",\n      \"name\": \"VerifiableCredential\",\n      \"constraints\": {\n        \"fields\": [\n          {\n            \"path\": [\n              \"$.credentialSubject.givenName\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\n              \"$.credentialSubject.familyName\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\n              \"$.credentialSubject.participantType\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          }\n        ]\n      }\n    }\n  ],\n  \"issuer\": {\n    \"name\": \"Sovra\",\n    \"styles\": {\n      \"thumbnail\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n        \"alt\": \"Sovra\"\n      },\n      \"hero\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n        \"alt\": \"Sovra\"\n      },\n      \"background\": {\n        \"color\": \"#ff0000\"\n      },\n      \"text\": {\n        \"color\": \"#d4d400\"\n      }\n    }\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseURL}}/api/verifications/workspace/{workspace_id}",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"verifications",
+								"workspace",
+								"{workspace_id}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verification By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "x-api-key",
+								"value": "{{x-api-key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseURL}}/api/verifications/{verification_id}",
+							"host": [
+								"{{baseURL}}"
+							],
+							"path": [
+								"api",
+								"verifications",
+								"{verification_id}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseURL",
+			"value": ""
+		},
+		{
+			"key": "x-api-key",
+			"value": ""
+		}
+	]
+}

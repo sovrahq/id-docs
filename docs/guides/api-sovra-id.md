@@ -48,9 +48,12 @@ Cada sección incluye ejemplos prácticos, códigos de respuesta y tablas de ref
 
 Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el entorno **Sandbox**. Este entorno te permite probar todas las funcionalidades sin afectar datos de producción.
 
-- [Acceder a Aplicación - Sovra Sandbox](https://id.sandbox.sovra.io/auth/signin){:target="_blank"}
-- [Acceder a Swagger - Sovra Sandbox API](https://id.sandbox.sovra.io/auth/signin){:target="_blank"}
-- [Descargar JSON Postman](../../resources/api_sovra_id.postman_collection.json){:target="_blank"}
+- <a href="https://id.sandbox.sovra.io/" target="_blank">Acceder a Aplicación - Sovra Sandbox</a>
+
+- <a href=https://id.api.sandbox.sovra.io/api target="_blank">Acceder a Swagger - Sovra Sandbox API</a>
+
+- <a href='../resources/api_sovra_id.postman_collection.json' target="_blank">Descargar JSON Postman</a>
+
 
 ### Pasos para crear cuenta
 
@@ -925,4 +928,4 @@ Puedes extender el `credential.@context` con propiedades personalizadas:
 *Imagen Nº2* - **Diseño de Credenciales**
 ![Diseño de Credenciales](../../assets/images/design_credential.png)
 
-Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/){:target="_blank"}
+<a href=https://www.w3.org/TR/xmlschema11-1/ target="_blank">Tipos de datos XSD</a>

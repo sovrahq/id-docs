@@ -1,38 +1,52 @@
 # Documentación Sovra ID API
 
-Esta documentación te guiará paso a paso para configurar tu cuenta, acceder a la API y utilizar todas las funcionalidades disponibles de Sovra ID.
+## Tabla de Contenidos
+1. [Introducción](#introducción)
+2. [Configuración Inicial](#configuración-inicial)
+3. [Endpoints](#endpoints)
+   - 3.1 [Verificación del Workspace](#verificación-del-workspace)
+   - 3.2 [Creación y Gestión de Credenciales](#creación-y-gestión-de-credenciales)
+   - 3.3 [Creación y Gestión de Verificación](#creación-y-gestión-de-verificación)
+4. [Referencia Completa de Campos](#referencia-completa-de-campos)
+5. [Ejemplos y Referencias](#ejemplos-y-referencias)
 
-## **¿Qué podrás hacer?**
+---
 
-Con esta guía aprenderás a:
+## Introducción
 
-- Obtener el ID del Workspace y verificar la configuración de tu cuenta.
-- Crear credenciales verificables con datos personalizados.
-- Consultar los detalles de cualquier credencial emitida.
-- Gestionar el estado de las credenciales (suspender, revocar o activar).
-- Crear verificaciones para validar credenciales de terceros.
+Esta documentación te guiará paso a paso para configurar tu cuenta, acceder a la API y utilizar todas las funcionalidades disponibles de Sovra ID.
 
-## **Estructura de la Guía**
+### ¿Qué podrás hacer?
+
+Con esta guía aprenderás a:
+
+- Obtener el ID del Workspace y verificar la configuración de tu cuenta.
+- Crear credenciales verificables con datos personalizados.
+- Consultar los detalles de cualquier credencial emitida.
+- Gestionar el estado de las credenciales (suspender, revocar o activar).
+- Crear verificaciones para validar credenciales de terceros.
+
+### Estructura de la Guía
 
 La documentación está organizada en los siguientes pasos:
 
-1. **Configuración inicial** - Registro de usuario y obtención de la `x-api-key`
+1. **Configuración inicial** - Registro de usuario y obtención de la `x-api-key`
     1. Pasos para crear cuenta
     2. Verificación de la cuenta
 2. **Endpoints** 
     1. **Verificación del Workspace** - Consulta del estado del workspace.
-    2. **Creación y gestión de Credenciales** - Estructura de datos, ejemplos de solicitud, consulta de detalles y control de estados
-    3. **Creación de gestión de Verificación** -  Estructura de datos, ejemplos de solicitud y consulta de detalles.
+    2. **Creación y gestión de Credenciales** - Estructura de datos, ejemplos de solicitud, consulta de detalles y control de estados
+    3. **Creación de gestión de Verificación** -  Estructura de datos, ejemplos de solicitud y consulta de detalles.
 
-Cada sección incluye ejemplos prácticos, códigos de respuesta y tablas de referencia para facilitar la integración con tu aplicación.
+Cada sección incluye ejemplos prácticos, códigos de respuesta y tablas de referencia para facilitar la integración con tu aplicación.
 
-**Nota:** Esta guía está diseñada para el entorno Sandbox.
+**Nota:** Esta guía está diseñada para el entorno Sandbox.
 
 ---
 
-## **Configuración inicial**
+## Configuración Inicial
 
-Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el entorno **Sandbox**. Este entorno te permite probar todas las funcionalidades sin afectar datos de producción.
+Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el entorno **Sandbox**. Este entorno te permite probar todas las funcionalidades sin afectar datos de producción.
 
  [Acceder a Sovra Sandbox](https://id.sandbox.sovra.io/auth/signin)
 
@@ -40,13 +54,13 @@ Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el en
 
 **Paso 1: Crear Nueva Cuenta**
 
-1. Haz clic en **"¿Don't have an account?"** en la página de inicio de sesión
+1. Haz clic en **"¿Don't have an account?"** en la página de inicio de sesión
 2. Completa el formulario de registro con la siguiente información:
 
 | Campo | Valor de Ejemplo | Descripción |
 | --- | --- | --- |
-| **Organization Name** | Integration 01 | Nombre de tu organización |
-| **Workspace Name** | Integration 01 | Nombre del workspace inicial |
+| **Organization Name** | Integration 01 | Nombre de tu organización |
+| **Workspace Name** | Integration 01 | Nombre del workspace inicial |
 | **First Name** | John | Tu nombre |
 | **Last Name** | Doe | Tu apellido |
 | **Email** | name@yourbusiness.com | Email corporativo válido |
@@ -56,31 +70,30 @@ Para comenzar a utilizar la API de Sovra ID, necesitas crear una cuenta en el en
 
 Una vez completado el registro:
 
-1. **Inicia sesión** con tus credenciales
-2. Navega a la sección **"Workspace"** desde el menú principal
-3. Encontrarás la información de configuración de tu workspace
+1. **Inicia sesión** con tus credenciales
+2. Navega a la sección **"Workspace"** desde el menú principal
+3. Encontrarás la información de configuración de tu workspace
 
-**Paso 3: Obtener Credenciales de Acceso**
+**Paso 3: Obtener Credenciales de Acceso**
 
-En la sección de Workspace podrás ver:
+En la sección de Workspace podrás ver:
 
 - **DID (Decentralized Identifier)**: Tu identificador único descentralizado
-- **API Key**: Tu clave de acceso para la API (formato x-api-key)
+- **API Key**: Tu clave de acceso para la API (formato x-api-key)
 
 <aside>
 
- **Importante**: El DID puede tardar entre **3 y 5 minutos** en generarse después del registro. Si no aparece inmediatamente, espera unos minutos y recarga la página.
+ **Importante**: El DID puede tardar entre **3 y 5 minutos** en generarse después del registro. Si no aparece inmediatamente, espera unos minutos y recarga la página.
 
 </aside>
 
 ### Verificación de la cuenta
 
-Una vez que tengas tu `x-api-key`, puedes verificar que todo esté funcionando correctamente haciendo una solicitud de prueba al endpoint de estado del workspace (ver sección siguiente).
+Una vez que tengas tu `x-api-key`, puedes verificar que todo esté funcionando correctamente haciendo una solicitud de prueba al endpoint de estado del workspace (ver sección siguiente).
 
 ---
 
-## **Endpoints**
-
+## Endpoints
 
 La API de Sovra ID proporciona endpoints para la gestión de credenciales verificables, verificaciones y workspaces. Todos los endpoints requieren autenticación mediante API Key en el header `x-api-key`.
 
@@ -88,9 +101,7 @@ La API de Sovra ID proporciona endpoints para la gestión de credenciales verifi
 
 **Autenticación:** API Key en header `x-api-key`
 
----
-
-### 1. Verificación del Workspace
+### 3.1 Verificación del Workspace
 
 #### GET `/workspaces/status`
 
@@ -148,7 +159,7 @@ x-api-key: TU_API_KEY
 
 ---
 
-### 2. Creación de credenciales
+### 3.2 Creación y Gestión de Credenciales
 
 #### POST `/credentials/workspace/{workspace_id}`
 
@@ -253,6 +264,9 @@ Content-Type: application/json
   }
 }
 ```
+
+**Campos de Solicitud (Body):**
+
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
@@ -276,28 +290,6 @@ Content-Type: application/json
 | `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
 | `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
 | `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
-
-Puedes extender el `credential.@context` se puede hacer con propiedades personalizadas como:
-
-```json
-  "@context": [
-        "..."
-      {
-        "participantType": {
-          "@id": "https://example.org/vocab#participantType",
-          "@type": "xsd:string"
-        }
-      }
-    ]
-
-```
-*Imagen Nº1* - **Propiedad Personalizada**
-![Propiedad personalizada](../../assets/images/property_new.png)
-
-*Imagen Nº2* - **Diseño de Credenciales**
-![Diseño de Credenciales](../../assets/images/design_credential.png)
-Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)
-
 
 **Respuesta Exitosa (201):**
 ```json
@@ -382,7 +374,8 @@ Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)
 }
 ```
 
-**Campos nuevos**
+**Campos de Respuesta - Creación:**
+
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
@@ -392,7 +385,7 @@ Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)
 | `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
 | `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
 
-#### GET `/api/credentials/{id}`
+#### GET `/credentials/{id}`
 
 Detalles de la credencial verificable.
 
@@ -405,7 +398,7 @@ Content-Type: application/json
 **Parámetros de URL:**
 - `id` (string): ID de la credencial
 
-**Respuesta Exitosa (201):**
+**Respuesta Exitosa (200):**
 ```json
 {
   "id": "541ffd6d-8702-4489-b7df-76233e24e685",
@@ -430,7 +423,7 @@ Content-Type: application/json
     ],
     "expirationDate": "2027-09-04",
     "credentialSubject": {
-      "id?": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
+      "id": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
       "givenName": "Test Name",
       "familyName": "Test Family Name",
       "participantType": "Test Participant Type"
@@ -496,9 +489,9 @@ Content-Type: application/json
   "tenant_id": "c7b8ef84-cfcf-461c-afec-64457be59253",
   "holder_did": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ"
 }
-   
 ```
-**Campos nuevos**
+
+**Campos de Respuesta - Consulta:**
 
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
@@ -512,68 +505,9 @@ Content-Type: application/json
 | `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
 | `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
 
-**Campos de Respuesta por Etapa del Ciclo de Vida**
+#### GET `/public/credentials/status/{credential_id}`
 
-Una credencial verificable pasa por diferentes etapas durante su ciclo de vida, y cada etapa contiene campos específicos. La tabla a continuación muestra todos los campos disponibles organizados por el momento en que aparecen:
-
-1. **Etapa de Creación**: Cuando envías la solicitud POST, algunos campos vienen en el body de la petición y otros se generan automáticamente en la respuesta.
-
-2. **Etapa de Asociación**: Una vez que el usuario escanea el QR code y acepta la credencial en su wallet, aparecen campos adicionales como la prueba criptográfica y la identificación del portador.
-
-Esta organización te permite entender qué información estará disponible en cada momento del proceso y planificar tu integración en consecuencia.
-
-**Campos de Respuestas**
-
-
-| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
-|-------|--------------|-------------|-------------|---------------------|
-| `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
-| `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
-| `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
-| `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
-| `credential.issuer` | string | DID del Workspace | Automática | Al crear (respuesta) |
-| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
-| `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
-| `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |
-| `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
-| `outputDescriptor.id` | string | Identificador único del descriptor de salida | Manual | Al crear (body) |
-| `outputDescriptor.schema` | string | URL del schema que define la estructura de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display` | object | Configuración de visualización de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.title` | object | Título principal de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.subtitle` | object | Subtítulo de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.description` | object | Descripción detallada de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.properties` | array | Array de propiedades que se mostrarán en la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.properties[].path` | array | Ruta JSONPath para acceder al valor en la credencial | Manual | Al crear (body) |
-| `outputDescriptor.display.properties[].fallback` | string | Valor por defecto si no se encuentra el campo | Manual | Al crear (body) |
-| `outputDescriptor.display.properties[].label` | string | Etiqueta que se mostrará para la propiedad | Manual | Al crear (body) |
-| `outputDescriptor.display.properties[].schema` | object | Definición del tipo de dato de la propiedad | Manual | Al crear (body) |
-| `outputDescriptor.styles` | object | Define los estilos visuales de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.styles.text` | object | Configuración de color del texto | Manual | Al crear (body) |
-| `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
-| `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
-| `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
-| `credential.credentialSubject.id` | string | DID del portador de la credencial | Automática | Al asociar |
-| `credential.proof` | object | Prueba criptográfica de la credencial | Automática | Al asociar |
-| `credential.proof.type` | string | Tipo de firma criptográfica utilizada | Automática | Al asociar |
-| `credential.proof.created` | string (ISO 8601) | Fecha y hora de creación de la prueba | Automática | Al asociar |
-| `credential.proof.proofValue` | string | Valor de la prueba criptográfica | Automática | Al asociar |
-| `credential.proof.proofPurpose` | string | Propósito de la prueba (assertionMethod) | Automática | Al asociar |
-| `credential.proof.verificationMethod` | string | Método de verificación utilizado | Automática | Al asociar |
-| `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
-| `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
-
-**Notas sobre los momentos de existencia:**
-
-- **Al crear (request)**: Campos que deben enviarse en el cuerpo de la solicitud POST
-- **Al crear (response)**: Campos que se generan automáticamente y se devuelven en la respuesta de creación
-- **Al asociar (response)**: Campos que aparecen únicamente después de que el usuario escanea el QR y asocia la credencial a su wallet
-
-
-####  GET `/public/credentials/status/{credential_id}`
-
-Verifica el estado de una credencial
+Verifica el estado de una credencial.
 
 **Headers:**
 ```
@@ -628,8 +562,7 @@ x-api-key: TU_API_KEY
 | `verifiableCredential[].claim.currentStatus` | string | Estado actual de la credencial |
 | `verifiableCredential[].claim.statusReason` | string | Motivo del cambio de estado |
 
-
-####  PUT `/credentials/{credential_id}/workspace/{workspace_id}/status/{status}`
+#### PUT `/credentials/{credential_id}/workspace/{workspace_id}/status/{status}`
 
 Cambia el estado de una credencial (revocar, suspender o activar).
 
@@ -654,3 +587,98 @@ x-api-key: TU_API_KEY
 ```json
 true
 ```
+
+---
+
+### 3.3 Creación y Gestión de Verificación
+
+[Contenido futuro para verificaciones]
+
+---
+
+## Referencia Completa de Campos
+
+### Campos de Respuesta por Etapa del Ciclo de Vida
+
+Una credencial verificable pasa por diferentes etapas durante su ciclo de vida, y cada etapa contiene campos específicos. La tabla a continuación muestra todos los campos disponibles organizados por el momento en que aparecen:
+
+1. **Etapa de Creación**: Cuando envías la solicitud POST, algunos campos vienen en el body de la petición y otros se generan automáticamente en la respuesta.
+
+2. **Etapa de Asociación**: Una vez que el usuario escanea el QR code y acepta la credencial en su wallet, aparecen campos adicionales como la prueba criptográfica y la identificación del portador.
+
+Esta organización te permite entender qué información estará disponible en cada momento del proceso y planificar tu integración en consecuencia.
+
+**Campos de Respuestas**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
+| `invitation_wallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitation_wallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
+| `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
+| `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
+| `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
+| `credential.issuer` | string | DID del Workspace | Automática | Al crear (respuesta) |
+| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
+| `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |
+| `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
+| `outputDescriptor.id` | string | Identificador único del descriptor de salida | Manual | Al crear (body) |
+| `outputDescriptor.schema` | string | URL del schema que define la estructura de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display` | object | Configuración de visualización de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.title` | object | Título principal de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.subtitle` | object | Subtítulo de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.description` | object | Descripción detallada de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties` | array | Array de propiedades que se mostrarán en la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].path` | array | Ruta JSONPath para acceder al valor en la credencial | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].fallback` | string | Valor por defecto si no se encuentra el campo | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].label` | string | Etiqueta que se mostrará para la propiedad | Manual | Al crear (body) |
+| `outputDescriptor.display.properties[].schema` | object | Definición del tipo de dato de la propiedad | Manual | Al crear (body) |
+| `outputDescriptor.styles` | object | Define los estilos visuales de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.styles.text` | object | Configuración de color del texto | Manual | Al crear (body) |
+| `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
+| `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
+| `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
+| `credential.credentialSubject.id` | string | DID del portador de la credencial | Automática | Al asociar |
+| `credential.proof` | object | Prueba criptográfica de la credencial | Automática | Al asociar |
+| `credential.proof.type` | string | Tipo de firma criptográfica utilizada | Automática | Al asociar |
+| `credential.proof.created` | string (ISO 8601) | Fecha y hora de creación de la prueba | Automática | Al asociar |
+| `credential.proof.proofValue` | string | Valor de la prueba criptográfica | Automática | Al asociar |
+| `credential.proof.proofPurpose` | string | Propósito de la prueba (assertionMethod) | Automática | Al asociar |
+| `credential.proof.verificationMethod` | string | Método de verificación utilizado | Automática | Al asociar |
+| `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
+| `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
+
+**Notas sobre los momentos de existencia:**
+
+- **Al crear (request)**: Campos que deben enviarse en el cuerpo de la solicitud POST
+- **Al crear (response)**: Campos que se generan automáticamente y se devuelven en la respuesta de creación
+- **Al asociar (response)**: Campos que aparecen únicamente después de que el usuario escanea el QR y asocia la credencial a su wallet
+
+---
+
+## Ejemplos y Referencias
+
+### Propiedades Personalizadas
+
+Puedes extender el `credential.@context` con propiedades personalizadas:
+
+```json
+"@context": [
+  "...",
+  {
+    "participantType": {
+      "@id": "https://example.org/vocab#participantType",
+      "@type": "xsd:string"
+    }
+  }
+]
+```
+
+*Imagen Nº1* - **Propiedad Personalizada**
+![Propiedad personalizada](../../assets/images/property_new.png)
+
+*Imagen Nº2* - **Diseño de Credenciales**
+![Diseño de Credenciales](../../assets/images/design_credential.png)
+
+Referencia: [Tipos de datos XSD](https://www.w3.org/TR/xmlschema11-1/)

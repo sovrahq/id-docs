@@ -328,7 +328,10 @@ Content-Type: application/json
       "participantType": "Test Participant Type"
     },
     "id": "https://id.api.sandbox.sovra.io/api/credentials/541ffd6d-8702-4489-b7df-76233e24e685",
-    "issuer": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
+    "issuer": {
+      "id":"did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
+      "name": "Integration 01"
+    }
     "issuanceDate": "2025-10-16",
     "credentialStatus": {
       "id": "https://id.api.sandbox.sovra.io/api/public/credentials/status/541ffd6d-8702-4489-b7df-76233e24e685",
@@ -391,6 +394,8 @@ Content-Type: application/json
 | `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
 | `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
 | `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
+| `credential.issuer.id` | string | DID del Workspace | Automática | Al crear (respuesta) |
+| `credential.issuer.name` | string | Nombre del Workspace | Automática | Al crear (respuesta) |
 
 #### GET `/credentials/{id}`
 
@@ -436,7 +441,10 @@ Content-Type: application/json
       "participantType": "Test Participant Type"
     },
     "id": "https://id.api.sandbox.sovra.io/api/credentials/541ffd6d-8702-4489-b7df-76233e24e685",
-    "issuer": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
+    "issuer": {
+      "id":"did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
+      "name": "Integration 01"
+    },
     "issuanceDate": "2025-10-16",
     "credentialStatus": {
       "id": "https://id.api.sandbox.sovra.io/api/public/credentials/status/541ffd6d-8702-4489-b7df-76233e24e685",
@@ -867,7 +875,8 @@ Esta organización te permite entender qué información estará disponible en c
 | `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
 | `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
 | `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
-| `credential.issuer` | string | DID del Workspace | Automática | Al crear (respuesta) |
+| `credential.issuer.id` | string | DID del Workspace | Automática | Al crear (respuesta) |
+| `credential.issuer.name` | string | Nombre del Workspace | Automática | Al crear (respuesta) |
 | `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
 | `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
 | `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |

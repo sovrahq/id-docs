@@ -1,0 +1,45 @@
+{
+  "eventType": "verifiable-presentation-finished",
+  "eventData": {
+    "role": "VERIFIER",
+    "verified": true,
+    "holderDID": "did:quarkid:EiCyEqmt68P5hYxcUZb5cbI-0jGeNMU8Ti5GnOow7tUQBA",
+    "verifierDID": "did:quarkid:EiCMsbgQsIgb_YgZlQfhI3_lzJ_VcBms7ZkYD_1dt_uK3A",
+    "invitationId": "093adec6-c86e-4a7a-81c0-fa2a7e9901c0",
+    "verifiableCredentials": [
+      {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://www.w3.org/2018/credentials/examples/v1",
+          "https://w3id.org/security/bbs/v1",
+          {
+            "participantType": {
+              "@id": "https://example.org/vocab#participantType",
+              "@type": "xsd:string"
+            }
+          }
+        ],
+        "id": "https://example.com/123123",
+        "type": [
+          "VerifiableCredential"
+        ],
+        "issuanceDate": "2025-01-16T01:50:37.24-03:00",
+        "expirationDate": "2025-12-31",
+        "credentialSubject": {
+          "givenName": "Santiago",
+          "familyName": "Rdz",
+          "participantType": "Startup",
+          "id": "did:quarkid:EiCyEqmt68P5hYxcUZb5cbI-0jGeNMU8Ti5GnOow7tUQBA"
+        },
+        "proof": {
+          "type": "BbsBlsSignature2020",
+          "created": "2025-05-22T23:25:09Z",
+          "proofPurpose": "assertionMethod",
+          "proofValue": "r5KogTOAbfvvgT7iTuB0bNL7EGQHMvynb4Bi3p/HPXtJmZfuA5Trx0jCVXQop9acYUHlKfzccE4m7waZyoLEkBLFiK2g54Q2i+CdtYBgDdkUDsoULSBMcH1MwGHwdjfXpldFNFrHFx/IAvLVniyeMQ==",
+          "verificationMethod": "did:quarkid:EiCMsbgQsIgb_YgZlQfhI3_lzJ_VcBms7ZkYD_1dt_uK3A#vc-bbsbls"
+        },
+        "credentialStatus": {}
+      }
+    ]
+  }
+}

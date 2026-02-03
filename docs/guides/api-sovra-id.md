@@ -7,8 +7,9 @@
    - 3.1 [Verificación del Workspace](#31-verificación-del-workspace)
    - 3.2 [Creación y Gestión de Credenciales](#32-creación-y-gestión-de-credenciales)
    - 3.3 [Creación y Gestión de Verificación](#33-creación-y-gestión-de-verificación)
-4. [Referencia Completa de Campos](#referencia-completa-de-campos)
-5. [Ejemplos y Referencias](#ejemplos-y-referencias)
+4. [Webhooks](#webhooks)
+5. [Referencia Completa de Campos](#referencia-completa-de-campos)
+6. [Ejemplos y Referencias](#ejemplos-y-referencias)
 
 ---
 
@@ -850,6 +851,28 @@ Content-Type: application/json
 | `verified` | boolean | Estado de verificación de la credencial | Automática | Al verificar |
 | `holder_did` | string | DID del portador de la credencial | Automática | Al verificar |
 | `verifier_did` | string | DID del verificador | Automática | Al verificar |
+
+---
+
+## Webhooks
+
+Los webhooks te permiten recibir notificaciones en tiempo real cuando ocurren eventos importantes en tu workspace. En lugar de hacer polling constante a la API, tu servidor recibirá automáticamente una petición HTTP POST con información del evento.
+
+### Eventos Disponibles
+
+| Evento | Descripción |
+|--------|-------------|
+| `credential-issued` | Se dispara cuando una credencial ha sido emitida exitosamente y el holder la ha aceptado en su wallet |
+| `verifiable-presentation-finished` | Se dispara cuando una verificación de credencial ha sido completada |
+
+### Configuración
+
+La información de configuración de webhooks se encuentra en la respuesta del endpoint `/workspaces/status`:
+
+- `webhook_url`: URL de tu servidor donde se enviarán los eventos
+- `webhook_secret`: Secreto para validar la autenticidad de los webhooks
+
+Para una guía completa sobre webhooks, incluyendo ejemplos de payloads, estructura de datos y ejemplos de implementación, consulta la [Guía de Webhooks](./webhooks.md).
 
 ---
 

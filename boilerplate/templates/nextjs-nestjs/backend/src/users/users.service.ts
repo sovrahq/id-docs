@@ -69,16 +69,16 @@ export class UsersService {
     );
 
     await this.credentialsService.create(
-      credentialResponse.invitation_wallet.invitationId,
+      credentialResponse.invitationWallet.invitationId,
       credentialResponse.id,
     );
 
-    user.invitation_id = credentialResponse.invitation_wallet.invitationId;
+    user.invitation_id = credentialResponse.invitationWallet.invitationId;
     await this.usersRepository.save(user);
 
     return {
-      invitationId: credentialResponse.invitation_wallet.invitationId,
-      invitationContent: credentialResponse.invitation_wallet.invitationContent,
+      invitationId: credentialResponse.invitationWallet.invitationId,
+      invitationContent: credentialResponse.invitationWallet.invitationContent,
     };
   }
 

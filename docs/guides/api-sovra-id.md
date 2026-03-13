@@ -123,23 +123,23 @@ x-api-key: TU_API_KEY
 [
   {
     "id": "c7b8ef84-cfcf-461c-afec-64abcfedth",
-    "workspace_number": 1,
+    "workspaceNumber": 1,
     "name": "Integration 01",
     "description": "Workspace por defecto de Integration 01",
     "status": true,
-    "is_default": false,
+    "isDefault": false,
     "did": "did:quarkid:EiaaaaaSOpt50p8vSx2L264abcfegdthg",
     "metadata": {
-      "created_at": "2025-10-15T16:19:04.571Z",
+      "createdAt": "2025-10-15T16:19:04.571Z",
       "created_by": "system",
-      "is_default": true
+      "isDefault": true
     },
-    "webhook_url": "https://id.api.sandbox.sovra.io/api/webhooks",
-    "webhook_secret": "538aaa1212aaaaaaa",
+    "webhookUrl": "https://id.api.sandbox.sovra.io/api/webhooks",
+    "webhookSecret": "538aaa1212aaaaaaa",
     "branding": null,
     "apikey": "219a8CqHinSVL/X64abcfegdthg",
-    "created_at": "2025-10-15T16:19:04.006Z",
-    "updated_at": "2025-10-15T16:21:40.850Z"
+    "createdAt": "2025-10-15T16:19:04.006Z",
+    "updatedAt": "2025-10-15T16:21:40.850Z"
   }
 ]
 ```
@@ -149,19 +149,19 @@ x-api-key: TU_API_KEY
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `id` | string | ID único del workspace |
-| `workspace_number` | number | Número incremental del workspace |
+| `workspaceNumber` | number | Número incremental del workspace |
 | `name` | string | Nombre del workspace |
 | `description` | string | Descripción del workspace |
 | `status` | boolean | Estado actual del workspace (activo/inactivo) |
-| `is_default` | boolean | Si es el workspace por defecto, se carga primero en la aplicación |
+| `isDefault` | boolean | Si es el workspace por defecto, se carga primero en la aplicación |
 | `did` | string | Identificador descentralizado del workspace |
 | `metadata` | object | Metadatos adicionales del workspace |
-| `webhook_url` | string | URL para recibir eventos webhook |
-| `webhook_secret` | string | Secreto para validar firmas webhook |
+| `webhookUrl` | string | URL para recibir eventos webhook |
+| `webhookSecret` | string | Secreto para validar firmas webhook |
 | `branding` | object | Configuración de marca del workspace |
 | `apikey` | string | API Key para comunicación con la API |
-| `created_at` | string | Fecha de creación |
-| `updated_at` | string | Fecha de última actualización |
+| `createdAt` | string | Fecha de creación |
+| `updatedAt` | string | Fecha de última actualización |
 
 ---
 
@@ -303,7 +303,7 @@ Content-Type: application/json
 ```json
 {
   "id": "541ffd6d-8702-4489-b7df-76233e24e685",
-  "invitation_wallet": {
+  "invitationWallet": {
     "invitationId": "cf8cf509-1e61-4a1c-b8fd-05aa35a6e35b",
     "invitationContent": "didcomm://?_oob=eyJ0eXBlIjoiaHR0cHM6Ly9kaWRjb21tLm9yZy9vdXQtb2YtYmFuZC8yLjAvaW52aXRhdGlvbiIsImlkIjoiY2Y4Y2Y1MDktMWU2MS00YTFjLWI4ZmQtMDVhYTM1YTZlMzViIiwiZnJvbSI6ImRpZDpxdWFya2lkOkVpQWpkdmVnMmRYblVWcnNCVnFmcU1KckUxQXBXeG11UEJDc2d6Skp2Yi1qbXciLCJib2R5Ijp7ImdvYWxfY29kZSI6InN0cmVhbWxpbmVkLXZjIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXX19"
   },
@@ -332,7 +332,7 @@ Content-Type: application/json
     "issuer": {
       "id":"did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
       "name": "Integration 01"
-    }
+    },
     "issuanceDate": "2025-10-16",
     "credentialStatus": {
       "id": "https://id.api.sandbox.sovra.io/api/public/credentials/status/541ffd6d-8702-4489-b7df-76233e24e685",
@@ -390,8 +390,8 @@ Content-Type: application/json
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitationWallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitationWallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
 | `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
 | `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
 | `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
@@ -415,7 +415,7 @@ Content-Type: application/json
 ```json
 {
   "id": "541ffd6d-8702-4489-b7df-76233e24e685",
-  "invitation_wallet": {
+  "invitationWallet": {
     "invitationId": "cf8cf509-1e61-4a1c-b8fd-05aa35a6e35b",
     "invitationContent": "didcomm://?_oob=eyJ0eXBlIjoiaHR0cHM6Ly9kaWRjb21tLm9yZy9vdXQtb2YtYmFuZC8yLjAvaW52aXRhdGlvbiIsImlkIjoiY2Y4Y2Y1MDktMWU2MS00YTFjLWI4ZmQtMDVhYTM1YTZlMzViIiwiZnJvbSI6ImRpZDpxdWFya2lkOkVpQWpkdmVnMmRYblVWcnNCVnFmcU1KckUxQXBXeG11UEJDc2d6Skp2Yi1qbXciLCJib2R5Ijp7ImdvYWxfY29kZSI6InN0cmVhbWxpbmVkLXZjIiwiYWNjZXB0IjpbImRpZGNvbW0vdjIiXX19"
   },
@@ -502,8 +502,8 @@ Content-Type: application/json
       ]
     }
   },
-  "tenant_id": "c7b8ef84-cfcf-461c-afec-64457be59253",
-  "holder_did": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ"
+  "tenantId": "c7b8ef84-cfcf-461c-afec-64457be59253",
+  "holderDID": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ"
 }
 ```
 
@@ -518,8 +518,8 @@ Content-Type: application/json
 | `credential.proof.proofValue` | string | Valor de la prueba criptográfica | Automática | Al asociar |
 | `credential.proof.proofPurpose` | string | Propósito de la prueba (assertionMethod) | Automática | Al asociar |
 | `credential.proof.verificationMethod` | string | Método de verificación utilizado | Automática | Al asociar |
-| `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
-| `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
+| `tenantId` | string | ID del tenant/workspace | Automática | Al asociar |
+| `holderDID` | string | DID del portador de la credencial | Automática | Al asociar |
 
 #### GET `/public/credentials/status/{credential_id}`
 
@@ -672,7 +672,7 @@ Content-Type: application/json
 ```json
 {
   "id": "093adec6-c86e-4a7a-81c0-fa2a121212a",
-  "presentation_wallet": {
+  "presentationWallet": {
     "presentationId": "string",
     "presentationContent": "string"
   },
@@ -742,8 +742,8 @@ Content-Type: application/json
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `id` | string | ID único de la verificación | Automática | Al crear (responses) |
-| `presentation_wallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
-| `presentation_wallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
+| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
+| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
 | `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (requests) |
 | `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (requests) |
 | `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (requests) |
@@ -777,7 +777,7 @@ Content-Type: application/json
 ```json
 {
   "id": "6addd52a-30a5-4540-9992-33638562b9c2",
-  "presentation_wallet": {
+  "presentationWallet": {
     "presentationId": "string",
     "presentationContent": "string"
   },
@@ -820,8 +820,8 @@ Content-Type: application/json
   },
   "role": "VERIFIER",
   "verified": true,
-  "holder_did": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
-  "verifier_did": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A"
+  "holderDID": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
+  "verifierDid": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A"
 }
 ```
 
@@ -830,8 +830,8 @@ Content-Type: application/json
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `id` | string | ID único de la verificación | Automática | Al crear (responses) |
-| `presentation_wallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
-| `presentation_wallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
+| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
+| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
 | `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (request) |
 | `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (request) |
 | `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (request) |
@@ -849,8 +849,8 @@ Content-Type: application/json
 | `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (request) |
 | `role` | string | Rol del usuario en la verificación (VERIFIER) | Automática | Al verificar |
 | `verified` | boolean | Estado de verificación de la credencial | Automática | Al verificar |
-| `holder_did` | string | DID del portador de la credencial | Automática | Al verificar |
-| `verifier_did` | string | DID del verificador | Automática | Al verificar |
+| `holderDID` | string | DID del portador de la credencial | Automática | Al verificar |
+| `verifierDid` | string | DID del verificador | Automática | Al verificar |
 
 ---
 
@@ -869,8 +869,8 @@ Los webhooks te permiten recibir notificaciones en tiempo real cuando ocurren ev
 
 La información de configuración de webhooks se encuentra en la respuesta del endpoint `/workspaces/status`:
 
-- `webhook_url`: URL de tu servidor donde se enviarán los eventos
-- `webhook_secret`: Secreto para validar la autenticidad de los webhooks
+- `webhookUrl`: URL de tu servidor donde se enviarán los eventos
+- `webhookSecret`: Secreto para validar la autenticidad de los webhooks
 
 Para una guía completa sobre webhooks, incluyendo ejemplos de payloads, estructura de datos y ejemplos de implementación, consulta la [Guía de Webhooks](./webhooks.md).
 
@@ -893,8 +893,8 @@ Esta organización te permite entender qué información estará disponible en c
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
 | `id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
-| `invitation_wallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitationWallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
+| `invitationWallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
 | `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
 | `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
 | `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
@@ -927,8 +927,8 @@ Esta organización te permite entender qué información estará disponible en c
 | `credential.proof.proofValue` | string | Valor de la prueba criptográfica | Automática | Al asociar |
 | `credential.proof.proofPurpose` | string | Propósito de la prueba (assertionMethod) | Automática | Al asociar |
 | `credential.proof.verificationMethod` | string | Método de verificación utilizado | Automática | Al asociar |
-| `tenant_id` | string | ID del tenant/workspace | Automática | Al asociar |
-| `holder_did` | string | DID del portador de la credencial | Automática | Al asociar |
+| `tenantId` | string | ID del tenant/workspace | Automática | Al asociar |
+| `holderDID` | string | DID del portador de la credencial | Automática | Al asociar |
 
 **Notas sobre los momentos de existencia:**
 

@@ -1,270 +1,364 @@
 {
-	"info": {
-		"_postman_id": "3fe32f2a-ef29-45e1-b7fc-b5b259c0e620",
-		"name": "Sovra ID",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "44641457",
-		"_collection_link": "https://typebold.postman.co/workspace/0a108991-e20e-4f53-8781-9bef9222d93b/collection/44641457-3fe32f2a-ef29-45e1-b7fc-b5b259c0e620?action=share&source=collection_link&creator=44641457"
-	},
-	"item": [
-		{
-			"name": "Workspace",
-			"item": [
-				{
-					"name": "Workspace Status",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{baseURL}}/api/workspaces/status",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"workspaces",
-								"status"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Credentials",
-			"item": [
-				{
-					"name": "Create Credential",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"credential\": {\n    \"@context\": [\n      \"https://www.w3.org/2018/credentials/v1\",\n      \"https://www.w3.org/2018/credentials/examples/v1\",\n      \"https://w3id.org/security/bbs/v1\",\n      {\n        \"participantType\": {\n          \"@id\": \"https://example.org/vocab#participantType\",\n          \"@type\": \"xsd:string\"\n        }\n      }\n    ],\n    \"type\": [\n      \"VerifiableCredential\"\n    ],\n    \"expirationDate\": \"2027-10-15\",\n    \"credentialSubject\": {\n      \"givenName\": \"Test Name\",\n      \"familyName\": \"Test Family Name\",\n      \"participantType\": \"Test Participant Type\"\n    }\n  },\n  \"outputDescriptor\": {\n    \"id\": \"credential_output\",\n    \"schema\": \"https://example.com/schema\",\n    \"display\": {\n      \"title\": {\n        \"text\": \"Credential Title\"\n      },\n      \"subtitle\": {\n        \"text\": \"Credential Subtitle\"\n      },\n      \"description\": {\n        \"text\": \"Credential Description\"\n      },\n      \"properties\": [\n        {\n          \"path\": [\n            \"$.credentialSubject.givenName\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Nombre(s)\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.credentialSubject.familyName\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Apellido(s)\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.credentialSubject.participantType\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Type of participant\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        },\n        {\n          \"path\": [\n            \"$.expirationDate\"\n          ],\n          \"fallback\": \"Unknown\",\n          \"label\": \"Expiration\",\n          \"schema\": {\n            \"type\": \"string\"\n          }\n        }\n      ]\n    },\n    \"styles\": {\n      \"text\": {\n        \"color\": \"#ffffff\"\n      },\n      \"hero\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n        \"alt\": \"Your Background Alt Text\"\n      },\n      \"background\": {\n        \"color\": \"#0b1f45\"\n      },\n      \"thumbnail\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n        \"alt\": \"Your Logo Alt Text\"\n      }\n    }\n  }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseURL}}/api/credentials/workspace/{workspace_id}",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"credentials",
-								"workspace",
-								"{workspace_id}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Credential by ID",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{baseURL}}/api/credentials/{credential_id}",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"credentials",
-								"{credential_id}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Change Credential Status",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"reason\": \"Credencial revocada\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseURL}}/api/credentials/{credential_id}/workspace/{workspace_id}/status/suspend",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"credentials",
-								"{credential_id}",
-								"workspace",
-								"{workspace_id}",
-								"status",
-								"suspend"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Credential Status",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{baseURL}}/api/public/credentials/status/{credential_id}",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"public",
-								"credentials",
-								"status",
-								"{credential_id}"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Verifications",
-			"item": [
-				{
-					"name": "Create Verifications",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"inputDescriptors\": [\n    {\n      \"id\": \"VerifiableCredential\",\n      \"name\": \"VerifiableCredential\",\n      \"constraints\": {\n        \"fields\": [\n          {\n            \"path\": [\n              \"$.credentialSubject.givenName\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\n              \"$.credentialSubject.familyName\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\n              \"$.credentialSubject.participantType\"\n            ],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          }\n        ]\n      }\n    }\n  ],\n  \"issuer\": {\n    \"name\": \"Sovra\",\n    \"styles\": {\n      \"thumbnail\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n        \"alt\": \"Sovra\"\n      },\n      \"hero\": {\n        \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n        \"alt\": \"Sovra\"\n      },\n      \"background\": {\n        \"color\": \"#ff0000\"\n      },\n      \"text\": {\n        \"color\": \"#d4d400\"\n      }\n    }\n  }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{baseURL}}/api/verifications/workspace/{workspace_id}",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"verifications",
-								"workspace",
-								"{workspace_id}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Verification By ID",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "x-api-key",
-								"value": "{{x-api-key}}",
-								"type": "text"
-							}
-						],
-						"url": {
-							"raw": "{{baseURL}}/api/verifications/{verification_id}",
-							"host": [
-								"{{baseURL}}"
-							],
-							"path": [
-								"api",
-								"verifications",
-								"{verification_id}"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	],
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"packages": {},
-				"requests": {},
-				"exec": [
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"packages": {},
-				"requests": {},
-				"exec": [
-					""
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "baseURL",
-			"value": ""
-		},
-		{
-			"key": "x-api-key",
-			"value": ""
-		}
-	]
+  "info": {
+    "_postman_id": "616dd783-c738-4299-862d-83d381ae5882",
+    "name": "Sovra ID API (Swagger)",
+    "description": "Swagger-documented endpoints for Sovra ID API.\n\nBase URL: https://id.api.sandbox.sovra.io/api\n\n## Authentication\nUse `x-api-key` header with your workspace API key.\n\n## Credential Issuance Protocols\n1. **W3C + DIDComm** - Default protocol using DIDComm messaging\n2. **W3C + OID4VCI** - OpenID for Verifiable Credential Issuance with W3C format\n3. **mDoc + OID4VCI** - OpenID for Verifiable Credential Issuance with mDoc (ISO 18013-5)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44641457",
+    "_collection_link": "https://go.postman.co/collection/44641457-616dd783-c738-4299-862d-83d381ae5882?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Workspaces",
+      "item": [
+        {
+          "name": "Get Workspace Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/workspaces/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "workspaces",
+                "status"
+              ]
+            },
+            "description": "Get workspace status and configuration details including DID, webhook settings, branding, and API key."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Credentials",
+      "item": [
+        {
+          "name": "Create Credential",
+          "item": [
+            {
+              "name": "W3C + DIDComm",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"credential\": {\n        \"@context\": [\n            \"https://www.w3.org/2018/credentials/v1\",\n            \"https://www.w3.org/2018/credentials/examples/v1\",\n            \"https://w3id.org/security/bbs/v1\",\n            {\n                \"participantType\": {\n                    \"@id\": \"https://example.org/vocab#participantType\",\n                    \"@type\": \"xsd:string\"\n                }\n            }\n        ],\n        \"type\": [\n            \"VerifiableCredential\"\n        ],\n        \"expirationDate\": \"2028-03-12T14:00:26.543Z\",\n        \"credentialSubject\": {\n            \"givenName\": \"Test Name\",\n            \"familyName\": \"Test Family Name\",\n            \"participantType\": \"Test Participant Type\"\n        }\n    },\n    \"outputDescriptor\": {\n        \"id\": \"credential_output\",\n        \"schema\": \"https://example.com/schema\",\n        \"display\": {\n            \"title\": {\n                \"text\": \"Credential Title\"\n            },\n            \"subtitle\": {\n                \"text\": \"Credential Subtitle\"\n            },\n            \"description\": {\n                \"text\": \"Credential Description\"\n            },\n            \"properties\": [\n                {\n                    \"path\": [\n                        \"$.credentialSubject.givenName\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Nombre(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.familyName\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Apellido(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.participantType\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Type of participant\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.expirationDate\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Expiration\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                }\n            ]\n        },\n        \"styles\": {\n            \"text\": {\n                \"color\": \"#ffffff\"\n            },\n            \"hero\": {\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n                \"alt\": \"Your Background Alt Text\"\n            },\n            \"background\": {\n                \"color\": \"#0b1f45\"\n            },\n            \"thumbnail\": {\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n                \"alt\": \"Your Logo Alt Text\"\n            }\n        }\n    },\n    \"protocol\": \"didcomm\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/credentials/workspace/{{workspace_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "credentials",
+                    "workspace",
+                    "{{workspace_id}}"
+                  ]
+                },
+                "description": "Create a W3C Verifiable Credential using the DIDComm protocol.\n\nThis is the default issuance flow. The credential is delivered via DIDComm messaging. The response includes an `invitationWallet` with a DIDComm invitation URL that the holder's wallet can use to receive the credential."
+              },
+              "response": []
+            },
+            {
+              "name": "W3C + OID4VCI",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"credential\": {\n        \"@context\": [\n            \"https://www.w3.org/2018/credentials/v1\",\n            \"https://www.w3.org/2018/credentials/examples/v1\",\n            \"https://w3id.org/security/bbs/v1\",\n            {\n                \"participantType\": {\n                    \"@id\": \"https://example.org/vocab#participantType\",\n                    \"@type\": \"xsd:string\"\n                }\n            }\n        ],\n        \"type\": [\n            \"VerifiableCredential\"\n        ],\n        \"expirationDate\": \"2028-03-12T14:00:26.543Z\",\n        \"credentialSubject\": {\n            \"givenName\": \"Test Name\",\n            \"familyName\": \"Test Family Name\",\n            \"participantType\": \"Test Participant Type\"\n        }\n    },\n    \"outputDescriptor\": {\n        \"id\": \"credential_output\",\n        \"schema\": \"https://example.com/schema\",\n        \"display\": {\n            \"title\": {\n                \"text\": \"Credential Title\"\n            },\n            \"subtitle\": {\n                \"text\": \"Credential Subtitle\"\n            },\n            \"description\": {\n                \"text\": \"Credential Description\"\n            },\n            \"properties\": [\n                {\n                    \"path\": [\n                        \"$.credentialSubject.givenName\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Nombre(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.familyName\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Apellido(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.participantType\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Type of participant\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.expirationDate\"\n                    ],\n                    \"fallback\": \"Unknown\",\n                    \"label\": \"Expiration\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                }\n            ]\n        },\n        \"styles\": {\n            \"text\": {\n                \"color\": \"#ffffff\"\n            },\n            \"hero\": {\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\",\n                \"alt\": \"Your Background Alt Text\"\n            },\n            \"background\": {\n                \"color\": \"#0b1f45\"\n            },\n            \"thumbnail\": {\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/Logo.png\",\n                \"alt\": \"Your Logo Alt Text\"\n            }\n        }\n    },\n    \"protocol\": \"oid4vc\",\n    \"credentialConfigurationId\": \"VerifiableCredential\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/credentials/workspace/{{workspace_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "credentials",
+                    "workspace",
+                    "{{workspace_id}}"
+                  ]
+                },
+                "description": "Create a W3C Verifiable Credential using the OID4VCI (OpenID for Verifiable Credential Issuance) protocol.\n\nRequires `protocol: \"oid4vc\"` and a `credentialConfigurationId` to identify the credential configuration. The response includes an OID4VCI offer URL that the holder's wallet can use to claim the credential."
+              },
+              "response": []
+            },
+            {
+              "name": "mDoc + OID4VCI",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"credential\": {\n        \"namespaces\": {\n            \"org.iso.18013.5.1\": {\n                \"given_name\": \"María\",\n                \"family_name\": \"García López\",\n                \"birth_date\": \"1990-05-15\",\n                \"document_number\": \"NL-2024-TEST-001\",\n                \"driving_privileges\": [\n                    {\n                        \"vehicle_category_code\": \"B\"\n                    },\n                    {\n                        \"vehicle_category_code\": \"A\"\n                    }\n                ]\n            }\n        }\n    },\n    \"outputDescriptor\": {\n        \"id\": \"mdl-test\",\n        \"schema\": \"org.iso.18013.5.1.mDL\",\n        \"styles\": {\n            \"hero\": {\n                \"alt\": \"Licencia de Conducir Digital\",\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\"\n            },\n            \"text\": {\n                \"color\": \"#FFFFFF\"\n            },\n            \"thumbnail\": {\n                \"alt\": \"mDL Icon\",\n                \"uri\": \"https://storage.googleapis.com/sovra_brand/BG.png\"\n            },\n            \"background\": {\n                \"color\": \"#0066CC\"\n            }\n        },\n        \"display\": {\n            \"title\": {\n                \"text\": \"Licencia de Conducir Digital\"\n            },\n            \"subtitle\": {\n                \"text\": \"ISO 18013-5 mDL\"\n            },\n            \"description\": {\n                \"text\": \"Mobile Driver's License emitida vía OID4VCI\"\n            },\n            \"properties\": [\n                {\n                    \"path\": [\n                        \"$.credentialSubject.given_name\"\n                    ],\n                    \"fallback\": \"N/A\",\n                    \"label\": \"Nombre(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.family_name\"\n                    ],\n                    \"fallback\": \"N/A\",\n                    \"label\": \"Apellido(s)\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.birth_date\"\n                    ],\n                    \"fallback\": \"N/A\",\n                    \"label\": \"Fecha de Nacimiento\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                },\n                {\n                    \"path\": [\n                        \"$.credentialSubject.document_number\"\n                    ],\n                    \"fallback\": \"N/A\",\n                    \"label\": \"No. Documento\",\n                    \"schema\": {\n                        \"type\": \"string\"\n                    }\n                }\n            ]\n        }\n    },\n    \"protocol\": \"oid4vc\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/credentials/workspace/{{workspace_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "credentials",
+                    "workspace",
+                    "{{workspace_id}}"
+                  ]
+                },
+                "description": "Create an mDoc credential (ISO 18013-5) using the OID4VCI protocol.\n\nThe credential structure uses `docType` and `namespaces` instead of W3C's `@context` and `credentialSubject`. The protocol defaults to `oid4vc` for mDoc credentials. The response includes an OID4VCI offer URL."
+              },
+              "response": []
+            }
+          ],
+          "description": "Create credentials using different format and protocol combinations."
+        },
+        {
+          "name": "Get Credential",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/credentials/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credentials",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "5deea8d4-ac2e-4ccb-8223-e34a34cee000",
+                  "description": "Credential UUID"
+                }
+              ]
+            },
+            "description": "Get credential details by ID. Includes the full credential with proof, output descriptor, and issuance metadata."
+          },
+          "response": []
+        },
+        {
+          "name": "Change Credential Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Credential was compromised\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/credentials/:credential_id/workspace/:workspace_id/status/:status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "credentials",
+                ":credential_id",
+                "workspace",
+                ":workspace_id",
+                "status",
+                ":status"
+              ],
+              "variable": [
+                {
+                  "key": "credential_id",
+                  "value": "5deea8d4-ac2e-4ccb-8223-e34a34cee000",
+                  "description": "Credential UUID"
+                },
+                {
+                  "key": "workspace_id",
+                  "value": "{{workspace_id}}",
+                  "description": "Workspace UUID"
+                },
+                {
+                  "key": "status",
+                  "value": "revoked",
+                  "description": "New status: 'revoked', 'suspend', or 'active'"
+                }
+              ]
+            },
+            "description": "Change the status of an issued credential.\n\nAvailable statuses:\n- `active` - Credential is valid\n- `suspend` - Temporarily suspended\n- `revoked` - Permanently revoked\n\nOptionally provide a reason in the request body."
+          },
+          "response": []
+        }
+      ],
+      "description": "Credential issuance and management. Supports 3 issuance flows:\n- **W3C + DIDComm**: Default protocol using DIDComm messaging\n- **W3C + OID4VCI**: OpenID for Verifiable Credential Issuance with W3C format\n- **mDoc + OID4VCI**: OpenID for Verifiable Credential Issuance with mDoc (ISO 18013-5)"
+    },
+    {
+      "name": "Verifications",
+      "item": [
+        {
+          "name": "Create Verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inputDescriptors\": [\n    {\n      \"id\": \"VerifiableCredential\",\n      \"name\": \"Identity Verification\",\n      \"constraints\": {\n        \"fields\": [\n          {\n            \"path\": [\"$.credentialSubject.givenName\"],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\"$.credentialSubject.familyName\"],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          },\n          {\n            \"path\": [\"$.credentialSubject.email\"],\n            \"filter\": {\n              \"type\": \"string\"\n            }\n          }\n        ]\n      }\n    }\n  ],\n  \"issuer\": {\n    \"name\": \"Sovra\",\n    \"styles\": {\n      \"text\": {\n        \"color\": \"#ffffff\"\n      },\n      \"thumbnail\": {\n        \"uri\": \"https://example.com/verifier-logo.png\",\n        \"alt\": \"Verifier Logo\"\n      },\n      \"background\": {\n        \"color\": \"#0b1f45\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/verifications/workspace/{{workspace_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "verifications",
+                "workspace",
+                "{{workspace_id}}"
+              ]
+            },
+            "description": "Create a verification request. The response includes a `presentationWallet` with a DIDComm invitation URL that the holder's wallet uses to present credentials."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Verification",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/verifications/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "verifications",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "3cecc0d3-8ec1-4e25-bd24-48e8e4d89037",
+                  "description": "Verification UUID"
+                }
+              ]
+            },
+            "description": "Get verification details by ID. Includes presentation data, input descriptors, verification status, and holder/verifier DIDs."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Get Credential Status (Public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/public/credentials/status/:credential_id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "public",
+                "credentials",
+                "status",
+                ":credential_id"
+              ],
+              "variable": [
+                {
+                  "key": "credential_id",
+                  "value": "5deea8d4-ac2e-4ccb-8223-e34a34cee000",
+                  "description": "Credential UUID to check status"
+                }
+              ]
+            },
+            "description": "Publicly verify a credential's status without authentication.\n\nReturns a `verifiableCredential` array with status claims. If the credential is active, the array is empty. Otherwise, it includes the current status (`revoked`, `suspended`, `expired`) and optional reason."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "x-api-key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://id.api.sandbox.sovra.io/api"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "workspace_id",
+      "value": ""
+    }
+  ]
 }

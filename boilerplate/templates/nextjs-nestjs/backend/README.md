@@ -172,7 +172,7 @@ Content-Type: application/json
 ```json
 {
   "id": "credential_id",
-  "invitation_wallet": {
+  "invitationWallet": {
     "invitationId": "invitation_id",
     "invitationContent": "didcomm://?..."
   },

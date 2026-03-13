@@ -33,8 +33,8 @@ export class VerificationsService {
       sovraTemplateVerification(),
     );
 
-    const presentationId = verificationResponse.presentation_wallet?.presentationId;
-    
+    const presentationId = verificationResponse.presentationWallet?.presentationId;
+
     if (!presentationId) {
       throw new BadRequestException('presentationId not found in response');
     }
@@ -52,7 +52,7 @@ export class VerificationsService {
 
     return {
       presentationId: presentationId,
-      presentationContent: verificationResponse.presentation_wallet?.presentationContent,
+      presentationContent: verificationResponse.presentationWallet?.presentationContent,
     };
   }
 

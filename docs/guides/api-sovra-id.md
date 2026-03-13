@@ -5,7 +5,7 @@
 2. [Configuración Inicial](#configuración-inicial)
 3. [Endpoints](#endpoints)
    - 3.1 [Verificación del Workspace](#31-verificación-del-workspace)
-   - 3.2 [Creación y Gestión de Credenciales](#32-creación-y-gestión-de-credenciales)
+   - 3.2 [Creación y Gestión de Credenciales](#32-creación-y-gestión-de-credenciales) (incluye [Protocolos de Emisión](#protocolos-de-emisión))
    - 3.3 [Creación y Gestión de Verificación](#33-creación-y-gestión-de-verificación)
 4. [Webhooks](#webhooks)
 5. [Referencia Completa de Campos](#referencia-completa-de-campos)
@@ -182,6 +182,18 @@ Content-Type: application/json
 **Parámetros de URL:**
 - `workspace_id` (string): ID del workspace donde crear la credencial
 
+### Protocolos de Emisión
+
+La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
+
+| Protocolo | Valor de `protocol` | Descripción |
+|-----------|-------------------|-------------|
+| **W3C + DIDComm** | `didcomm` | Protocolo por defecto. La credencial se entrega mediante mensajería DIDComm. La respuesta incluye un `invitationWallet` con una URL de invitación DIDComm |
+| **W3C + OID4VCI** | `oid4vc` | OpenID for Verifiable Credential Issuance con formato W3C. Requiere `credentialConfigurationId`. La respuesta incluye una URL de oferta OID4VCI |
+| **mDoc + OID4VCI** | `oid4vc` | OpenID for Verifiable Credential Issuance con formato mDoc (ISO 18013-5). Usa `namespaces` en lugar de `@context`/`credentialSubject` |
+
+### Ejemplo 1: W3C + DIDComm (por defecto)
+
 **Cuerpo de la Solicitud:**
 ```json
 {
@@ -269,9 +281,201 @@ Content-Type: application/json
         "alt": "Your Logo Alt Text"
       }
     }
-  }
+  },
+  "protocol": "didcomm"
 }
 ```
+
+### Ejemplo 2: W3C + OID4VCI
+
+```json
+{
+  "credential": {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://www.w3.org/2018/credentials/examples/v1",
+      "https://w3id.org/security/bbs/v1",
+      {
+        "participantType": {
+          "@id": "https://example.org/vocab#participantType",
+          "@type": "xsd:string"
+        }
+      }
+    ],
+    "type": ["VerifiableCredential"],
+    "expirationDate": "2028-03-12T14:00:26.543Z",
+    "credentialSubject": {
+      "givenName": "Test Name",
+      "familyName": "Test Family Name",
+      "participantType": "Test Participant Type"
+    }
+  },
+  "outputDescriptor": {
+    "id": "credential_output",
+    "schema": "https://example.com/schema",
+    "display": {
+      "title": {
+        "text": "Credential Title"
+      },
+      "subtitle": {
+        "text": "Credential Subtitle"
+      },
+      "description": {
+        "text": "Credential Description"
+      },
+      "properties": [
+        {
+          "path": ["$.credentialSubject.givenName"],
+          "fallback": "Unknown",
+          "label": "Nombre(s)",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.credentialSubject.familyName"],
+          "fallback": "Unknown",
+          "label": "Apellido(s)",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.credentialSubject.participantType"],
+          "fallback": "Unknown",
+          "label": "Type of participant",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.expirationDate"],
+          "fallback": "Unknown",
+          "label": "Expiration",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "styles": {
+      "text": {
+        "color": "#ffffff"
+      },
+      "hero": {
+        "uri": "https://storage.googleapis.com/sovra_brand/BG.png",
+        "alt": "Your Background Alt Text"
+      },
+      "background": {
+        "color": "#0b1f45"
+      },
+      "thumbnail": {
+        "uri": "https://storage.googleapis.com/sovra_brand/Logo.png",
+        "alt": "Your Logo Alt Text"
+      }
+    }
+  },
+  "protocol": "oid4vc",
+  "credentialConfigurationId": "VerifiableCredential"
+}
+```
+
+### Ejemplo 3: mDoc + OID4VCI (ISO 18013-5)
+
+```json
+{
+  "credential": {
+    "namespaces": {
+      "org.iso.18013.5.1": {
+        "given_name": "María",
+        "family_name": "García López",
+        "birth_date": "1990-05-15",
+        "document_number": "NL-2024-TEST-001",
+        "driving_privileges": [
+          {
+            "vehicle_category_code": "B"
+          },
+          {
+            "vehicle_category_code": "A"
+          }
+        ]
+      }
+    }
+  },
+  "outputDescriptor": {
+    "id": "mdl-test",
+    "schema": "org.iso.18013.5.1.mDL",
+    "display": {
+      "title": {
+        "text": "Licencia de Conducir Digital"
+      },
+      "subtitle": {
+        "text": "ISO 18013-5 mDL"
+      },
+      "description": {
+        "text": "Mobile Driver's License emitida vía OID4VCI"
+      },
+      "properties": [
+        {
+          "path": ["$.credentialSubject.given_name"],
+          "fallback": "N/A",
+          "label": "Nombre(s)",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.credentialSubject.family_name"],
+          "fallback": "N/A",
+          "label": "Apellido(s)",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.credentialSubject.birth_date"],
+          "fallback": "N/A",
+          "label": "Fecha de Nacimiento",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "path": ["$.credentialSubject.document_number"],
+          "fallback": "N/A",
+          "label": "No. Documento",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "styles": {
+      "hero": {
+        "alt": "Licencia de Conducir Digital",
+        "uri": "https://storage.googleapis.com/sovra_brand/BG.png"
+      },
+      "text": {
+        "color": "#FFFFFF"
+      },
+      "thumbnail": {
+        "alt": "mDL Icon",
+        "uri": "https://storage.googleapis.com/sovra_brand/BG.png"
+      },
+      "background": {
+        "color": "#0066CC"
+      }
+    }
+  },
+  "protocol": "oid4vc"
+}
+```
+
+<aside>
+
+**Nota:** Para credenciales mDoc, la estructura de `credential` usa `namespaces` en lugar de `@context`, `type` y `credentialSubject`. Los campos dentro de los namespaces siguen el estándar ISO 18013-5.
+
+</aside>
 
 **Campos de Solicitud (Body):**
 
@@ -298,6 +502,8 @@ Content-Type: application/json
 | `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
 | `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
 | `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
+| `protocol` | string | Protocolo de emisión: `didcomm` (por defecto) o `oid4vc` | Manual | Al crear (body) |
+| `credentialConfigurationId` | string | Identificador de configuración de credencial. Requerido cuando `protocol` es `oid4vc` con formato W3C | Manual | Al crear (body) |
 
 **Respuesta Exitosa (201):**
 ```json
@@ -920,6 +1126,8 @@ Esta organización te permite entender qué información estará disponible en c
 | `outputDescriptor.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (body) |
 | `outputDescriptor.styles.background` | object | Color de fondo de la credencial | Manual | Al crear (body) |
 | `outputDescriptor.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (body) |
+| `protocol` | string | Protocolo de emisión: `didcomm` (por defecto) o `oid4vc` | Manual | Al crear (body) |
+| `credentialConfigurationId` | string | Identificador de configuración de credencial. Requerido cuando `protocol` es `oid4vc` con formato W3C | Manual | Al crear (body) |
 | `credential.credentialSubject.id` | string | DID del portador de la credencial | Automática | Al asociar |
 | `credential.proof` | object | Prueba criptográfica de la credencial | Automática | Al asociar |
 | `credential.proof.type` | string | Tipo de firma criptográfica utilizada | Automática | Al asociar |

@@ -92,7 +92,8 @@ export const sovraTemplateCredential = ({ givenName, familyName, userId }: { giv
                     alt: "Your Logo Alt Text"
                 }
             }
-        }
+        },
+        protocol: 'didcomm'
     }
 }
 

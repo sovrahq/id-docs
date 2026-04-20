@@ -6,7 +6,7 @@
 3. [Endpoints](#endpoints)
    - 3.1 [Verificación del Workspace](#31-verificación-del-workspace)
    - 3.2 [Creación y Gestión de Credenciales](#32-creación-y-gestión-de-credenciales) (incluye [Protocolos de Emisión](#protocolos-de-emisión))
-   - 3.3 [Creación y Gestión de Verificación](#33-creación-y-gestión-de-verificación)
+   - 3.3 [Creación y Gestión de Verificación](#33-creación-y-gestión-de-verificación) (incluye [Protocolos de Verificación](#protocolos-de-verificación))
 4. [Webhooks](#webhooks)
 5. [Referencia Completa de Campos](#referencia-completa-de-campos)
 6. [Ejemplos y Referencias](#ejemplos-y-referencias)
@@ -814,6 +814,39 @@ true
 
 ## 3.3 Creación y Gestión de Verificación
 
+#### GET `/verifications`
+
+Obtiene la lista de verificaciones de un workspace.
+
+**Headers:**
+```
+x-api-key: TU_API_KEY
+```
+
+**Parámetros de Query:**
+- `workspaceId` (string): ID del workspace
+
+**Respuesta Exitosa (200):**
+```json
+[
+  {
+    "id": "093adec6-c86e-4a7a-81c0-fa2a121212a",
+    "presentationWallet": {
+      "presentationId": "string",
+      "presentationContent": "string"
+    },
+    "inputDescriptors": [...],
+    "issuer": {...},
+    "role": "VERIFIER",
+    "verified": true,
+    "holderDID": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
+    "verifierDid": "did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
+    "createdAt": "2025-10-16T15:23:47Z",
+    "updatedAt": "2025-10-16T15:25:00Z"
+  }
+]
+```
+
 #### POST `/verifications/workspace/{workspace_id}`
 
 Crea una nueva verificación de credencial.
@@ -826,6 +859,18 @@ Content-Type: application/json
 
 **Parámetros de URL:**
 - `workspace_id` (string): ID del workspace donde crear la verificación
+
+### Protocolos de Verificación
+
+La API soporta 3 combinaciones de formato y protocolo para crear verificaciones:
+
+| Protocolo | Descripción |
+|-----------|-------------|
+| **W3C + DIDComm** | Protocolo por defecto. Usa `inputDescriptors` + `issuer`. La respuesta incluye un `presentationWallet` con una URL de invitación DIDComm |
+| **W3C + OID4VP** | OpenID for Verifiable Presentations con formato W3C. Usa `dcqlQuery` con `format: "jwt_vc_json"`. La respuesta incluye un `authorizationRequestUri` |
+| **mDoc + OID4VP** | OpenID for Verifiable Presentations con formato mDoc (ISO 18013-5). Usa `dcqlQuery` con `format: "mso_mdoc"` y `meta.doctype` |
+
+### Ejemplo 1: W3C + DIDComm (por defecto)
 
 **Cuerpo de la Solicitud:**
 ```json
@@ -922,49 +967,150 @@ Content-Type: application/json
 }
 ```
 
+### Ejemplo 2: W3C + OID4VP
 
-**Campos de Solicitud (Body):**
+**Cuerpo de la Solicitud:**
+```json
+{
+  "dcqlQuery": {
+    "credentials": [
+      {
+        "id": "vc_credential",
+        "format": "jwt_vc_json",
+        "claims": [
+          { "path": ["$.credentialSubject.givenName"] },
+          { "path": ["$.credentialSubject.familyName"] },
+          { "path": ["$.credentialSubject.participantType"] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Respuesta Exitosa (201):**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "sessionId": "session_abc123",
+  "authorizationRequestUri": "openid4vp://authorize?client_id=...&request_uri=...",
+  "dcqlQuery": {
+    "credentials": [
+      {
+        "id": "vc_credential",
+        "format": "jwt_vc_json",
+        "claims": [
+          { "path": ["$.credentialSubject.givenName"] },
+          { "path": ["$.credentialSubject.familyName"] },
+          { "path": ["$.credentialSubject.participantType"] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Ejemplo 3: mDoc + OID4VP (ISO 18013-5)
+
+**Cuerpo de la Solicitud:**
+```json
+{
+  "dcqlQuery": {
+    "credentials": [
+      {
+        "id": "mdl_credential",
+        "format": "mso_mdoc",
+        "claims": [
+          { "path": ["org.iso.18013.5.1", "given_name"] },
+          { "path": ["org.iso.18013.5.1", "family_name"] },
+          { "path": ["org.iso.18013.5.1", "birth_date"] }
+        ],
+        "meta": { "doctype": "org.iso.18013.5.1.mDL" }
+      }
+    ]
+  }
+}
+```
+
+**Respuesta Exitosa (201):**
+```json
+{
+  "id": "f9e8d7c6-b5a4-3210-fedc-ba0987654321",
+  "sessionId": "session_xyz789",
+  "authorizationRequestUri": "openid4vp://authorize?client_id=...&request_uri=...",
+  "dcqlQuery": {
+    "credentials": [
+      {
+        "id": "mdl_credential",
+        "format": "mso_mdoc",
+        "claims": [
+          { "path": ["org.iso.18013.5.1", "given_name"] },
+          { "path": ["org.iso.18013.5.1", "family_name"] },
+          { "path": ["org.iso.18013.5.1", "birth_date"] }
+        ],
+        "meta": { "doctype": "org.iso.18013.5.1.mDL" }
+      }
+    ]
+  }
+}
+```
+
+<aside>
+
+**Nota:** Para verificaciones con OID4VP, la estructura usa `dcqlQuery` en lugar de `inputDescriptors` + `issuer`. La respuesta incluye `sessionId` y `authorizationRequestUri` en lugar de `presentationWallet`.
+
+</aside>
+
+**Campos de Solicitud - W3C + DIDComm (Body):**
 
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
-| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (requests) |
-| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (requests) |
-| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (requests) |
-| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (requests) |
-| `issuer.name` | string | Nombre del emisor | Manual | Al crear (requests) |
-| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (requests) |
-| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (requests) |
-| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (requests) |
-| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (requests) |
-| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (requests) |
+| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (request) |
+| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (request) |
+| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (request) |
+| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (request) |
+| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (request) |
+| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (request) |
+| `issuer.name` | string | Nombre del emisor | Manual | Al crear (request) |
+| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (request) |
+| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (request) |
+| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (request) |
+| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (request) |
+| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (request) |
 
-**Campos de Respuesta - Verificación:**
+**Campos de Solicitud - OID4VP (Body):**
 
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
-| `id` | string | ID único de la verificación | Automática | Al crear (responses) |
-| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
-| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
-| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (requests) |
-| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (requests) |
-| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (requests) |
-| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (requests) |
-| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (requests) |
-| `issuer.name` | string | Nombre del emisor | Manual | Al crear (requests) |
-| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (requests) |
-| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (requests) |
-| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (requests) |
-| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (requests) |
-| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (requests) |
+| `dcqlQuery` | object | Query DCQL para protocolos OID4VP. Alternativo a `inputDescriptors` + `issuer` | Manual | Al crear (request) |
+| `dcqlQuery.credentials` | array | Array de credenciales a solicitar | Manual | Al crear (request) |
+| `dcqlQuery.credentials[].id` | string | Identificador de la credencial en la query | Manual | Al crear (request) |
+| `dcqlQuery.credentials[].format` | string | Formato de la credencial: `jwt_vc_json` (W3C) o `mso_mdoc` (mDoc) | Manual | Al crear (request) |
+| `dcqlQuery.credentials[].claims` | array | Claims requeridos para la verificación | Manual | Al crear (request) |
+| `dcqlQuery.credentials[].claims[].path` | array | Ruta al campo. JSONPath para W3C (ej: `["$.credentialSubject.givenName"]`), namespace + field para mDoc (ej: `["org.iso.18013.5.1", "given_name"]`) | Manual | Al crear (request) |
+| `dcqlQuery.credentials[].meta` | object | Metadata adicional (opcional). Para mDoc incluye `doctype` | Manual | Al crear (request) |
+
+**Campos de Respuesta - Verificación (W3C + DIDComm):**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la verificación | Automática | Al crear (response) |
+| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (response) |
+| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (response) |
+| `inputDescriptors` | array | Echo de los descriptores de entrada enviados en el request | Manual | Al crear (request) |
+| `issuer` | object | Echo de la configuración del emisor enviada en el request | Manual | Al crear (request) |
+
+**Campos de Respuesta - Verificación (OID4VP):**
+
+| Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
+|-------|--------------|-------------|-------------|---------------------|
+| `id` | string | ID único de la verificación | Automática | Al crear (response) |
+| `sessionId` | string | ID de sesión OID4VP | Automática | Al crear (response) |
+| `authorizationRequestUri` | string | URI de autorización OID4VP para generar el código QR | Automática | Al crear (response) |
+| `dcqlQuery` | object | Echo de la query DCQL enviada en el request | Manual | Al crear (request) |
 
 #### GET `/verifications/{id}`
 
@@ -1035,24 +1181,14 @@ Content-Type: application/json
 
 | Campo | Tipo de Dato | Descripción | Generación | Momento de existencia |
 |-------|--------------|-------------|-------------|---------------------|
-| `id` | string | ID único de la verificación | Automática | Al crear (responses) |
-| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario | Automática | Al crear (responses) |
-| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (responses) |
-| `inputDescriptors` | array | Array de descriptores de entrada que definen qué credenciales se pueden presentar | Manual | Al crear (request) |
-| `inputDescriptors[].id` | string | Identificador único del descriptor de entrada | Manual | Al crear (request) |
-| `inputDescriptors[].name` | string | Nombre descriptivo del descriptor de entrada | Manual | Al crear (request) |
-| `inputDescriptors[].constraints` | object | Restricciones que deben cumplir las credenciales | Manual | Al crear (request) |
-| `inputDescriptors[].constraints.fields` | array | Array de campos que deben estar presentes en la credencial | Manual | Al crear (request) |
-| `inputDescriptors[].constraints.fields[].path` | array | Ruta JSONPath para acceder al campo en la credencial | Manual | Al crear (request) |
-| `inputDescriptors[].constraints.fields[].filter` | object | Filtro que define el tipo de dato esperado | Manual | Al crear (request) |
-| `inputDescriptors[].constraints.fields[].filter.type` | string | Tipo de dato esperado (string, number, boolean, etc.) | Manual | Al crear (request) |
-| `issuer` | object | Configuración del emisor para la verificación | Manual | Al crear (request) |
-| `issuer.name` | string | Nombre del emisor | Manual | Al crear (request) |
-| `issuer.styles` | object | Estilos visuales para la verificación | Manual | Al crear (request) |
-| `issuer.styles.thumbnail` | object | Imagen miniatura (logo) con URI y texto alternativo | Manual | Al crear (request) |
-| `issuer.styles.hero` | object | Imagen de fondo principal con URI y texto alternativo | Manual | Al crear (request) |
-| `issuer.styles.background` | object | Color de fondo de la verificación | Manual | Al crear (request) |
-| `issuer.styles.text` | object | Configuración de color del texto | Manual | Al crear (request) |
+| `id` | string | ID único de la verificación | Automática | Al crear (response) |
+| `presentationWallet.presentationId` | string | ID único de la presentación para conectar con la wallet del usuario (DIDComm) | Automática | Al crear (response) |
+| `presentationWallet.presentationContent` | string | URL de presentación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (response) |
+| `sessionId` | string | ID de sesión OID4VP (solo para verificaciones OID4VP) | Automática | Al crear (response) |
+| `authorizationRequestUri` | string | URI de autorización OID4VP (solo para verificaciones OID4VP) | Automática | Al crear (response) |
+| `dcqlQuery` | object | Query DCQL (solo para verificaciones OID4VP) | Manual | Al crear (request) |
+| `inputDescriptors` | array | Descriptores de entrada (solo para verificaciones DIDComm) | Manual | Al crear (request) |
+| `issuer` | object | Configuración del emisor (solo para verificaciones DIDComm) | Manual | Al crear (request) |
 | `role` | string | Rol del usuario en la verificación (VERIFIER) | Automática | Al verificar |
 | `verified` | boolean | Estado de verificación de la credencial | Automática | Al verificar |
 | `holderDID` | string | DID del portador de la credencial | Automática | Al verificar |

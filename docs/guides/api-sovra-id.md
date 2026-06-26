@@ -203,8 +203,14 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       "https://www.w3.org/ns/credentials/examples/v2",
       "https://w3id.org/security/data-integrity/v2",
       {
-        "givenName": "https://schema.org/givenName",
-        "familyName": "https://schema.org/familyName",
+        "givenName": {
+          "@id": "https://schema.org/givenName",
+          "@type": "xsd:string"
+        },
+        "familyName": {
+          "@id": "https://schema.org/familyName",
+          "@type": "xsd:string"
+        },
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
           "@type": "xsd:string"
@@ -298,8 +304,14 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       "https://www.w3.org/ns/credentials/examples/v2",
       "https://w3id.org/security/data-integrity/v2",
       {
-        "givenName": "https://schema.org/givenName",
-        "familyName": "https://schema.org/familyName",
+        "givenName": {
+          "@id": "https://schema.org/givenName",
+          "@type": "xsd:string"
+        },
+        "familyName": {
+          "@id": "https://schema.org/familyName",
+          "@type": "xsd:string"
+        },
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
           "@type": "xsd:string"
@@ -526,8 +538,14 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       "https://www.w3.org/ns/credentials/examples/v2",
       "https://w3id.org/security/data-integrity/v2",
       {
-        "givenName": "https://schema.org/givenName",
-        "familyName": "https://schema.org/familyName",
+        "givenName": {
+          "@id": "https://schema.org/givenName",
+          "@type": "xsd:string"
+        },
+        "familyName": {
+          "@id": "https://schema.org/familyName",
+          "@type": "xsd:string"
+        },
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
           "@type": "xsd:string"
@@ -640,8 +658,14 @@ Content-Type: application/json
       "https://www.w3.org/ns/credentials/examples/v2",
       "https://w3id.org/security/data-integrity/v2",
       {
-        "givenName": "https://schema.org/givenName",
-        "familyName": "https://schema.org/familyName",
+        "givenName": {
+          "@id": "https://schema.org/givenName",
+          "@type": "xsd:string"
+        },
+        "familyName": {
+          "@id": "https://schema.org/familyName",
+          "@type": "xsd:string"
+        },
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
           "@type": "xsd:string"
@@ -1300,8 +1324,14 @@ Puedes extender el `credential.@context` con propiedades personalizadas:
 "@context": [
   "...",
   {
-    "givenName": "https://schema.org/givenName",
-    "familyName": "https://schema.org/familyName",
+    "givenName": {
+      "@id": "https://schema.org/givenName",
+      "@type": "xsd:string"
+    },
+    "familyName": {
+      "@id": "https://schema.org/familyName",
+      "@type": "xsd:string"
+    },
     "participantType": {
       "@id": "https://example.org/vocab#participantType",
       "@type": "xsd:string"
@@ -1312,7 +1342,7 @@ Puedes extender el `credential.@context` con propiedades personalizadas:
 
 <aside>
 
-**Nota (VC Data Model v2):** A diferencia de v1, los contextos v2 (`https://www.w3.org/ns/credentials/v2` y `https://www.w3.org/ns/credentials/examples/v2`) **no definen** `givenName` ni `familyName`. Para que sigan siendo propiedades semánticamente válidas, debes declararlas en el objeto inline del `@context` (por ejemplo, mapeadas a `schema.org`), tal como se muestra en los ejemplos de creación. Las propiedades que no se declaran solo se resuelven mediante el `@vocab` de ejemplo y pierden su significado.
+**Nota (VC Data Model v2):** A diferencia de v1, los contextos v2 (`https://www.w3.org/ns/credentials/v2` y `https://www.w3.org/ns/credentials/examples/v2`) **no definen** `givenName` ni `familyName`. De hecho, el único término de nombre de persona ya disponible en los contextos v2 es `name` (mapeado a `https://schema.org/name`); no existe equivalente para `givenName`/`familyName`. Por eso debes declararlas en el objeto inline del `@context` (mapeadas a `schema.org`), como objeto con `@id` y `@type` —igual que `participantType`—, tal como se muestra en los ejemplos de creación. Las propiedades que no se declaran solo se resuelven mediante el `@vocab` de ejemplo y pierden su significado.
 
 </aside>
 

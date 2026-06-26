@@ -199,9 +199,9 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
 {
   "credential": {
     "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://www.w3.org/2018/credentials/examples/v1",
-      "https://w3id.org/security/bbs/v1",
+      "https://www.w3.org/ns/credentials/v2",
+      "https://www.w3.org/ns/credentials/examples/v2",
+      "https://w3id.org/security/data-integrity/v2",
       {
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
@@ -210,7 +210,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       }
     ],
     "type": ["VerifiableCredential"],
-    "expirationDate": "2027-10-15",
+    "validUntil": "2027-10-15T00:00:00.000Z",
     "credentialSubject": {
       "givenName": "Test Name",
       "familyName": "Test Family Name",
@@ -256,7 +256,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
           }
         },
         {
-          "path": ["$.expirationDate"],
+          "path": ["$.validUntil"],
           "fallback": "Unknown",
           "label": "Expiration",
           "schema": {
@@ -292,9 +292,9 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
 {
   "credential": {
     "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://www.w3.org/2018/credentials/examples/v1",
-      "https://w3id.org/security/bbs/v1",
+      "https://www.w3.org/ns/credentials/v2",
+      "https://www.w3.org/ns/credentials/examples/v2",
+      "https://w3id.org/security/data-integrity/v2",
       {
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
@@ -303,7 +303,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       }
     ],
     "type": ["VerifiableCredential"],
-    "expirationDate": "2028-03-12T14:00:26.543Z",
+    "validUntil": "2028-03-12T14:00:26.543Z",
     "credentialSubject": {
       "givenName": "Test Name",
       "familyName": "Test Family Name",
@@ -349,7 +349,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
           }
         },
         {
-          "path": ["$.expirationDate"],
+          "path": ["$.validUntil"],
           "fallback": "Unknown",
           "label": "Expiration",
           "schema": {
@@ -483,8 +483,8 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
 |-------|--------------|-------------|-------------|---------------------|
 | `credential.@context` | array de string, object | Define las propiedades usados por la credencial. Puedes extenderlo con propiedades personalizadas | Manual | Al crear (body) |
 | `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
-| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
-| `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
+| `credential.validFrom` | string (ISO 8601) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.validUntil` | string (ISO 8601) | Fecha de expiración de la credencial | Manual | Al crear (body) |
 | `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |
 | `outputDescriptor.id` | string | Identificador único del descriptor de salida | Manual | Al crear (body) |
 | `outputDescriptor.schema` | string | URL del schema que define la estructura de la credencial | Manual | Al crear (body) |
@@ -518,9 +518,9 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       "VerifiableCredential"
     ],
     "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://www.w3.org/2018/credentials/examples/v1",
-      "https://w3id.org/security/bbs/v1",
+      "https://www.w3.org/ns/credentials/v2",
+      "https://www.w3.org/ns/credentials/examples/v2",
+      "https://w3id.org/security/data-integrity/v2",
       {
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
@@ -528,7 +528,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
         }
       }
     ],
-    "expirationDate": "2027-09-04",
+    "validUntil": "2027-09-04T00:00:00.000Z",
     "credentialSubject": {
       "givenName": "Test Name",
       "familyName": "Test Family Name",
@@ -539,7 +539,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
       "id":"did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
       "name": "Integration 01"
     },
-    "issuanceDate": "2025-10-16",
+    "validFrom": "2025-10-16T00:00:00.000Z",
     "credentialStatus": {
       "id": "https://id.api.sandbox.sovra.io/api/public/credentials/status/541ffd6d-8702-4489-b7df-76233e24e685",
       "type": "CredentialStatusList2017"
@@ -599,7 +599,7 @@ La API soporta 3 combinaciones de formato y protocolo para emitir credenciales:
 | `invitationWallet.invitationId` | string | ID único de la invitación para conectar con la wallet del usuario | Automática | Al crear (respuesta) |
 | `invitationWallet.invitationContent` | string | URL de invitación DIDComm para establecer conexión con la wallet del usuario | Automática | Al crear (respuesta) |
 | `credential.id` | string | ID único de la credencial | Automática | Al crear (respuesta) |
-| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.validFrom` | string (ISO 8601) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
 | `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
 | `credential.issuer.id` | string | DID del Workspace | Automática | Al crear (respuesta) |
 | `credential.issuer.name` | string | Nombre del Workspace | Automática | Al crear (respuesta) |
@@ -630,9 +630,9 @@ Content-Type: application/json
       "VerifiableCredential"
     ],
     "@context": [
-      "https://www.w3.org/2018/credentials/v1",
-      "https://www.w3.org/2018/credentials/examples/v1",
-      "https://w3id.org/security/bbs/v1",
+      "https://www.w3.org/ns/credentials/v2",
+      "https://www.w3.org/ns/credentials/examples/v2",
+      "https://w3id.org/security/data-integrity/v2",
       {
         "participantType": {
           "@id": "https://example.org/vocab#participantType",
@@ -640,7 +640,7 @@ Content-Type: application/json
         }
       }
     ],
-    "expirationDate": "2027-09-04",
+    "validUntil": "2027-09-04T00:00:00.000Z",
     "credentialSubject": {
       "id": "did:quarkid:EiCYG42rgXScE37NpavexEiRUjc6RJd0Hotz5KXY22tuYQ",
       "givenName": "Test Name",
@@ -652,7 +652,7 @@ Content-Type: application/json
       "id":"did:quarkid:EiBppRyATSOpt50p8vSx2L2Hud8IHawvwOp_Q04HEn2k7A",
       "name": "Integration 01"
     },
-    "issuanceDate": "2025-10-16",
+    "validFrom": "2025-10-16T00:00:00.000Z",
     "credentialStatus": {
       "id": "https://id.api.sandbox.sovra.io/api/public/credentials/status/541ffd6d-8702-4489-b7df-76233e24e685",
       "type": "CredentialStatusList2017"
@@ -1242,8 +1242,8 @@ Esta organización te permite entender qué información estará disponible en c
 | `credential.type` | string[] | Siempre debe contener "VerifiableCredential" como primer elemento | Manual | Al crear (body) |
 | `credential.issuer.id` | string | DID del Workspace | Automática | Al crear (respuesta) |
 | `credential.issuer.name` | string | Nombre del Workspace | Automática | Al crear (respuesta) |
-| `credential.issuanceDate` | string (YYYY-MM-DD) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
-| `credential.expirationDate` | string (YYYY-MM-DD) | Fecha de expiración de la credencial | Manual | Al crear (body) |
+| `credential.validFrom` | string (ISO 8601) | Fecha de emisión de la credencial | Automática | Al crear (respuesta) |
+| `credential.validUntil` | string (ISO 8601) | Fecha de expiración de la credencial | Manual | Al crear (body) |
 | `credential.credentialSubject` | object | Contiene los datos específicos del portador de la credencial. Debe coincidir con las propiedades definidas en @context | Manual | Al crear (body) |
 | `credential.credentialStatus` | object | Estado de la credencial con información de revocación | Automática | Al crear (respuesta) |
 | `outputDescriptor.id` | string | Identificador único del descriptor de salida | Manual | Al crear (body) |

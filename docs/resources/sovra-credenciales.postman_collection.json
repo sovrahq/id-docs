@@ -1,0 +1,253 @@
+{
+  "info": {
+    "name": "Sovra ID — Credenciales",
+    "description": "API servidor-a-servidor de Sovra ID, autenticada con una API key de workspace.\n\nTodas las solicitudes bajo `Issuer` y `Verifier` requieren:\n\n```\nAuthorization: Bearer {{apiKey}}\n```\n\nLa clave se crea desde el dashboard (Settings → API keys) y tiene el prefijo `sovra_sk_`. Configurá `baseUrl` y `apiKey` en las variables de la colección (o sobreescribilas por entorno).\n\nEntornos:\n- Test: `https://test-api-sovra.flagonsa.com`\n- Producción: `https://api.sovra.io`\n\nDocumentación: https://github.com/sovrahq/id-docs/tree/main/docs/guides",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Issuer",
+      "description": "Ciclo de vida de emisión, acotado al workspace de la API key.",
+      "item": [
+        {
+          "name": "Crear oferta de credencial",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el credential_id para las solicitudes siguientes.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('credentialId', body.credential_id);",
+                  "  console.log('offer_uri:', body.offer_uri);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema_id\": \"{{schemaId}}\",\n  \"claims\": {\n    \"full_name\": \"Ada Lovelace\",\n    \"age_over_18\": true\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credential-offer",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credential-offer"]
+            },
+            "description": "Crea una oferta OID4VCI pre-autorizada.\n\n`schema_id` es el slug del esquema (no su UUID); se usa siempre su última versión. `claims` se preasocian a la oferta y se copian en la credencial cuando el holder la canjea.\n\nLa respuesta trae `credential_id` (identificador estable de todo el ciclo de vida), `offer_uri` (para el QR), `expires_at` (24 h) y `credential` (vista previa **sin firmar**).\n\nEl SD-JWT firmado llega después, en el webhook `credential.issued`.\n\nRate limit: 120 req/min por API key."
+          }
+        },
+        {
+          "name": "Listar credenciales emitidas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credentials"]
+            },
+            "description": "Todas las credenciales efectivamente emitidas por el workspace. Las ofertas pendientes no aparecen acá; se consultan de a una por su `credential_id`."
+          }
+        },
+        {
+          "name": "Consultar una credencial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credentials", "{{credentialId}}"]
+            },
+            "description": "Metadatos de una credencial. El mismo id cubre todo el ciclo de vida: mientras el holder no la canjeó, `status` es `pending` (o `expired` si venció la ventana de la oferta) con `holder_did` e `issued_at` en null; después de la emisión, `status` refleja el estado real (`issued`, `suspended`, `revoked`).\n\nEl SD-JWT firmado **no** se devuelve acá."
+          }
+        },
+        {
+          "name": "Revocar credencial",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/revoked",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credentials", "{{credentialId}}", "status", "revoked"]
+            },
+            "description": "Revocación permanente. El bit correspondiente se marca on-chain y dispara el webhook `credential.revoked`.\n\nNo es idempotente: revocar algo ya revocado devuelve 422 `invalid_status_transition`."
+          }
+        },
+        {
+          "name": "Suspender credencial",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/suspended",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credentials", "{{credentialId}}", "status", "suspended"]
+            },
+            "description": "Suspensión reversible. Solo se permite desde `issued`. Dispara `credential.suspended`."
+          }
+        },
+        {
+          "name": "Reactivar credencial suspendida",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/issued",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issuer", "credentials", "{{credentialId}}", "status", "issued"]
+            },
+            "description": "Devuelve a `issued` una credencial suspendida. Solo se permite desde `suspended`. Dispara `credential.unsuspended`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verifier",
+      "description": "Sesiones de verificación OID4VP, acotadas al workspace de la API key.",
+      "item": [
+        {
+          "name": "Crear sesión de verificación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"identidad\",\n        \"format\": \"vc+sd-jwt\",\n        \"claims\": [\n          { \"path\": [\"email\"] }\n        ]\n      }\n    ]\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "verifier", "verifications"]
+            },
+            "description": "Inicia una sesión de verificación OID4VP. `dcql_query` sigue la especificación DCQL de OID4VP.\n\nTres reglas que evitan casi todos los fallos:\n1. Cada `path` debe coincidir carácter por carácter con el `key` del esquema.\n2. Todos los claims pedidos son obligatorios: si el holder omite uno, falla toda la presentación.\n3. `id` es una etiqueta libre tuya, devuelta tal cual en el resultado; no filtra por tipo de credencial.\n\nLa respuesta trae `session_id`, `authorization_request_uri` (autocontenida) y `authorization_request_uri_ref` (corta, para DCQL grandes). La sesión vive 10 minutos."
+          }
+        },
+        {
+          "name": "Listar sesiones de verificación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications?limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "verifier", "verifications"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Filtro opcional: pending, completed, failed, expired.",
+                  "disabled": true
+                },
+                { "key": "limit", "value": "50", "description": "Default 50, máximo 200." },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Sesiones del workspace autenticado, de la más nueva a la más vieja."
+          }
+        },
+        {
+          "name": "Consultar una sesión de verificación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications/{{verificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "verifier", "verifications", "{{verificationId}}"]
+            },
+            "description": "Estado actual de una sesión. Si `status` es `completed`, `presentation_data.credentials[].claims` trae los valores divulgados. Si es `failed`, `error` identifica el paso exacto que falló."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Público",
+      "description": "Endpoints sin autenticación.",
+      "item": [
+        {
+          "name": "Lista de estado (revocación)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/status/{{issuerDid}}/revocation",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "status", "{{issuerDid}}", "revocation"]
+            },
+            "description": "La W3C Bitstring Status List firmada (VC-JWT, ES256) del emisor. Sin autenticación.\n\nResponde `application/jwt` con ETag y Cache-Control; mandá `If-None-Match` para recibir 304 cuando no cambió nada.\n\nEs la URL que las credenciales llevan embebida en su claim `credentialStatus`. La ruta es inmutable por diseño."
+          }
+        },
+        {
+          "name": "Lista de estado (suspensión)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/status/{{issuerDid}}/suspension",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "status", "{{issuerDid}}", "suspension"]
+            },
+            "description": "Igual que la anterior, para el mapa de suspensión."
+          }
+        },
+        {
+          "name": "Especificación OpenAPI",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/openapi/api",
+              "host": ["{{baseUrl}}"],
+              "path": ["openapi", "api"]
+            },
+            "description": "La especificación OpenAPI en vivo de la API de integración. Es la fuente de verdad del entorno."
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://test-api-sovra.flagonsa.com",
+      "description": "Test: https://test-api-sovra.flagonsa.com · Producción: https://api.sovra.io"
+    },
+    { "key": "apiKey", "value": "sovra_sk_reemplazame", "description": "API key del workspace (Settings → API keys)." },
+    { "key": "schemaId", "value": "", "description": "El slug del esquema, no su UUID." },
+    { "key": "credentialId", "value": "", "description": "Se completa automáticamente al crear una oferta." },
+    { "key": "verificationId", "value": "", "description": "Se completa automáticamente al crear una verificación." },
+    { "key": "issuerDid", "value": "", "description": "DID del workspace emisor (did:sovra:0x…)." }
+  ]
+}

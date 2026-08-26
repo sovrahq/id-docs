@@ -1301,9 +1301,9 @@ Puedes extender el `credential.@context` con propiedades personalizadas:
 ```
 
 *Imagen Nº1* - **Propiedad Personalizada**
-![Propiedad personalizada](../../assets/images/property_new.png)
+![Propiedad personalizada](../../../assets/images/property_new.png)
 
 *Imagen Nº2* - **Diseño de Credenciales**
-![Diseño de Credenciales](../../assets/images/design_credential.png)
+![Diseño de Credenciales](../../../assets/images/design_credential.png)
 
 <a href=https://www.w3.org/TR/xmlschema11-1/ target="_blank">Tipos de datos XSD</a>

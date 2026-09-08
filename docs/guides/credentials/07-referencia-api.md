@@ -24,9 +24,8 @@ Referencia completa de la API servidor-a-servidor de Sovra ID (`/api/v1`).
 | Test | `https://test-api-sovra.flagonsa.com` |
 | Producción | `https://api.sovra.io` |
 
-**Formato.** Todo es JSON (`Content-Type: application/json`), salvo dos excepciones
-que se indican explícitamente: la lista de estado (`application/jwt`) y la página de
-un documento (`text/html`).
+**Formato.** Todo es JSON (`Content-Type: application/json`), salvo una excepción que
+se indica explícitamente: la lista de estado (`application/jwt`).
 
 **Fechas.** ISO 8601 en UTC (`2026-08-26T04:41:32Z`). Dentro del SD-JWT, `iat` y
 `exp` son segundos Unix.
@@ -251,13 +250,14 @@ Devuelve la credencial de un documento firmado, para que un verificador la
 compruebe. Nunca devuelve un veredicto. Tener el id es la autorización (salvo que el
 documento sea `private`).
 
-### `GET /api/v1/documents/{id}/page`
-
-El mismo documento renderizado como página HTML, con el layout que definió el emisor.
-
 ---
 
 ## Documentos firmados
+
+> 📑 **Resumen.** La documentación completa de documentos firmados —emisión,
+> visibilidad, renderizado, verificación, errores— está en
+> [`../documents/`](../documents/), y la referencia endpoint por endpoint en
+> [`../documents/07-referencia-api.md`](../documents/07-referencia-api.md).
 
 Un **documento** es una variante sin wallet: el emisor firma los datos directamente,
 sin holder y sin divulgación selectiva, y ancla la firma on-chain. Sirve para

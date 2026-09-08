@@ -82,7 +82,7 @@ El asistente pide:
 | **Name** | Nombre visible del esquema | De acá se deriva el `schema_id`. |
 | **Credential type** | El `vct` de la credencial | Sensible a mayúsculas. Es lo que el verificador debe reconocer. |
 | **Validity period** | Cuánto vive la credencial | Formato `^\d+(y\|m\|d)$`: `10y`, `6m`, `30d`. Si no se puede parsear, se usa 1 año en silencio. |
-| **Kind** | `credential` o `document` | Para emitir a una wallet: **`credential`**. |
+| **Kind** | `credential` o `document` | Para emitir a una wallet: **`credential`**. Para documentos firmados, ver [`../documents/`](../documents/). |
 | **Claims** | Los campos | Cada uno con `key`, `label`, `type` (`string`, `number`, `date`, `boolean`) y `required`. |
 
 Tres cosas que conviene saber antes de cargar el primer esquema:

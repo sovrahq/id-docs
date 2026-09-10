@@ -98,34 +98,157 @@ dominio puede llamarlo directo, siempre que no envíe credenciales.
 curl -s "$BASE_URL/api/v1/documents/$DOCUMENT_ID"
 ```
 
-**`200 OK`**
+**`200 OK`** — la respuesta completa, tal cual la devuelve la API:
 
 ```json
 {
   "id": "63813a91-6986-46bf-9f23-128a6598cd82",
-  "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3Nk…eyJjb250ZW50…~",
   "issuer": {
-    "did": "did:sovra:0xb516d2f945db504198d726bda2a01d19ecd3cc23",
     "name": "Lotería de San Juan",
-    "address": "0xb516d2f945db504198d726bda2a01d19ecd3cc23"
+    "address": "0xb516d2f945db504198d726bda2a01d19ecd3cc23",
+    "did": "did:sovra:0xb516d2f945db504198d726bda2a01d19ecd3cc23"
   },
   "schema": {
     "name": "Document Example",
     "claims": [
-      { "key": "date", "label": "Date", "type": "date", "required": true, "disclosable": true }
+      {
+        "disclosable": true,
+        "key": "date",
+        "label": "Date",
+        "required": true,
+        "type": "date"
+      },
+      {
+        "disclosable": true,
+        "key": "idDocument",
+        "label": "ID Document",
+        "required": true,
+        "type": "number"
+      },
+      {
+        "disclosable": true,
+        "key": "content",
+        "label": "Content",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "disclosable": true,
+        "key": "isConfidential",
+        "label": "Confidencial",
+        "required": true,
+        "type": "boolean"
+      }
     ]
   },
   "layout": {
-    "page": { "width": 794, "height": 1123 },
-    "elements": [ /* … */ ]
+    "elements": [
+      {
+        "bold": true,
+        "color": "#111827",
+        "id": "title",
+        "size": 26,
+        "type": "text",
+        "value": "Document Example",
+        "x": 283,
+        "y": 56
+      },
+      {
+        "bold": true,
+        "color": "#111827",
+        "id": "emt2553os0",
+        "size": 14,
+        "type": "text",
+        "value": "Date",
+        "x": 600,
+        "y": 128
+      },
+      {
+        "bind": "date",
+        "color": "#111827",
+        "id": "emt25542s1",
+        "size": 14,
+        "type": "field",
+        "x": 648,
+        "y": 128
+      },
+      {
+        "bold": true,
+        "color": "#111827",
+        "id": "emt2555sp2",
+        "size": 14,
+        "type": "text",
+        "value": "Content",
+        "x": 48,
+        "y": 208
+      },
+      {
+        "bold": true,
+        "color": "#111827",
+        "id": "emt25578k3",
+        "size": 14,
+        "type": "text",
+        "value": "Confidencial",
+        "x": 48,
+        "y": 872
+      },
+      {
+        "bind": "isConfidential",
+        "color": "#111827",
+        "id": "emt2558k94",
+        "size": 14,
+        "type": "field",
+        "x": 152,
+        "y": 872
+      },
+      {
+        "bind": "content",
+        "color": "#111827",
+        "id": "emt255ha05",
+        "size": 14,
+        "type": "field",
+        "x": 48,
+        "y": 240
+      },
+      {
+        "bold": true,
+        "color": "#111827",
+        "id": "emt255sub6",
+        "size": 14,
+        "type": "text",
+        "value": "ID Document",
+        "x": 48,
+        "y": 128
+      },
+      {
+        "bind": "idDocument",
+        "color": "#111827",
+        "id": "emt255xr77",
+        "size": 14,
+        "type": "field",
+        "x": 152,
+        "y": 128
+      }
+    ],
+    "page": {
+      "height": 1123,
+      "width": 794
+    }
   },
   "anchor": {
     "status": "anchored",
     "tx_hash": "0x9c93c1eec04ae7e4566b4ee394ac518b33c36b0ffd324276289e998eed72f8ca",
     "anchored_at": "2026-08-21T14:12:43Z"
-  }
+  },
+  "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3NkLWp3dCJ9.eyJjb250ZW50IjoiQ29udGVuaWRvIGRlIFBydWViYSIsImRhdGUiOiIyMC0wOC0yMDI2IiwiZXhwIjoxODE4ODU3NTU0LCJpYXQiOjE3ODczMjE1NTQsImlkRG9jdW1lbnQiOjEyMzQ1NjcsImlzQ29uZmlkZW50aWFsIjpmYWxzZSwiaXNzIjoiaHR0cHM6Ly90ZXN0LWFwaS1zb3ZyYS5mbGFnb25zYS5jb20vZGlkOnNvdnJhOjB4YjUxNmQyZjk0NWRiNTA0MTk4ZDcyNmJkYTJhMDFkMTllY2QzY2MyMyIsImp0aSI6IjYzODEzYTkxLTY5ODYtNDZiZi05ZjIzLTEyOGE2NTk4Y2Q4MiIsInZjdCI6IkRvY3VtZW50In0.FEArm9ydMriuvLaIij1i6f02ZxrFkvOC3YXDfL8RWsAfiuS-l1VfxaJPjqBqVeNnwjSds48ZhVbRpO4UBeyGHQ~"
 }
 ```
+
+Dos cosas sobre el orden, que no son lo mismo: **el orden de las claves** del JSON es
+el que devuelve el servicio y no hay que asumirlo estable, pero **el orden de
+`layout.elements[]` sí es significativo** — es el orden de pintado, y no coincide con
+el orden visual de la hoja (acá `content` se dibuja después de `Confidencial`). Ver
+[5. Renderizado](05-renderizado.md).
 
 | Campo | Tipo | Qué es | Firmado |
 |---|---|---|---|

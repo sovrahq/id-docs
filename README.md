@@ -29,6 +29,7 @@ es un **documento**.
 | 7 | [Referencia de la API](docs/guides/credentials/07-referencia-api.md) | Todos los endpoints de `/api/v1`. |
 | 8 | [Errores y troubleshooting](docs/guides/credentials/08-errores-y-troubleshooting.md) | Cada código de error y su solución. |
 | 9 | [Verificación sin Sovra](docs/guides/credentials/09-verificacion-sin-sovra.md) | Verificar contra SovraChain con el SDK. |
+| 10 | [Verificar por WhatsApp](docs/guides/credentials/10-whatsapp.md) | Deep link, QR, correlación y cotejo de identidad en el chat. |
 
 ### 📑 Documentos firmados
 
@@ -58,6 +59,7 @@ es un **documento**.
 
 ## 🧰 Recursos
 
+- [Boilerplate de WhatsApp](boilerplate/templates/whatsapp-meta/) — bot que verifica credenciales dentro del chat, directo contra la Cloud API de Meta. `npm run demo` corre la conversación entera sin credenciales.
 - [Colección de Postman — Credenciales](docs/resources/sovra-credenciales.postman_collection.json) — importala y configurá `baseUrl` + `apiKey`.
 - [Colección de Postman — Documentos firmados](docs/resources/sovra-documentos-firmados.postman_collection.json) — importala y configurá `base_url`, `api_key`, `schema_id`.
 - Especificación OpenAPI en vivo: `GET {baseUrl}/openapi/api`.
@@ -69,9 +71,10 @@ anterior** (`x-api-key`, `did:quarkid`, DIDComm, BBS+), solo como referencia
 histórica. **No la uses para integraciones nuevas**: los endpoints, los formatos y
 los eventos no son compatibles con la API actual.
 
-> ⚠️ El contenido de [`boilerplate/`](boilerplate/) todavía apunta a la plataforma
-> anterior (usa `x-api-key` y credenciales `did:quarkid`). Está pendiente de migrar a
-> la API actual; mientras tanto, seguí las [guías](docs/guides/).
+> ⚠️ [`boilerplate/templates/nextjs-nestjs/`](boilerplate/templates/nextjs-nestjs/) todavía
+> apunta a la plataforma anterior (usa `x-api-key` y credenciales `did:quarkid`). Está
+> pendiente de migrar; mientras tanto, seguí las [guías](docs/guides/). El template
+> [`whatsapp-meta/`](boilerplate/templates/whatsapp-meta/) **sí** usa la API actual.
 
 ## 📝 Contribuir
 

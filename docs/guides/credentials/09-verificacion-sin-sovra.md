@@ -219,4 +219,4 @@ para re-auditar credenciales guardadas o para verificar en un entorno aislado.
 
 ---
 
-**Anterior:** [← 8. Errores y troubleshooting](08-errores-y-troubleshooting.md) · **Volver al [índice](README.md)**
+**Anterior:** [← 8. Errores y troubleshooting](08-errores-y-troubleshooting.md) · **Siguiente:** [10. Verificar por WhatsApp →](10-whatsapp.md)

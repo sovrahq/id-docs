@@ -30,6 +30,7 @@ una **API key de workspace** (`Authorization: Bearer sovra_sk_...`).
 | 7 | [Referencia de la API](07-referencia-api.md) | Todos los endpoints, parámetros y respuestas. |
 | 8 | [Errores y troubleshooting](08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 | 9 | [Verificación sin Sovra](09-verificacion-sin-sovra.md) | Verificar contra la cadena, sin depender de la API de Sovra. |
+| 10 | [Verificar por WhatsApp](10-whatsapp.md) | Llevar la verificación al chat: deep link, QR, correlación y cotejo de identidad. |
 
 ## Atajo: los dos flujos en una pantalla
 
@@ -65,6 +66,7 @@ curl -X POST "$BASE_URL/api/v1/verifier/verifications" \
 ## Recursos
 
 - [Colección de Postman](../../resources/sovra-credenciales.postman_collection.json) — importala y configurá `baseUrl` + `apiKey`.
+- [Boilerplate de WhatsApp](../../../boilerplate/templates/whatsapp-meta/) — bot que verifica dentro del chat, directo contra la Cloud API de Meta.
 - Especificación OpenAPI en vivo: `GET {baseUrl}/openapi/api`
 
 ---

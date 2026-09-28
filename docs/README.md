@@ -2,12 +2,13 @@
 
 ## 📘 Documentación vigente
 
-👉 **[`guides/`](guides/)** — dos rutas de lectura, según qué emitas:
+👉 **[`guides/`](guides/)** — tres rutas de lectura, según qué emitas:
 
 | | Qué es | Cuándo |
 |---|---|---|
 | 📄 **[`guides/credentials/`](guides/credentials/)** | Credenciales verificables que viven en la wallet del ciudadano, con divulgación selectiva y prueba de posesión | Licencias, identidad, membresías, títulos habilitantes |
 | 📑 **[`guides/documents/`](guides/documents/)** | Documentos firmados: una credencial **sin holder**, que el emisor firma, ancla on-chain y entrega | Certificados, constancias, actas, comprobantes |
+| 🪪 **[`guides/credentials-mdoc/`](guides/credentials-mdoc/)** | Lo mismo que una credencial, en el formato **ISO 18013-5**: CBOR firmado con un MSO en vez de un SD-JWT | Licencias de conducir móviles (mDL), documentos de identidad interoperables |
 
 **La regla práctica:** si el dato es sobre una persona y ella decide cuándo y cuánto
 mostrarlo, es una **credencial**. Si es una hoja que la institución emite y reparte,
@@ -29,6 +30,19 @@ es un **documento**. La comparación completa está en el
 | 9 | [Verificación sin Sovra](guides/credentials/09-verificacion-sin-sovra.md) | Verificar contra SovraChain con el SDK. |
 | 10 | [Verificar por WhatsApp](guides/credentials/10-whatsapp.md) | Deep link, QR, correlación y cotejo de identidad en el chat. |
 
+### Credenciales mDoc (ISO 18013-5)
+
+| # | Guía | Contenido |
+|---|---|---|
+| 1 | [Introducción](guides/credentials-mdoc/01-introduccion.md) | Qué es un mDoc, docType y namespace, anatomía del `IssuerSigned`, el namespace meta, las dos rutas de confianza. |
+| 2 | [Primeros pasos](guides/credentials-mdoc/02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
+| 3 | [Emisión de mDocs](guides/credentials-mdoc/03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
+| 4 | [Verificación de mDocs](guides/credentials-mdoc/04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
+| 5 | [Referencia de la API](guides/credentials-mdoc/05-referencia-api.md) | Endpoints, objetos, tipos de claim, catálogo de elementos ISO. |
+| 6 | [Errores y troubleshooting](guides/credentials-mdoc/06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
+| 7 | [Verificación sin Sovra](guides/credentials-mdoc/07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
+| 8 | [Habilitar mDL ISO](guides/credentials-mdoc/08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
+
 ### Documentos firmados
 
 | # | Guía | Contenido |
@@ -45,6 +59,7 @@ es un **documento**. La comparación completa está en el
 ## 🧰 Recursos
 
 - [Colección de Postman — Credenciales](resources/sovra-credenciales.postman_collection.json)
+- [Colección de Postman — mDoc](resources/sovra-mdoc.postman_collection.json)
 - [Colección de Postman — Documentos firmados](resources/sovra-documentos-firmados.postman_collection.json)
 - Especificación OpenAPI en vivo: `GET {baseUrl}/openapi/api`
 

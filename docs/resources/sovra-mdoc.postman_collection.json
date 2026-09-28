@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "Sovra ID — mDoc (ISO 18013-5)",
+    "description": "Emisión y verificación de credenciales **mDoc** (ISO/IEC 18013-5), el formato de la licencia de conducir móvil (mDL).\n\nNo existen endpoints específicos de mDoc: se emplean los mismos que para SD-JWT, y el formato lo determina el esquema. Las operaciones específicas de mDoc —creación del esquema `mso_mdoc`, registro del document signer y admisión de una raíz IACA— residen en el **dashboard**.\n\nLa totalidad de las solicitudes requiere:\n\n```\nAuthorization: Bearer {{apiKey}}\n```\n\nLa clave se crea desde el dashboard (Settings → API keys) y presenta el prefijo `sovra_sk_`.\n\nDeben configurarse `baseUrl`, `apiKey`, `schemaId` y, según el esquema empleado, `docType` y `namespace`.\n\nEntornos:\n- Test: `https://test-api-sovra.flagonsa.com`\n- Producción: `https://api.sovra.io`\n\nDocumentación: https://github.com/sovrahq/id-docs/tree/main/docs/guides/credentials-mdoc",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://test-api-sovra.flagonsa.com",
+      "description": "Test: https://test-api-sovra.flagonsa.com · Producción: https://api.sovra.io"
+    },
+    {
+      "key": "apiKey",
+      "value": "sovra_sk_reemplazame",
+      "description": "API key del workspace (Settings → API keys)."
+    },
+    {
+      "key": "schemaId",
+      "value": "licencia_de_conducir",
+      "description": "El slug del esquema mDoc, no su UUID. Para mso_mdoc: minúsculas, dígitos, - o _."
+    },
+    {
+      "key": "docType",
+      "value": "org.iso.18013.5.1.mDL",
+      "description": "El docType del esquema. Generado: io.sovra.<dirección-eoa>.<schema_id>.1 · ISO: org.iso.18013.5.1.mDL"
+    },
+    {
+      "key": "namespace",
+      "value": "org.iso.18013.5.1",
+      "description": "Dónde residen los elementos. NO coincide con el docType cuando este es ISO. Con un docType generado, es la misma cadena."
+    },
+    {
+      "key": "credentialId",
+      "value": "",
+      "description": "Se completa automáticamente al crear una oferta."
+    },
+    {
+      "key": "verificationId",
+      "value": "",
+      "description": "Se completa automáticamente al crear una sesión de verificación."
+    }
+  ],
+  "item": [
+    {
+      "name": "Issuer",
+      "description": "Emisión de mDocs. El mismo endpoint que para SD-JWT; el formato lo fija el esquema.",
+      "item": [
+        {
+          "name": "Crear oferta de mDoc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el credential_id para las solicitudes siguientes.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('credentialId', body.credential_id);",
+                  "  console.log('offer_uri:', body.offer_uri);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credential-offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credential-offer"
+              ]
+            },
+            "description": "Crea una oferta OID4VCI preautorizada. **Es el mismo endpoint que para SD-JWT**: el formato lo determina el esquema, no la llamada. Si el `schema_id` designa un esquema `mso_mdoc`, lo que se emite es un mDoc.\n\n`claims` se envía **en estructura plana e indexado por `key`**: el namespace se obtiene del esquema, y la API no lo solicita.\n\nCodificación por tipo:\n- `date` → `\"YYYY-MM-DD\"`, diez caracteres exactos.\n- `datetime` → ISO 8601 con offset.\n- `bytes` → **base64 estándar con padding**, sin espacios ni alfabeto URL-safe.\n- `number` → únicamente valores enteros; un float carece de forma CBOR determinista.\n- `driving_privileges` → array de categorías; `vehicle_category_code` es obligatorio.\n- `codes` es **opcional** y no figura en este ejemplo: enumera las restricciones de cada categoría —el equivalente de la columna de observaciones de una licencia de plástico— y sus identificadores los define la autoridad emisora, no ISO. Si no se dispone de un catálogo de restricciones, se omite. Documentado en la guía 3.\n\nLa respuesta contiene `credential_id`, `offer_uri` (destinado al QR), `expires_at` (24 h) y `credential` (vista previa **sin firmar**).\n\nEl mDoc firmado se entrega con posterioridad, en el webhook `credential.issued`, con `format: \"mso_mdoc\"`, `doc_type`, y `credential` en CBOR base64url **sin padding**.\n\nErrores específicos de mDoc: `422 unencodable_claims`, `422 document_signer_required`.\n\nLímite de tasa: 120 solicitudes por minuto y API key.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema_id\": \"{{schemaId}}\",\n  \"claims\": {\n    \"family_name\": \"Lovelace\",\n    \"given_name\": \"Ada\",\n    \"birth_date\": \"1815-12-10\",\n    \"issue_date\": \"2026-01-15\",\n    \"expiry_date\": \"2036-01-15\",\n    \"issuing_country\": \"MX\",\n    \"issuing_authority\": \"Nuevo León\",\n    \"document_number\": \"NL-0001\",\n    \"un_distinguishing_sign\": \"MEX\",\n    \"portrait\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\",\n    \"driving_privileges\": [\n      {\n        \"vehicle_category_code\": \"B\",\n        \"issue_date\": \"2026-01-15\",\n        \"expiry_date\": \"2036-01-15\"\n      }\n    ],\n    \"age_over_18\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Consultar una credencial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credentials",
+                "{{credentialId}}"
+              ]
+            },
+            "description": "Consulta por `credential_id`, el identificador de todo el ciclo de vida."
+          }
+        },
+        {
+          "name": "Revocar una credencial",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/revoked",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credentials",
+                "{{credentialId}}",
+                "status",
+                "revoked"
+              ]
+            },
+            "description": "Revocación **permanente**. Marca el índice de la credencial en el mapa de revocación publicado en la cadena.\n\nNo admite reversión: una credencial revocada no puede reactivarse.\n\nEn mDoc, el índice de la lista de estado reside en `io.sovra.meta.1/status_list_index`, firmado por el emisor: ISO 18013-5 no define un campo `credentialStatus`. Un único índice sirve a ambos propósitos, revocación y suspensión.\n\nLos tres valores admitidos por `{status}` son `revoked`, `suspended` e `issued`. No existe `active`: la reactivación se expresa con `issued`, que es el estado al que se retorna.\n\nErrores: `400 unknown_status` · `404 credential_not_found` · `422 credential_not_yet_issued` · `422 invalid_status_transition`."
+          }
+        },
+        {
+          "name": "Suspender una credencial",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/suspended",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credentials",
+                "{{credentialId}}",
+                "status",
+                "suspended"
+              ]
+            },
+            "description": "Suspensión **reversible**. Marca el índice en el mapa de suspensión, y la credencial deja de verificar con `credential_suspended` mientras permanezca en ese estado.\n\nSe revierte con la solicitud «Reactivar una credencial».\n\nEn mDoc, el índice de la lista de estado reside en `io.sovra.meta.1/status_list_index`, firmado por el emisor: ISO 18013-5 no define un campo `credentialStatus`. Un único índice sirve a ambos propósitos, revocación y suspensión.\n\nLos tres valores admitidos por `{status}` son `revoked`, `suspended` e `issued`. No existe `active`: la reactivación se expresa con `issued`, que es el estado al que se retorna.\n\nErrores: `400 unknown_status` · `404 credential_not_found` · `422 credential_not_yet_issued` · `422 invalid_status_transition`."
+          }
+        },
+        {
+          "name": "Reactivar una credencial",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}/status/issued",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credentials",
+                "{{credentialId}}",
+                "status",
+                "issued"
+              ]
+            },
+            "description": "Revierte una suspensión y devuelve la credencial al estado `issued`.\n\n⚠️ El valor del segmento `{status}` es **`issued`**, no `active`: se indica el estado de destino, que es aquel en el que la credencial quedó al emitirse.\n\nÚnicamente resulta aplicable a una credencial `suspended`. Sobre una revocada devuelve `422 invalid_status_transition`.\n\nEn mDoc, el índice de la lista de estado reside en `io.sovra.meta.1/status_list_index`, firmado por el emisor: ISO 18013-5 no define un campo `credentialStatus`. Un único índice sirve a ambos propósitos, revocación y suspensión.\n\nLos tres valores admitidos por `{status}` son `revoked`, `suspended` e `issued`. No existe `active`: la reactivación se expresa con `issued`, que es el estado al que se retorna.\n\nErrores: `400 unknown_status` · `404 credential_not_found` · `422 credential_not_yet_issued` · `422 invalid_status_transition`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verifier",
+      "description": "Verificación de mDocs mediante OID4VP y DCQL.",
+      "item": [
+        {
+          "name": "Crear sesión de verificación (mDoc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y muestra la URI corta para el QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR (por referencia):', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "Crea una sesión OID4VP con una consulta DCQL para mDoc.\n\n**Diferencias respecto de SD-JWT:**\n- `format` es `mso_mdoc`.\n- Cada claim se denomina con **exactamente dos cadenas**: `{\"path\": [\"<namespace>\", \"<identificador>\"]}`.\n- `meta.doctype_value` es opcional; en su ausencia se admite cualquier docType.\n\n⚠️ **El namespace no coincide con el docType.** ISO asocia el docType `org.iso.18013.5.1.mDL` con el namespace `org.iso.18013.5.1`. Con un docType generado por Sovra (`io.sovra.<dirección>.<esquema>.1`) ambas cadenas coinciden, razón por la cual esta incidencia no se manifiesta hasta la migración a ISO.\n\nNo se admite la combinación de mDoc y SD-JWT en una misma consulta (`400 mixed_dcql_formats`): una presentación transporta una credencial en un formato.\n\nPara el QR resulta preferible `authorization_request_uri_ref`, cuya longitud no crece con el DCQL.\n\nEn el resultado, las claves de `claims` se entregan **cualificadas por namespace**, unidas mediante un punto: `\"org.iso.18013.5.1.family_name\"`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"licencia\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"family_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"given_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"age_over_18\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Control de edad (únicamente age_over_18)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "El supuesto que justifica el formato: acreditar la mayoría de edad **sin** solicitar la fecha de nacimiento ni el nombre.\n\n`age_over_NN` es un booleano firmado por el emisor, no un cálculo sobre `birth_date`. Cualquier `NN` de dos dígitos constituye un identificador válido en `org.iso.18013.5.1`; un mDL inicializado por Sovra incorpora `age_over_18` y `age_over_21`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"edad\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"age_over_18\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Consultar una sesión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications/{{verificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications",
+                "{{verificationId}}"
+              ]
+            },
+            "description": "El resultado se entrega asimismo por webhook (`presentation.verified` o `presentation.failed`); este endpoint se destina a consulta periódica o a diagnóstico.\n\nEn `presentation_data`, las claves de `claims` se entregan cualificadas por namespace: `\"org.iso.18013.5.1.family_name\"`."
+          }
+        }
+      ]
+    }
+  ]
+}

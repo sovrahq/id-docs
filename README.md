@@ -5,12 +5,13 @@ de identidad.
 
 ## 📚 Empezá acá
 
-👉 **[Guías de Sovra ID](docs/guides/)** — dos rutas de lectura, según qué emitas:
+👉 **[Guías de Sovra ID](docs/guides/)** — tres rutas de lectura, según qué emitas:
 
 | | Qué es | Cuándo |
 |---|---|---|
 | 📄 **[Credenciales verificables](docs/guides/credentials/)** | Viven en la wallet del ciudadano, con divulgación selectiva y prueba de posesión | Licencias, identidad, membresías, títulos habilitantes |
 | 📑 **[Documentos firmados](docs/guides/documents/)** | Una credencial **sin holder**: el emisor la firma, la ancla on-chain y la entrega | Certificados, constancias, actas, comprobantes |
+| 🪪 **[Credenciales mDoc](docs/guides/credentials-mdoc/)** | Lo mismo que una credencial, pero en el formato **ISO 18013-5** (CBOR + MSO) | Licencias de conducir móviles (mDL), documentos de identidad interoperables |
 
 **La regla práctica:** si el dato es sobre una persona y ella decide cuándo y cuánto
 mostrarlo, es una **credencial**. Si es una hoja que la institución emite y reparte,
@@ -31,6 +32,19 @@ es un **documento**.
 | 9 | [Verificación sin Sovra](docs/guides/credentials/09-verificacion-sin-sovra.md) | Verificar contra SovraChain con el SDK. |
 | 10 | [Verificar por WhatsApp](docs/guides/credentials/10-whatsapp.md) | Deep link, QR, correlación y cotejo de identidad en el chat. |
 
+### 🪪 Credenciales mDoc (ISO 18013-5)
+
+| # | Guía | Contenido |
+|---|---|---|
+| 1 | [Introducción](docs/guides/credentials-mdoc/01-introduccion.md) | Qué es un mDoc, docType y namespace, anatomía del `IssuerSigned`, el namespace meta, las dos rutas de confianza. |
+| 2 | [Primeros pasos](docs/guides/credentials-mdoc/02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
+| 3 | [Emisión de mDocs](docs/guides/credentials-mdoc/03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
+| 4 | [Verificación de mDocs](docs/guides/credentials-mdoc/04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
+| 5 | [Referencia de la API](docs/guides/credentials-mdoc/05-referencia-api.md) | Endpoints, objetos, tipos de claim, catálogo de elementos ISO. |
+| 6 | [Errores y troubleshooting](docs/guides/credentials-mdoc/06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
+| 7 | [Verificación sin Sovra](docs/guides/credentials-mdoc/07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
+| 8 | [Habilitar mDL ISO](docs/guides/credentials-mdoc/08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
+
 ### 📑 Documentos firmados
 
 | # | Guía | Contenido |
@@ -49,8 +63,9 @@ es un **documento**.
 ```
 ├── docs/
 │   ├── guides/
-│   │   ├── credentials/   # ✅ Credenciales verificables (wallet, OID4VCI/OID4VP)
-│   │   └── documents/     # ✅ Documentos firmados (sin holder, anclados on-chain)
+│   │   ├── credentials/        # ✅ Credenciales verificables (wallet, OID4VCI/OID4VP)
+│   │   ├── credentials-mdoc/   # ✅ Credenciales mDoc (ISO 18013-5, CBOR + MSO)
+│   │   └── documents/          # ✅ Documentos firmados (sin holder, anclados on-chain)
 │   ├── resources/         # Colecciones de Postman
 │   └── deprecated/        # 🗄 Plataforma anterior — solo referencia histórica
 ├── boilerplate/           # Plantillas y código base
@@ -61,6 +76,7 @@ es un **documento**.
 
 - [Boilerplate de WhatsApp](boilerplate/templates/whatsapp-meta/) — bot que verifica credenciales dentro del chat, directo contra la Cloud API de Meta. `npm run demo` corre la conversación entera sin credenciales.
 - [Colección de Postman — Credenciales](docs/resources/sovra-credenciales.postman_collection.json) — importala y configurá `baseUrl` + `apiKey`.
+- [Colección de Postman — mDoc](docs/resources/sovra-mdoc.postman_collection.json) — requiere configurar `baseUrl`, `apiKey`, `schemaId`, `docType` y `namespace`.
 - [Colección de Postman — Documentos firmados](docs/resources/sovra-documentos-firmados.postman_collection.json) — importala y configurá `base_url`, `api_key`, `schema_id`.
 - Especificación OpenAPI en vivo: `GET {baseUrl}/openapi/api`.
 
@@ -78,6 +94,7 @@ los eventos no son compatibles con la API actual.
 
 ## 📝 Contribuir
 
-Las guías viven en `docs/guides/credentials/` y `docs/guides/documents/`. Al agregar
+Las guías viven en `docs/guides/credentials/`, `docs/guides/credentials-mdoc/` y
+`docs/guides/documents/`. Al agregar
 una, sumala al índice de su carpeta, al de [`docs/guides/README.md`](docs/guides/README.md),
 al de [`docs/README.md`](docs/README.md) y al de este README.

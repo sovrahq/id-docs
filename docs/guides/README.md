@@ -1,6 +1,7 @@
 # Guías de Sovra ID
 
-La plataforma emite dos cosas, y cada una tiene su propia ruta de lectura:
+La plataforma emite dos cosas —credenciales y documentos— y las credenciales vienen
+en dos formatos. Son tres rutas de lectura:
 
 | | [**Credenciales verificables**](credentials/) | [**Documentos firmados**](documents/) |
 |---|---|---|
@@ -19,9 +20,13 @@ La plataforma emite dos cosas, y cada una tiene su propia ruta de lectura:
 mostrarlo, es una **credencial**. Si es una hoja que la institución emite y reparte,
 es un **documento**.
 
-Los dos formatos son **SD-JWT VC** firmados con **ES256** por el mismo emisor, con el
-estado publicado en **SovraChain**, y usan la misma **API key de workspace**
+Las dos son **SD-JWT VC** firmadas con **ES256** por el mismo emisor, con el estado
+publicado en **SovraChain**, y usan la misma **API key de workspace**
 (`Authorization: Bearer sovra_sk_...`).
+
+Y una credencial puede emitirse además como **mDoc** (ISO 18013-5): mismos endpoints
+y misma API key, pero CBOR firmado con un MSO en vez de un SD-JWT. Está en
+[`credentials-mdoc/`](credentials-mdoc/).
 
 ---
 
@@ -43,6 +48,33 @@ Emisión por **OID4VCI**, verificación por **OID4VP + DCQL**, revocación por
 | 9 | [Verificación sin Sovra](credentials/09-verificacion-sin-sovra.md) | Verificar contra la cadena, sin depender de la API de Sovra. |
 | 10 | [Verificar por WhatsApp](credentials/10-whatsapp.md) | Llevar la verificación al chat: deep link, QR, correlación y cotejo de identidad. |
 
+## 🪪 [`credentials-mdoc/`](credentials-mdoc/) — Credenciales mDoc (ISO 18013-5)
+
+Una credencial verificable, en el formato de la norma de la **licencia de conducir
+móvil**: **CBOR** firmado con un **MSO** `COSE_Sign1` en vez de un SD-JWT. Se emite y
+se verifica por **los mismos endpoints** —el formato lo decide el esquema— pero un
+claim se nombra con dos segmentos, `[namespace, identificador]`.
+
+| | SD-JWT VC | mDoc |
+|---|---|---|
+| `format` del esquema | `vc+sd-jwt` | `mso_mdoc` |
+| Codificación | JSON / JWT | CBOR |
+| Cómo se nombra un claim | `["full_name"]` | `["org.iso.18013.5.1", "family_name"]` |
+| Identidad del emisor | El DID del workspace | La dirección del docType, **o** la cadena `x5chain` |
+| Prueba de posesión | KB-JWT | Device authentication |
+| Presencial (BLE/NFC) | — | ❌ No implementado: sólo el perfil en línea |
+
+| # | Guía | Para qué sirve |
+|---|---|---|
+| 1 | [Introducción](credentials-mdoc/01-introduccion.md) | Qué es un mDoc, docType y namespace, anatomía del `IssuerSigned`, el namespace meta, las dos rutas de confianza. |
+| 2 | [Primeros pasos](credentials-mdoc/02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
+| 3 | [Emisión de mDocs](credentials-mdoc/03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
+| 4 | [Verificación de mDocs](credentials-mdoc/04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
+| 5 | [Referencia de la API](credentials-mdoc/05-referencia-api.md) | Endpoints, objetos, tipos de claim, catálogo de elementos ISO. |
+| 6 | [Errores y troubleshooting](credentials-mdoc/06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
+| 7 | [Verificación sin Sovra](credentials-mdoc/07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
+| 8 | [Habilitar mDL ISO](credentials-mdoc/08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
+
 ## 📑 [`documents/`](documents/) — Documentos firmados
 
 Una sola llamada valida, firma y **ancla on-chain**. El `credential` resultante es un
@@ -62,20 +94,21 @@ al servicio que lo emitió.
 
 ---
 
-## Lo que comparten las dos rutas
+## Lo que comparten las tres rutas
 
 | | |
 |---|---|
 | **Entornos** | Test: `https://test-api-sovra.flagonsa.com` · Producción: `https://api.sovra.io` |
 | **Autenticación** | `Authorization: Bearer sovra_sk_...` — el esquema es sensible a mayúsculas |
 | **Dashboard** | Los esquemas, los layouts, las API keys y el webhook se configuran ahí. No hay API para eso |
-| **Formato** | SD-JWT VC (`vc+sd-jwt`), firma ES256, llaves en KMS |
+| **Formato** | SD-JWT VC (`vc+sd-jwt`) o mDoc (`mso_mdoc`, ISO 18013-5), firma ES256, llaves en KMS |
 | **Cadena** | SovraChain: DID Registry, Issuer Registry, estado de las credenciales |
 | **OpenAPI** | `GET {baseUrl}/openapi/api` — la fuente de verdad si algo acá queda desactualizado |
 
 ## Recursos
 
 - [Colección de Postman — Credenciales](../resources/sovra-credenciales.postman_collection.json)
+- [Colección de Postman — mDoc](../resources/sovra-mdoc.postman_collection.json)
 - [Colección de Postman — Documentos firmados](../resources/sovra-documentos-firmados.postman_collection.json)
 
 > La documentación de la plataforma anterior (`x-api-key`, `did:quarkid`, DIDComm,

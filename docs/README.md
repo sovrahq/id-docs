@@ -29,6 +29,7 @@ es un **documento**. La comparación completa está en el
 | 8 | [Errores y troubleshooting](guides/credentials/08-errores-y-troubleshooting.md) | Cada código de error y su solución. |
 | 9 | [Verificación sin Sovra](guides/credentials/09-verificacion-sin-sovra.md) | Verificar contra SovraChain con el SDK. |
 | 10 | [Verificar por WhatsApp](guides/credentials/10-whatsapp.md) | Deep link, QR, correlación y cotejo de identidad en el chat. |
+| 11 | [Emitir desde Moodle](guides/credentials/11-moodle.md) | Credencial al completar un curso, desde un plugin local de Moodle. |
 
 ### Credenciales mDoc (ISO 18013-5)
 

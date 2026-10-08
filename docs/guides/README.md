@@ -47,6 +47,7 @@ Emisión por **OID4VCI**, verificación por **OID4VP + DCQL**, revocación por
 | 8 | [Errores y troubleshooting](credentials/08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 | 9 | [Verificación sin Sovra](credentials/09-verificacion-sin-sovra.md) | Verificar contra la cadena, sin depender de la API de Sovra. |
 | 10 | [Verificar por WhatsApp](credentials/10-whatsapp.md) | Llevar la verificación al chat: deep link, QR, correlación y cotejo de identidad. |
+| 11 | [Emitir desde Moodle](credentials/11-moodle.md) | Credencial al completar un curso: oferta a pedido, webhook opcional, plugin local. |
 
 ## 🪪 [`credentials-mdoc/`](credentials-mdoc/) — Credenciales mDoc (ISO 18013-5)
 

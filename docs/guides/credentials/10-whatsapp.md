@@ -265,4 +265,4 @@ aprobación tarda. Pedila con tiempo.
 
 ---
 
-**Anterior:** [← 9. Verificación sin Sovra](09-verificacion-sin-sovra.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/whatsapp-meta/`](../../../boilerplate/templates/whatsapp-meta/)**
+**Anterior:** [← 9. Verificación sin Sovra](09-verificacion-sin-sovra.md) · **Siguiente:** [11. Emitir desde Moodle →](11-moodle.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/whatsapp-meta/`](../../../boilerplate/templates/whatsapp-meta/)**

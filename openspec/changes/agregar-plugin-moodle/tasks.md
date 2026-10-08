@@ -23,6 +23,6 @@
 
 ## 5. Documentación y punta a punta
 
-- [ ] 5.1 README del boilerplate (instalación, configuración, Moodle local, prueba con billetera, próximos pasos), guía `11-moodle.md` y entrada en `boilerplate/README.md`
+- [x] 5.1 README del boilerplate (instalación, configuración, Moodle local, prueba con billetera, próximos pasos), guía `11-moodle.md` y entrada en `boilerplate/README.md`
 - [x] 5.2 Recorrido punta a punta en Moodle 4.5 local contra el workspace de test: curso completado → notificación → página → oferta → QR y enlace → webhook simulado con firma buena y mala → reconciliación
 - [ ] 5.3 `openspec validate agregar-plugin-moodle` en verde y PR abierto contra `main`

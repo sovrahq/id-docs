@@ -15,8 +15,6 @@ require_once(__DIR__ . '/fixtures_trait.php');
  * @package    local_sovracred
  * @copyright  2026 Sovra
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_sovracred\task\reconcile
- * @covers     \local_sovracred\issuance::refresh
  */
 final class reconcile_test extends \advanced_testcase {
     use fixtures_trait;

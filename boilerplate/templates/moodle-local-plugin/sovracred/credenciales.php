@@ -24,12 +24,14 @@ if (isguestuser()) {
     throw new require_login_exception('guestsarenotallowed');
 }
 
-$action = optional_param('action', '', PARAM_ALPHA);
+$action = optional_param('op', '', PARAM_ALPHA);
 $id = optional_param('id', 0, PARAM_INT);
 
 $url = new moodle_url('/local/sovracred/credenciales.php');
 $PAGE->set_url($url);
-$PAGE->set_context(context_user::instance($USER->id));
+// Contexto de sistema: el de usuario agrega la cabecera de perfil, que acá no aporta.
+// Los datos son siempre los del propio usuario (todas las consultas filtran por $USER->id).
+$PAGE->set_context(context_system::instance());
 $PAGE->set_pagelayout('standard');
 $PAGE->set_title(get_string('mycredentials', 'local_sovracred'));
 $PAGE->set_heading(get_string('mycredentials', 'local_sovracred'));
@@ -95,7 +97,7 @@ foreach ($records as $record) {
     if ($record->status === issuance::AVAILABLE || ($record->status === issuance::OFFERED && !$offervalid)) {
         $body .= html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
         $body .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
-        $body .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'action', 'value' => 'recibir']);
+        $body .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'op', 'value' => 'recibir']);
         $body .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'id', 'value' => $record->id]);
         $body .= html_writer::tag('button', get_string('receive', 'local_sovracred'),
             ['type' => 'submit', 'class' => 'btn btn-primary']);

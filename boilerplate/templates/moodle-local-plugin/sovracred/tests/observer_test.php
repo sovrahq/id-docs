@@ -15,9 +15,6 @@ require_once(__DIR__ . '/fixtures_trait.php');
  * @package    local_sovracred
  * @copyright  2026 Sovra
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_sovracred\observer
- * @covers     \local_sovracred\issuance::register
- * @covers     \local_sovracred\issuance::notify
  */
 final class observer_test extends \advanced_testcase {
     use fixtures_trait;

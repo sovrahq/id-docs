@@ -19,6 +19,7 @@ El plugin SHALL registrar que un estudiante tiene derecho a la credencial de un 
 #### Scenario: El estudiante es el relacionado, no el actor
 - **WHEN** el evento lo dispara un usuario distinto del estudiante (el cron o un docente que marca la completitud a mano)
 - **THEN** el derecho queda a nombre del estudiante que completó el curso
+- **AND** la notificación está en el idioma del estudiante, no en el de quien disparó el evento
 
 ### Requirement: La oferta se crea cuando el estudiante la pide
 El plugin MUST NOT crear ofertas al completarse el curso. SHALL crear la oferta OID4VCI en la API de Sovra recién cuando el estudiante, autenticado y con una acción protegida contra CSRF, toca «Recibir en mi cartera» sobre un derecho propio. Mientras una oferta creada siga vigente con margen suficiente, SHALL reutilizarla en lugar de crear otra.
@@ -67,7 +68,7 @@ La página «Mis credenciales» SHALL mostrar cada oferta vigente como un códig
 
 #### Scenario: Sin recursos externos
 - **WHEN** se renderiza el QR
-- **THEN** la página no carga scripts, estilos ni imágenes desde fuera del propio Moodle
+- **THEN** el plugin no agrega scripts, estilos ni imágenes de fuera del propio Moodle (lo que cargue el tema o los filtros del sitio es configuración del sitio)
 
 ### Requirement: Los claims de la credencial
 Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `programa`, `curso`, `horas`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `nivel` sólo cuando tiene valor. El campo del perfil del que sale `documento` SHALL ser configurable. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
@@ -154,7 +155,8 @@ El plugin SHALL ofrecer a quien tenga la capacidad de verlo un reporte con los d
 
 #### Scenario: Prueba de conexión
 - **WHEN** el administrador prueba la conexión
-- **THEN** el plugin llama a la API con el esquema configurado y sin claims, no se crea ninguna oferta, y el resultado distingue «llave inválida», «esquema inexistente» y «conexión correcta»
+- **THEN** el plugin llama a la API con el esquema configurado y sin claims, y el resultado distingue «llave inválida», «esquema inexistente» y «conexión correcta»
+- **AND** si el esquema tiene campos obligatorios no se crea ninguna oferta; si no los tiene, el resultado avisa que se creó una oferta de prueba que vence sola
 
 #### Scenario: Reintento
 - **WHEN** el administrador pide consultar el estado de una oferta o reenviar el aviso

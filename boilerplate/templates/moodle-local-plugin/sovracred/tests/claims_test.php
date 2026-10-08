@@ -15,7 +15,6 @@ require_once(__DIR__ . '/fixtures_trait.php');
  * @package    local_sovracred
  * @copyright  2026 Sovra
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers     \local_sovracred\claims
  */
 final class claims_test extends \advanced_testcase {
     use fixtures_trait;

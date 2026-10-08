@@ -87,6 +87,10 @@ class issuance {
         $url = new \moodle_url('/local/sovracred/credenciales.php');
         $a = (object) ['course' => $coursename, 'url' => $url->out(false)];
 
+        // El evento lo dispara el cron (o un docente): el texto va en el idioma del estudiante, no en el de quien lo disparó.
+        $user = \core_user::get_user($issuance->userid, 'id, lang', MUST_EXIST);
+        $previouslang = force_current_language($user->lang);
+
         $message = new \core\message\message();
         $message->component = 'local_sovracred';
         $message->name = 'credentialavailable';
@@ -101,6 +105,8 @@ class issuance {
         $message->contexturl = $url->out(false);
         $message->contexturlname = get_string('mycredentials', 'local_sovracred');
         $message->courseid = $course->id;
+
+        force_current_language($previouslang);
         message_send($message);
     }
 

@@ -23,7 +23,7 @@ admin_externalpage_setup('local_sovracred_report');
 
 $status = optional_param('status', '', PARAM_ALPHA);
 $page = optional_param('page', 0, PARAM_INT);
-$action = optional_param('action', '', PARAM_ALPHA);
+$action = optional_param('op', '', PARAM_ALPHA);
 $id = optional_param('id', 0, PARAM_INT);
 $perpage = 50;
 
@@ -89,7 +89,7 @@ if ($lastrejected) {
 }
 echo html_writer::tag('ul', $items, ['class' => 'list-unstyled']);
 
-echo $OUTPUT->single_button(new moodle_url($baseurl, ['action' => 'test', 'sesskey' => sesskey()]),
+echo $OUTPUT->single_button(new moodle_url($baseurl, ['op' => 'test', 'sesskey' => sesskey()]),
     get_string('testconnection', 'local_sovracred'), 'post');
 
 // Conteo por estado, que también filtra.
@@ -123,11 +123,11 @@ $table->head = [
 foreach ($rows as $row) {
     $actions = [];
     if ($row->status === issuance::OFFERED) {
-        $actions[] = html_writer::link(new moodle_url($baseurl, ['action' => 'refresh', 'id' => $row->id, 'sesskey' => sesskey()]),
+        $actions[] = html_writer::link(new moodle_url($baseurl, ['op' => 'refresh', 'id' => $row->id, 'sesskey' => sesskey()]),
             get_string('refresh', 'local_sovracred'));
     }
     if (in_array($row->status, [issuance::AVAILABLE, issuance::OFFERED], true)) {
-        $actions[] = html_writer::link(new moodle_url($baseurl, ['action' => 'notify', 'id' => $row->id, 'sesskey' => sesskey()]),
+        $actions[] = html_writer::link(new moodle_url($baseurl, ['op' => 'notify', 'id' => $row->id, 'sesskey' => sesskey()]),
             get_string('notify', 'local_sovracred'));
     }
     $table->data[] = [
@@ -135,7 +135,8 @@ foreach ($rows as $row) {
         format_string($row->coursename),
         get_string('status_' . $row->status, 'local_sovracred'),
         $row->timecompleted ? userdate($row->timecompleted, get_string('strftimedatetimeshort', 'langconfig')) : '',
-        $row->offerexpires ? userdate($row->offerexpires, get_string('strftimedatetimeshort', 'langconfig')) : '',
+        $row->status === issuance::OFFERED && $row->offerexpires
+            ? userdate($row->offerexpires, get_string('strftimedatetimeshort', 'langconfig')) : '',
         s((string) $row->lasterror),
         implode(' · ', $actions),
     ];

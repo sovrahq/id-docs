@@ -55,15 +55,18 @@ Tres decisiones que conviene entender antes de tocar nada:
 Una oferta de Sovra **vence a las 24 horas y es de un solo uso**. Si se creara al
 completar el curso —que a veces el cron calcula de madrugada— la mayoría vencería
 sin usarse. El plugin sólo registra *«tiene derecho»*; la oferta nace en el
-momento en que el estudiante toca el botón, siempre fresca. Si recarga la página,
-se reutiliza la misma mientras le queden más de 10 minutos.
+momento en que el estudiante toca el botón, siempre fresca. Si recarga la página se
+reutiliza la misma, y **nunca hay dos ofertas canjeables del mismo derecho**: se
+crea otra recién cuando Sovra confirma que la anterior venció. (Si hubiera dos,
+la anterior podría canjearse sin que Moodle pudiera asociarla al estudiante.)
 
 **2. El webhook es opcional.** Sovra avisa `credential.issued` cuando el
 estudiante acepta, pero el aviso viene de fuera del país, y muchos firewalls
 institucionales lo bloquean. Una **tarea programada** consulta el estado de las
 ofertas abiertas cada 5 minutos, y la página del estudiante también lo consulta
-al abrirse. Con el webhook la confirmación es instantánea; sin él, tarda unos
-minutos. Nada más cambia.
+al abrirse. Las credenciales ya emitidas se vuelven a consultar una vez por día,
+para reflejar revocaciones y suspensiones. Con el webhook todo es instantáneo; sin
+él, una emisión se confirma en hasta 5 minutos y una revocación, en hasta un día.
 
 **3. Los datos de la credencial están en código.** Qué datos personales viajan en
 una credencial es una decisión de producto y de privacidad: está en
@@ -105,6 +108,12 @@ la reconciliación; si Moodle ya calcula completitudes, ya lo tenés) y la
 | Esquema | El slug del esquema, por ejemplo `bogota-formacion`. |
 | Cursos que emiten | Todos, o una lista de IDs de curso. |
 | Campo del número de documento | El campo estándar «Número de ID» o cualquier campo propio del perfil. |
+
+> ⚠️ **La institución firma lo que el estudiante tiene en su perfil.** Si el
+> estudiante puede editar su nombre, su apellido o el campo del documento, puede
+> recibir una credencial firmada con datos ajenos. Bloquealos: en la configuración
+> del método de autenticación (**Bloquear campos de usuario**) para nombre y
+> apellido, y marcando el campo de perfil del documento como no editable.
 
 Y además:
 
@@ -214,7 +223,7 @@ internet:** la cartera habla con Sovra, no con Moodle.
 4. Escaneá el QR de la pantalla con la cartera y aceptá la credencial. Revisá en
    el teléfono que los datos y el diseño sean los esperados.
 5. Sin webhook, la página de la computadora pasa a *«Está en tu cartera»* en la
-   próxima recarga (se recarga sola cada 15 s). Para forzar la tarea:
+   próxima recarga (se recarga sola cada 20 s). Para forzar la tarea:
    `php admin/cli/scheduled_task.php --execute='\local_sovracred\task\reconcile'`.
 6. Probá también el botón desde el teléfono: abrí Moodle **en el teléfono**,
    tocá **«Abrir mi cartera»** — tiene que abrir la app, no el navegador.
@@ -237,7 +246,7 @@ sovracred/
 │   ├── hmac.php               X-Sovra-Signature: sha256=HMAC del cuerpo crudo
 │   ├── observer.php           \core\event\course_completed → derecho + notificación
 │   ├── config.php             Lectura de ajustes; secretos descifrados
-│   ├── task/reconcile.php     Cada 5 min: confirma ofertas sin depender del webhook
+│   ├── task/reconcile.php     Cada 5 min: confirma ofertas; 1 vez por día: revocaciones
 │   └── privacy/provider.php   Exportación y borrado de datos (API de privacidad de Moodle)
 ├── db/                        Tablas, permisos, evento, notificación, tarea
 ├── lang/{en,es}/              Textos
@@ -250,7 +259,7 @@ Los estados de un derecho:
 ```
 available ──(el estudiante la pide)──▶ offered ──(la canjea)──▶ issued ⇄ suspended
     ▲                                     │                        │
-    └──────────(la oferta vence)──────────┘                        └──▶ revoked
+    └─────(Sovra informa: venció)─────────┘                        └──▶ revoked
 ```
 
 ## Antes de producción
@@ -261,13 +270,16 @@ available ──(el estudiante la pide)──▶ offered ──(la canjea)──
       reporte que ningún derecho quede con `missingclaims: documento`.
 - [ ] **Organización propia en producción.** El nombre que el ciudadano lee como
       emisor es el de la **organización** de Sovra, no el del workspace.
+- [ ] **Bloquear nombre, apellido y documento** para que el estudiante no los
+      pueda editar (ver la advertencia en [Configuración](#2-en-moodle)).
 - [ ] **Webhook o no webhook.** Si el firewall permite el aviso de Sovra, configurar
-      URL y secreto; si no, dejar el secreto vacío y confiar en la tarea (≤ 5 min).
+      URL y secreto. Si no, dejar el secreto vacío: las emisiones se confirman en
+      hasta 5 minutos y las revocaciones en hasta un día.
 - [ ] **Cursos completados antes de instalar:**
       `php local/sovracred/cli/backfill.php` cuenta; `--run` los registra;
       `--run --notify` además avisa a cada estudiante.
-- [ ] **Revocación.** Este plugin refleja revocaciones y suspensiones que llegan
-      por webhook, pero no las inicia. Para revocar: consola de Sovra o
+- [ ] **Revocación.** Este plugin refleja revocaciones y suspensiones (por webhook,
+      o por la consulta diaria), pero no las inicia. Para revocar: consola de Sovra o
       `PUT /api/v1/issuer/credentials/{id}/status/revoked`.
 - [ ] **El SD-JWT firmado no se guarda.** Llega una sola vez en el webhook
       `credential.issued` y Sovra no lo almacena. Si tu institución lo necesita

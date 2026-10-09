@@ -31,7 +31,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 $rawbody = (string) file_get_contents('php://input');
 $signature = $_SERVER['HTTP_X_SOVRA_SIGNATURE'] ?? null;
 
-$status = \local_sovracred\webhook::handle($rawbody, $signature, \local_sovracred\config::webhook_secret());
+try {
+    $status = \local_sovracred\webhook::handle($rawbody, $signature, \local_sovracred\config::webhook_secret());
+} catch (\Throwable $e) {
+    // Sin esto, el manejador de Moodle responde 404, y un 4xx hace que Sovra descarte el evento sin reintentar.
+    $status = 500;
+}
 
 http_response_code($status);
 echo json_encode(['ok' => $status === 200]);

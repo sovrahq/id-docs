@@ -37,7 +37,7 @@ class webhook {
      * @param string $rawbody El cuerpo tal como llegó.
      * @param string|null $signature El header X-Sovra-Signature.
      * @param string $secret El secreto del webhook.
-     * @return int 200, 401 o 503
+     * @return int 200, 401, 500 o 503
      */
     public static function handle(string $rawbody, ?string $signature, string $secret): int {
         global $DB;
@@ -47,7 +47,10 @@ class webhook {
         }
         if (!hmac::is_valid($rawbody, $signature, $secret)) {
             // Para el reporte: un secreto mal copiado se ve acá. No se guarda el cuerpo: trae datos personales.
-            set_config('lastrejected', time(), 'local_sovracred');
+            // Como mucho una escritura por minuto: el endpoint es público y esto no tiene que ser disparable a voluntad.
+            if ((int) get_config('local_sovracred', 'lastrejected') < time() - MINSECS) {
+                set_config('lastrejected', time(), 'local_sovracred');
+            }
             return 401;
         }
 
@@ -63,25 +66,37 @@ class webhook {
             return 200;
         }
 
+        // Marcar la entrega y aplicarla en una sola transacción: si el proceso muere en el medio,
+        // no queda un id marcado como procesado sin haberse aplicado.
+        $transaction = null;
         try {
-            $rowid = $DB->insert_record('local_sovracred_webhook', (object) [
+            $transaction = $DB->start_delegated_transaction();
+            $DB->insert_record('local_sovracred_webhook', (object) [
                 'eventid' => $eventid,
                 'event' => $event,
                 'timereceived' => time(),
             ]);
-        } catch (\dml_write_exception $e) {
-            // Misma entrega procesándose en paralelo: el índice único sobre eventid ya la tomó.
-            return 200;
-        }
-
-        try {
             self::apply($event, $payload);
+            $transaction->allow_commit();
+            return 200;
         } catch (\Throwable $e) {
-            // Liberar el id para que el reintento de Sovra (que llega por el 500) se procese.
-            $DB->delete_records('local_sovracred_webhook', ['id' => $rowid]);
-            throw $e;
+            if ($transaction && !$transaction->is_disposed()) {
+                try {
+                    $transaction->rollback($e);
+                } catch (\Throwable $rethrown) {
+                    // rollback() vuelve a lanzar la excepción: ya la tenemos.
+                    unset($rethrown);
+                }
+            }
+            // ¿Era la misma entrega procesándose en paralelo? Entonces el índice único ya la tomó y está aplicada.
+            if ($DB->record_exists('local_sovracred_webhook', ['eventid' => $eventid])) {
+                return 200;
+            }
+            // Cualquier otro fallo: 500 para que Sovra reintente. Un 4xx lo descartaría para siempre,
+            // y una excepción sin atrapar acá la convierte Moodle en un 404.
+            debugging('local_sovracred: no se pudo aplicar la entrega ' . $eventid . ': ' . get_class($e), DEBUG_NORMAL);
+            return 500;
         }
-        return 200;
     }
 
     /**
@@ -105,12 +120,21 @@ class webhook {
         }
 
         // Los eventos se entregan en paralelo y con reintentos: un revoked puede llegar antes que un issued demorado.
-        $eventtime = !empty($payload['timestamp']) ? (int) strtotime($payload['timestamp']) : time();
+        // statustime sólo guarda horas del reloj de Sovra (timestamp de eventos, issued_at): nunca el de Moodle.
+        $eventtime = !empty($payload['timestamp']) ? (int) strtotime($payload['timestamp']) : 0;
+        if (!$eventtime) {
+            // Sin hora legible: se aplica, pero sin mover la marca.
+            $eventtime = (int) $issuance->statustime;
+        }
         if ($eventtime < (int) $issuance->statustime) {
             return;
         }
 
         $changes = ['status' => self::TRANSITIONS[$event], 'statustime' => $eventtime, 'lasterror' => null];
+        if (self::TRANSITIONS[$event] === issuance::ISSUED && empty($issuance->timeissued)) {
+            // Un unsuspended que llega antes que el issued demorado.
+            $changes['timeissued'] = $eventtime ?: time();
+        }
         if ($event === 'credential.issued') {
             $issuedat = !empty($data['issued_at']) ? strtotime($data['issued_at']) : false;
             $changes['holderdid'] = $data['holder_did'] ?? null;

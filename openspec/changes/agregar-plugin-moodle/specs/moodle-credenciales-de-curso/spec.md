@@ -22,7 +22,7 @@ El plugin SHALL registrar que un estudiante tiene derecho a la credencial de un 
 - **AND** la notificación está en el idioma del estudiante, no en el de quien disparó el evento
 
 ### Requirement: La oferta se crea cuando el estudiante la pide
-El plugin MUST NOT crear ofertas al completarse el curso. SHALL crear la oferta OID4VCI en la API de Sovra recién cuando el estudiante, autenticado y con una acción protegida contra CSRF, toca «Recibir en mi cartera» sobre un derecho propio. Mientras una oferta creada siga vigente con margen suficiente, SHALL reutilizarla en lugar de crear otra.
+El plugin MUST NOT crear ofertas al completarse el curso. SHALL crear la oferta OID4VCI en la API de Sovra recién cuando el estudiante, autenticado y con una acción protegida contra CSRF, toca «Recibir en mi cartera» sobre un derecho propio. Un derecho MUST NOT tener más de una oferta canjeable: mientras Sovra informe que la oferta anterior sigue pendiente, SHALL reutilizarla, y sólo SHALL crear otra cuando Sovra informe que venció. Dos solicitudes simultáneas del mismo derecho MUST NOT crear dos ofertas.
 
 #### Scenario: Primera solicitud
 - **WHEN** el estudiante toca «Recibir en mi cartera» sobre un derecho disponible
@@ -31,12 +31,16 @@ El plugin MUST NOT crear ofertas al completarse el curso. SHALL crear la oferta 
 - **AND** el derecho pasa a «oferta creada»
 
 #### Scenario: Oferta vigente
-- **WHEN** el estudiante vuelve a pedirla y la oferta anterior vence en más de 10 minutos
+- **WHEN** el estudiante vuelve a pedirla y Sovra informa que la oferta anterior sigue pendiente, aunque le falten pocos minutos
 - **THEN** se muestra la misma oferta y no se crea otra
 
-#### Scenario: Oferta vencida o por vencer
-- **WHEN** el estudiante la pide y la oferta anterior venció o vence en 10 minutos o menos
-- **THEN** el plugin consulta primero el estado de la anterior; si no fue canjeada, crea una nueva
+#### Scenario: Oferta vencida
+- **WHEN** el estudiante la pide y Sovra informa que la oferta anterior venció
+- **THEN** el plugin crea una nueva
+
+#### Scenario: URI de oferta inesperada
+- **WHEN** la API devuelve una `offer_uri` que no empieza con `openid-credential-offer://`
+- **THEN** no se guarda ni se muestra, y el error queda registrado
 
 #### Scenario: Ya se emitió aunque no llegó el aviso
 - **WHEN** el estudiante la pide y la consulta muestra que la oferta anterior ya fue canjeada
@@ -71,7 +75,7 @@ La página «Mis credenciales» SHALL mostrar cada oferta vigente como un códig
 - **THEN** el plugin no agrega scripts, estilos ni imágenes de fuera del propio Moodle (lo que cargue el tema o los filtros del sitio es configuración del sitio)
 
 ### Requirement: Los claims de la credencial
-Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `programa`, `curso`, `horas`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `nivel` sólo cuando tiene valor. El campo del perfil del que sale `documento` SHALL ser configurable. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
+Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `programa`, `curso`, `horas`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `nivel` sólo cuando tiene valor. El campo del perfil del que sale `documento` SHALL ser configurable, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
 
 #### Scenario: Claims completos
 - **WHEN** se arma la credencial de un estudiante con todos los datos
@@ -112,12 +116,16 @@ El plugin SHALL exponer un endpoint que no use la sesión de Moodle y que valide
 - **WHEN** llega un evento cuyo `timestamp` es anterior al del último cambio aplicado a ese derecho
 - **THEN** no pisa el estado actual
 
+#### Scenario: Falla interna al aplicar el evento
+- **WHEN** la entrega tiene firma válida pero guardarla falla (por ejemplo, un error de la base)
+- **THEN** se responde 500, para que Sovra reintente, y la entrega no queda marcada como procesada
+
 #### Scenario: Plugin sin secreto configurado
 - **WHEN** llega una entrega y el secreto del webhook no está configurado
 - **THEN** se responde 503, para que Sovra reintente cuando la configuración esté completa
 
 ### Requirement: Reconciliación sin depender del webhook
-Una tarea programada SHALL consultar a la API el estado de las ofertas creadas y no confirmadas, de modo que el flujo funcione aunque los avisos de Sovra no lleguen.
+Una tarea programada SHALL consultar a la API el estado de las ofertas creadas y no confirmadas, y una vez por día el de las credenciales emitidas o suspendidas, de modo que el flujo —incluidas revocaciones y suspensiones— funcione aunque los avisos de Sovra no lleguen. Con más candidatos que los que entran en una corrida, SHALL consultar primero los consultados hace más tiempo.
 
 #### Scenario: Oferta canjeada sin aviso
 - **WHEN** la tarea consulta una oferta que la API informa como `issued`
@@ -134,6 +142,14 @@ Una tarea programada SHALL consultar a la API el estado de las ofertas creadas y
 #### Scenario: API inaccesible
 - **WHEN** la consulta falla
 - **THEN** ningún derecho cambia y la próxima ejecución vuelve a intentarlo
+
+#### Scenario: Más ofertas abiertas que las de una corrida
+- **WHEN** hay más ofertas abiertas que las que entran en una corrida
+- **THEN** las corridas siguientes consultan las que quedaron afuera
+
+#### Scenario: Revocación sin webhook
+- **WHEN** una credencial emitida fue revocada en Sovra y el aviso no llegó
+- **THEN** a más tardar al día siguiente el derecho figura como «revocada»
 
 ### Requirement: Conexión con la API de Sovra
 Toda llamada a la API SHALL autenticarse con `Authorization: Bearer sovra_sk_…` y SHALL salir por el cliente HTTP del núcleo de Moodle, que respeta la lista de hosts y puertos bloqueados de la seguridad HTTP del sitio. El plugin MUST NOT usar `x-api-key`, `did:quarkid` ni DIDComm. La API key y el secreto del webhook MUST NOT aparecer en registros, mensajes de error ni páginas.

@@ -58,7 +58,8 @@ $hasopenoffer = false;
 if (\local_sovracred\config::api_ready()) {
     $api = null;
     foreach ($records as $record) {
-        if ($record->status !== issuance::OFFERED) {
+        // Como mucho una consulta cada 10 s por oferta, aunque haya varias pestañas recargándose.
+        if ($record->status !== issuance::OFFERED || $record->timechecked > time() - 10) {
             continue;
         }
         try {
@@ -92,7 +93,8 @@ foreach ($records as $record) {
     $body .= html_writer::tag('p', get_string('completedon', 'local_sovracred',
         userdate($record->timecompleted, get_string('strftimedate', 'langconfig'))), ['class' => 'text-muted mb-2']);
 
-    $offervalid = $record->status === issuance::OFFERED && $record->offerexpires > time();
+    $offervalid = $record->status === issuance::OFFERED && $record->offerexpires > time()
+        && strpos((string) $record->offeruri, issuance::OFFER_SCHEME) === 0;
 
     if ($record->status === issuance::AVAILABLE || ($record->status === issuance::OFFERED && !$offervalid)) {
         $body .= html_writer::start_tag('form', ['method' => 'post', 'action' => $url->out(false)]);
@@ -131,8 +133,10 @@ foreach ($records as $record) {
             userdate($record->offerexpires, get_string('strftimedatetimeshort', 'langconfig'))), ['class' => 'small text-muted']);
 
     } else if ($record->status === issuance::ISSUED) {
-        $body .= $OUTPUT->notification(get_string('status_issued_student', 'local_sovracred',
-            userdate($record->timeissued, get_string('strftimedate', 'langconfig'))), \core\output\notification::NOTIFY_SUCCESS, false);
+        $issuedtext = $record->timeissued
+            ? get_string('status_issued_student', 'local_sovracred', userdate($record->timeissued, get_string('strftimedate', 'langconfig')))
+            : get_string('status_issued_student_nodate', 'local_sovracred');
+        $body .= $OUTPUT->notification($issuedtext, \core\output\notification::NOTIFY_SUCCESS, false);
 
     } else {
         $body .= $OUTPUT->notification(get_string('status_' . $record->status . '_student', 'local_sovracred'),
@@ -146,8 +150,8 @@ foreach ($records as $record) {
 }
 
 if ($hasopenoffer) {
-    // Mientras haya una oferta en pantalla, recargar cada 15 s para mostrar «Ya está en tu cartera» al escanear.
-    $PAGE->requires->js_amd_inline("setTimeout(function() { window.location.reload(); }, 15000);");
+    // Mientras haya una oferta en pantalla, recargar cada 20 s para mostrar «Ya está en tu cartera» al escanear.
+    $PAGE->requires->js_amd_inline("setTimeout(function() { window.location.reload(); }, 20000);");
 }
 
 echo $OUTPUT->footer();

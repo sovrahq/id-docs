@@ -61,7 +61,7 @@ class api_client {
         $body = ['schema_id' => $schemaid, 'claims' => (object) $claims];
         $data = $this->request('POST', '/api/v1/issuer/credential-offer', $body);
         if (empty($data['credential_id']) || empty($data['offer_uri'])) {
-            throw new api_exception('invalidresponse', 201);
+            throw new api_exception('invalidresponse');
         }
         return $data;
     }

@@ -78,6 +78,8 @@ final class issuance_test extends \advanced_testcase {
         $this->assertStringStartsWith('openid-credential-offer://', $saved->offeruri);
         $this->assertEquals($expires, $saved->offerexpires);
         $this->assertNull($saved->lasterror);
+        // Sin hora del reloj de Moodle: los eventos de Sovra se ordenan sólo con horas de Sovra.
+        $this->assertEquals(0, $saved->statustime);
     }
 
     public function test_oferta_vigente_se_reutiliza(): void {
@@ -85,25 +87,56 @@ final class issuance_test extends \advanced_testcase {
         $this->mock->append($this->offer_response('11111111-1111-1111-1111-111111111111', time() + DAYSECS));
         $issuance = issuance::request_offer($issuance);
 
+        $this->mock->append($this->json_response(200, ['id' => '11111111-1111-1111-1111-111111111111', 'status' => 'pending']));
         $again = issuance::request_offer($issuance);
 
-        $this->assertCount(1, $this->history);
+        // Sólo se consultó el estado: ningún POST nuevo.
+        $this->assertCount(2, $this->history);
+        $this->assertSame('GET', $this->history[1]['request']->getMethod());
         $this->assertSame('11111111-1111-1111-1111-111111111111', $again->credentialid);
     }
 
-    public function test_oferta_por_vencer_consulta_y_crea_otra(): void {
+    public function test_oferta_por_vencer_pero_canjeable_no_se_duplica(): void {
+        // Una sola oferta canjeable por derecho: aunque falten minutos, mientras Sovra diga pending no se crea otra.
         $issuance = $this->available_issuance();
-        $this->mock->append($this->offer_response('11111111-1111-1111-1111-111111111111', time() + 300));
+        $this->mock->append($this->offer_response('11111111-1111-1111-1111-111111111111', time() + 120));
         $issuance = issuance::request_offer($issuance);
 
         $this->mock->append($this->json_response(200, ['id' => '11111111-1111-1111-1111-111111111111', 'status' => 'pending']));
+        $issuance = issuance::request_offer($issuance);
+
+        $this->assertCount(2, $this->history);
+        $this->assertSame('11111111-1111-1111-1111-111111111111', $issuance->credentialid);
+    }
+
+    public function test_oferta_vencida_consulta_y_crea_otra(): void {
+        $issuance = $this->available_issuance();
+        $this->mock->append($this->offer_response('11111111-1111-1111-1111-111111111111', time() - 60));
+        $issuance = issuance::request_offer($issuance);
+
+        $this->mock->append($this->json_response(200, ['id' => '11111111-1111-1111-1111-111111111111', 'status' => 'expired']));
         $this->mock->append($this->offer_response('22222222-2222-2222-2222-222222222222', time() + DAYSECS));
         $issuance = issuance::request_offer($issuance);
 
         $this->assertCount(3, $this->history);
         $this->assertSame('GET', $this->history[1]['request']->getMethod());
+        $this->assertSame('POST', $this->history[2]['request']->getMethod());
         $this->assertSame(issuance::OFFERED, $issuance->status);
         $this->assertSame('22222222-2222-2222-2222-222222222222', $issuance->credentialid);
+    }
+
+    public function test_uri_de_oferta_con_otro_esquema_se_rechaza(): void {
+        global $DB;
+        $issuance = $this->available_issuance();
+        $this->mock->append($this->json_response(201, ['credential_id' => '11111111-1111-1111-1111-111111111111',
+            'offer_uri' => 'javascript:alert(1)', 'expires_at' => gmdate('Y-m-d\TH:i:s\Z', time() + DAYSECS)]));
+        try {
+            issuance::request_offer($issuance);
+            $this->fail('Tenía que rechazar la URI');
+        } catch (api_exception $e) {
+            $this->assertSame('invalidresponse', $e->errorcode);
+        }
+        $this->assertNull($DB->get_field(issuance::TABLE, 'offeruri', ['id' => $issuance->id]));
     }
 
     public function test_ya_emitida_aunque_no_llego_el_aviso(): void {
@@ -177,6 +210,8 @@ final class issuance_test extends \advanced_testcase {
             $this->assertSame('hostblocked', $e->errorcode);
         }
         $this->assertCount(0, $this->history);
+        global $DB;
+        $this->assertStringContainsString('hostblocked', $DB->get_field(issuance::TABLE, 'lasterror', ['id' => $issuance->id]));
     }
 
     public function test_claims_vacios_viajan_como_objeto(): void {
@@ -184,6 +219,7 @@ final class issuance_test extends \advanced_testcase {
         $this->mock->append($this->json_response(422, ['error' => 'missing_claims', 'details' => ['holderName']]));
         try {
             api_client::from_config()->create_offer('bogota-formacion', []);
+            $this->fail('Tenía que fallar con missing_claims');
         } catch (api_exception $e) {
             $this->assertSame('missing_claims', $e->errorcode);
         }

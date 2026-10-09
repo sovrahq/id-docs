@@ -20,11 +20,11 @@ Ver `proposal.md` — Why. Restricciones que dan forma a la solución:
 
 **PHP, no el stack SaaS.** Un plugin de Moodle sólo puede ser PHP; Elixir/Phoenix no aplica.
 
-**Una tabla de derechos, única por (usuario, curso).** Estados: `available` → `offered` → `issued` / `suspended` / `revoked`. El vencimiento de una oferta no es un estado propio: vuelve a `available`. Se guardan `credentialid`, `offeruri`, `offerexpires`, `holderdid`, `statustime` (para descartar eventos desordenados) y `lasterror`. Una segunda tabla guarda los `id` de entregas de webhook ya procesadas, con índice único: idempotencia que sobrevive reinicios y varias instancias.
+**Una tabla de derechos, única por (usuario, curso).** Estados: `available` → `offered` → `issued` / `suspended` / `revoked`. El vencimiento de una oferta no es un estado propio: vuelve a `available`. Se guardan `credentialid`, `offeruri`, `offerexpires`, `holderdid`, `statustime` (para descartar eventos desordenados: guarda **sólo horas del reloj de Sovra**, nunca el de Moodle), `timechecked` (última consulta a la API, ordena la reconciliación) y `lasterror`. Una segunda tabla guarda los `id` de entregas de webhook ya procesadas, con índice único: idempotencia que sobrevive reinicios y varias instancias.
 
 **No se guarda el SD-JWT firmado.** La guía 03 dice que es la única copia; pero para este caso Moodle no lo necesita (no reimprime ni verifica), y guardarlo sería conservar datos personales sin uso. Quien lo necesite lo agrega en `classes/webhook.php`.
 
-**Reutilizar la oferta con margen de 10 minutos.** Recargar la página no debe crear ofertas nuevas; pero una oferta a punto de vencer no le alcanza al estudiante para buscar el teléfono. Antes de crear otra se consulta el estado de la anterior: si ya se canjeó (aviso perdido), se marca emitida.
+**Una sola oferta canjeable por derecho.** Antes de crear otra se consulta a Sovra el estado de la anterior: si se canjeó (aviso perdido) se marca emitida; si sigue pendiente se reutiliza, **aunque le falten minutos**; sólo si Sovra la informa vencida se crea otra. Alternativa descartada: reemplazarla con un margen de 10 minutos — la anterior seguiría canjeable unos minutos con su `credential_id` ya pisado, y si el estudiante la escaneaba, ni el webhook ni la reconciliación podrían asociarla al derecho. Un lock por derecho (`\core\lock`) impide que dos pestañas o un doble clic creen dos ofertas.
 
 **Claims en `classes/claims.php`.** Qué datos lleva la credencial es una decisión de producto y privacidad: pasa por revisión, no se edita en caliente. Mapeo de prueba para `bogota-formacion`: `holderName` ← nombre completo; `documento` ← campo configurable (`idnumber` o un campo propio del perfil); `programa` ← categoría del curso; `curso` ← nombre del curso; `horas` y `nivel` ← campos personalizados del curso (`sovra_horas`, `sovra_nivel`); `entidadFormadora` ← nombre del sitio; `fechaFinalizacion` ← fecha de completitud; `codigoVerificacion` ← código aleatorio generado al registrar el derecho. Los nombres definitivos se acuerdan con Atenea.
 
@@ -32,9 +32,9 @@ Ver `proposal.md` — Why. Restricciones que dan forma a la solución:
 
 **QR con TCPDF del núcleo** (`TCPDF2DBarcode`, SVG). Sin dependencias ni CDN.
 
-**Webhook: `NO_MOODLE_COOKIES`, cuerpo crudo de `php://input`, `hash_equals`.** 401 sólo por firma inválida; 503 si el secreto no está configurado (Sovra reintenta hasta 8 veces, tiempo para terminar la puesta en marcha); 200 para todo lo demás. El trabajo es una o dos escrituras a la base: se hace en línea, dentro de los 5 s.
+**Webhook: `NO_MOODLE_COOKIES`, cuerpo crudo de `php://input`, `hash_equals`.** 401 sólo por firma inválida; 503 si el secreto no está configurado (Sovra reintenta hasta 8 veces, tiempo para terminar la puesta en marcha); **500 ante cualquier falla interna** —Moodle convierte una excepción sin atrapar en un 404, que Sovra descartaría—; 200 para todo lo demás. Marcar la entrega y aplicarla van en una misma transacción. El trabajo es una o dos escrituras a la base: se hace en línea, dentro de los 5 s.
 
-**Reconciliación cada 5 minutos**, hasta 100 ofertas por corrida, las más viejas primero.
+**Reconciliación cada 5 minutos**: hasta 100 ofertas abiertas por corrida, y hasta 50 credenciales emitidas o suspendidas que no se consultan hace más de un día (para reflejar revocaciones sin webhook). Siempre las consultadas hace más tiempo primero. La misma tarea borra los ids de entregas del webhook de más de 30 días.
 
 **Detección de dispositivo con `core_useragent::get_device_type()`** sólo para el orden de los elementos: ambos (QR y botón) están siempre presentes.
 
@@ -44,7 +44,9 @@ Ver `proposal.md` — Why. Restricciones que dan forma a la solución:
 - [El nombre del campo del documento no se conoce] → configurable; si queda vacío, el error aparece en el reporte antes de que un estudiante choque con él.
 - [Atenea migra a Azure en ~1 mes] → el plugin no guarda nada del host; sólo cambia la URL del webhook en la consola.
 - [Moodle 5.1 movió el código a `public/`] → los plugins se instalan igual en `public/local/`; documentado en el README.
-- [Volumen: 600 cursos, 32.800 usuarios] → el observer sólo escribe una fila; la API tiene límite de 120 ofertas por minuto, holgado para ofertas a pedido.
+- [Volumen: 600 cursos, 32.800 usuarios] → el observer sólo escribe una fila; la API tiene límite de 120 ofertas por minuto, holgado para ofertas a pedido. La página del estudiante consulta como mucho una vez cada 10 s por oferta abierta.
+- [Datos editables por el estudiante] → nombre, apellido y el campo del documento tienen que estar bloqueados en el sitio; la configuración lo advierte. El plugin no lo puede imponer.
+- [Una oferta por vencer no se reemplaza] → si al estudiante le quedan pocos minutos y no llega a escanear, espera a que venza y pide otra. Es el costo de no tener nunca dos ofertas canjeables.
 
 ## Migration Plan
 

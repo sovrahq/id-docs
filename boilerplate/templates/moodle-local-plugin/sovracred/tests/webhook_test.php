@@ -32,6 +32,8 @@ final class webhook_test extends \advanced_testcase {
         global $DB;
         parent::setUp();
         $this->resetAfterTest();
+        // El procesador usa una transacción propia.
+        $this->preventResetByRollback();
         $this->configure_plugin();
         $this->setAdminUser();
         $this->redirectMessages();
@@ -144,6 +146,36 @@ final class webhook_test extends \advanced_testcase {
         $this->assertSame(200, webhook::handle($issued, hmac::sign($issued, self::SECRET), self::SECRET));
 
         $this->assertSame(issuance::REVOKED, $this->current()->status);
+    }
+
+    public function test_fallo_al_aplicar_responde_500_y_libera_el_id(): void {
+        global $DB;
+        // Un holder_did más largo que la columna hace fallar la escritura dentro de la transacción.
+        $body = str_replace('did:sovra:0xabc', 'did:sovra:' . str_repeat('a', 300), $this->body('credential.issued'));
+        $this->assertSame(500, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertDebuggingCalled();
+        $this->assertSame(issuance::OFFERED, $this->current()->status);
+        $this->assertFalse($DB->record_exists('local_sovracred_webhook', ['eventid' => 'evt-1']));
+
+        // El reintento de Sovra, ya sano, se procesa.
+        $body = $this->body('credential.issued');
+        $this->assertSame(200, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertSame(issuance::ISSUED, $this->current()->status);
+    }
+
+    public function test_reloj_de_moodle_adelantado_no_descarta_el_issued(): void {
+        // Oferta recién creada (statustime = 0) y un evento cuya hora, en el reloj de Sovra, es anterior al de Moodle.
+        issuance::update($this->issuance, ['statustime' => 0]);
+        $body = $this->body('credential.issued', 'evt-1', gmdate('Y-m-d\TH:i:s\Z', time() - HOURSECS));
+        $this->assertSame(200, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertSame(issuance::ISSUED, $this->current()->status);
+    }
+
+    public function test_unsuspended_antes_que_el_issued_tiene_fecha(): void {
+        $body = $this->body('credential.unsuspended', 'evt-u', '2026-10-08T11:00:00Z');
+        $this->assertSame(200, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertSame(issuance::ISSUED, $this->current()->status);
+        $this->assertEquals(strtotime('2026-10-08T11:00:00Z'), $this->current()->timeissued);
     }
 
     public function test_sin_secreto_configurado(): void {

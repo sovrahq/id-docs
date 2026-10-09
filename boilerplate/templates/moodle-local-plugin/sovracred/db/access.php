@@ -14,10 +14,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
-    // Ver el reporte de credenciales y ejecutar sus acciones.
+    // Ver el reporte de credenciales y ejecutar sus acciones (consultar estado, reenviar aviso).
     'local/sovracred:viewreport' => [
         'riskbitmask' => RISK_PERSONAL,
-        'captype' => 'read',
+        'captype' => 'write',
         'contextlevel' => CONTEXT_SYSTEM,
         'archetypes' => [
             'manager' => CAP_ALLOW,

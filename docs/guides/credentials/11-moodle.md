@@ -66,9 +66,12 @@ Por eso el plugin separa dos cosas:
 | El curso se completa | Se registra el **derecho** y se avisa | No |
 | El estudiante toca «Recibir en mi cartera» | Se crea la **oferta** | Sí |
 
-Si el estudiante recarga la página, se reutiliza la oferta mientras le queden más
-de 10 minutos. Si está por vencer, primero se pregunta si la anterior ya se canjeó
-—el aviso pudo perderse— y sólo si no, se crea otra.
+Antes de crear otra, el plugin pregunta a Sovra por la anterior: si se canjeó —el
+aviso pudo perderse— la marca emitida; si sigue pendiente la reutiliza, **aunque le
+falten minutos**; sólo si venció crea otra. Así **un derecho nunca tiene dos ofertas
+canjeables**: si las tuviera, la vieja podría canjearse con un `credential_id` que
+Moodle ya pisó, y ni el webhook ni la consulta podrían asociarla al estudiante. Un
+lock por derecho evita lo mismo ante dos pestañas o un doble clic.
 
 ## Decisión 2 — el webhook es opcional
 
@@ -77,7 +80,8 @@ suelen estar detrás de firewalls de aplicación, a veces **con restricción por
 y el aviso puede no llegar nunca.
 
 El plugin no depende de él: una tarea programada consulta
-`GET /api/v1/issuer/credentials/{id}` para cada oferta abierta
+`GET /api/v1/issuer/credentials/{id}` cada 5 minutos para las ofertas abiertas, y una
+vez por día para las credenciales ya emitidas
 ([guía 3](03-emision-de-credenciales.md#consultar-el-estado-de-una-emisión)):
 
 | `status` | Qué hace el plugin |
@@ -87,7 +91,10 @@ El plugin no depende de él: una tarea programada consulta
 | `expired` | Vuelve a «disponible»: el estudiante puede pedir una nueva |
 | `suspended` / `revoked` | Refleja el estado |
 
-Con webhook, la confirmación es inmediata; sin él, tarda hasta 5 minutos.
+Con webhook todo es inmediato; sin él, una emisión se confirma en hasta 5 minutos y
+una revocación o suspensión, en hasta un día. Las consultadas hace más tiempo van
+primero, así ninguna queda sin consultar cuando hay más de las que entran en una
+corrida.
 
 ## Decisión 3 — qué responder al webhook
 
@@ -97,10 +104,11 @@ Un **4xx hace que Sovra descarte el evento sin reintentar**
 | Situación | Respuesta | Por qué |
 |---|---|---|
 | Firma inválida o ausente | **401** | Es el único caso en que hay que rechazar |
+| Falla interna al guardar | **500** | Sovra reintenta. Ojo: una excepción sin atrapar, Moodle la responde con **404**, y eso descarta el evento |
 | Secreto sin configurar | **503** | Sovra reintenta: tiempo para terminar la puesta en marcha |
-| Entrega repetida (mismo `id`) | 200 | Idempotencia: ya se procesó |
+| Entrega repetida (mismo `id`) | 200 | Idempotencia: ya se procesó (marcar y aplicar van en una transacción) |
 | Credencial que el plugin no creó | 200 | Otro sistema del mismo workspace |
-| Evento más viejo que el estado actual | 200, sin aplicar | Los eventos llegan en paralelo y desordenados |
+| Evento más viejo que el estado actual | 200, sin aplicar | Los eventos llegan desordenados. Se compara sólo contra horas de Sovra, nunca contra el reloj de Moodle |
 
 La firma se calcula sobre el **cuerpo crudo** (`php://input`), nunca sobre el JSON
 decodificado y vuelto a codificar, y se compara con `hash_equals`. El endpoint no
@@ -120,6 +128,8 @@ Por la misma razón, la notificación se arma **en el idioma del estudiante**
 - [ ] Los claims de `classes/claims.php` coinciden carácter por carácter con el esquema.
 - [ ] El campo del perfil con el documento está elegido, y el reporte no muestra
       `missingclaims`.
+- [ ] Nombre, apellido y documento **no son editables** por el estudiante: la
+      institución firma esos valores.
 - [ ] El host de la API está permitido en **Seguridad HTTP** del sitio
       (el plugin sale por `\core\http_client`, que respeta esa lista).
 - [ ] La API key y el secreto del webhook se cargaron en la configuración

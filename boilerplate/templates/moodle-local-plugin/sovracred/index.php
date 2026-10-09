@@ -122,7 +122,7 @@ $table->head = [
 ];
 foreach ($rows as $row) {
     $actions = [];
-    if ($row->status === issuance::OFFERED) {
+    if (!empty($row->credentialid)) {
         $actions[] = html_writer::link(new moodle_url($baseurl, ['op' => 'refresh', 'id' => $row->id, 'sesskey' => sesskey()]),
             get_string('refresh', 'local_sovracred'));
     }

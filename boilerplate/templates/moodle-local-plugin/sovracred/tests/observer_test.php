@@ -87,7 +87,6 @@ final class observer_test extends \advanced_testcase {
         // El evento lo dispara el administrador (como el cron o un docente que marca a mano).
         $this->complete_course($student, $course);
 
-        $this->assertNotEquals($USER->id, $student->id);
         $this->assertTrue($DB->record_exists('local_sovracred_issuance', ['userid' => $student->id]));
         $this->assertFalse($DB->record_exists('local_sovracred_issuance', ['userid' => $USER->id]));
     }

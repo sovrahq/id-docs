@@ -48,9 +48,22 @@ final class privacy_provider_test extends \core_privacy\tests\provider_testcase 
 
     public function test_borrado(): void {
         global $DB;
+        // Un segundo estudiante de control: sus datos no se tocan.
+        $other = $this->getDataGenerator()->create_user();
+        $this->complete_course($other, $this->create_course_with_fields());
+
         $context = \context_user::instance($this->student->id);
         privacy\provider::delete_data_for_user(new approved_contextlist($this->student, 'local_sovracred', [$context->id]));
         $this->assertFalse($DB->record_exists('local_sovracred_issuance', ['userid' => $this->student->id]));
+        $this->assertTrue($DB->record_exists('local_sovracred_issuance', ['userid' => $other->id]));
+
+        $othercontext = \context_user::instance($other->id);
+        $userlist = new \core_privacy\local\request\userlist($othercontext, 'local_sovracred');
+        privacy\provider::get_users_in_context($userlist);
+        $this->assertEquals([$other->id], $userlist->get_userids());
+        privacy\provider::delete_data_for_users(
+            new \core_privacy\local\request\approved_userlist($othercontext, 'local_sovracred', [$other->id]));
+        $this->assertFalse($DB->record_exists('local_sovracred_issuance', ['userid' => $other->id]));
     }
 
     public function test_reporte_restringido(): void {

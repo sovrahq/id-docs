@@ -38,17 +38,26 @@ class provider implements
             'courseid' => 'privacy:metadata:issuance:courseid',
             'status' => 'privacy:metadata:issuance:status',
             'verificationcode' => 'privacy:metadata:issuance:verificationcode',
+            'timecompleted' => 'privacy:metadata:issuance:timecompleted',
             'credentialid' => 'privacy:metadata:issuance:credentialid',
+            'offeruri' => 'privacy:metadata:issuance:offeruri',
+            'offerexpires' => 'privacy:metadata:issuance:offerexpires',
             'holderdid' => 'privacy:metadata:issuance:holderdid',
             'timeissued' => 'privacy:metadata:issuance:timeissued',
+            'lasterror' => 'privacy:metadata:issuance:lasterror',
         ], 'privacy:metadata:issuance');
 
         // Lo que viaja a Sovra al crear la oferta: los claims de classes/claims.php.
         $collection->add_external_location_link('sovra', [
             'holderName' => 'privacy:metadata:sovra:holdername',
             'documento' => 'privacy:metadata:sovra:documento',
+            'programa' => 'privacy:metadata:sovra:programa',
             'curso' => 'privacy:metadata:sovra:curso',
+            'horas' => 'privacy:metadata:sovra:horas',
+            'nivel' => 'privacy:metadata:sovra:nivel',
+            'entidadFormadora' => 'privacy:metadata:sovra:entidad',
             'fechaFinalizacion' => 'privacy:metadata:sovra:fecha',
+            'codigoVerificacion' => 'privacy:metadata:sovra:codigo',
         ], 'privacy:metadata:sovra');
 
         return $collection;

@@ -100,7 +100,8 @@ Crea una oferta OID4VCI pre-autorizada. Ver [3. Emisión](03-emision-de-credenci
 ### `GET /api/v1/issuer/credentials`
 
 Lista las credenciales **efectivamente emitidas** por el workspace. Las ofertas
-pendientes no aparecen.
+pendientes no aparecen. Cada elemento es un [objeto Credential](#credential)
+completo; el ejemplo está recortado.
 
 **Respuesta `200`**
 
@@ -153,17 +154,27 @@ Cambia el estado. Ver [6. Ciclo de vida](06-ciclo-de-vida-y-revocacion.md).
 | `id` | El `credential_id`. |
 | `status` | `revoked` (permanente), `suspended` (reversible), `issued` (reactivar). |
 
-**Respuesta `200`**
+**Respuesta `202`** — el cambio se **acepta**, no se aplica todavía:
 
 ```json
-{ "id": "b662aaad-d940-48fb-be9e-7194c76210ff", "status": "revoked" }
+{
+  "id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+  "status": "issued",
+  "pending_status": "revoked"
+}
 ```
 
-**Errores:** `400 unknown_status`, `401 invalid_api_key`, `404 credential_not_found`,
-`409 workspace_not_provisioned`, `422 credential_not_yet_issued`,
-`422 invalid_status_transition`.
+La escritura en la lista on-chain corre en segundo plano. `status` es el estado que
+la credencial sigue teniendo; se mueve cuando la transacción aterriza.
 
-Dispara `credential.revoked`, `credential.suspended` o `credential.unsuspended`.
+**Errores:** `400 unknown_status`, `401 invalid_api_key`, `404 credential_not_found`,
+`409 workspace_not_provisioned`, `409 status_change_pending` (ya hay un cambio en
+vuelo), `422 credential_not_yet_issued`, `422 invalid_status_transition`.
+
+Al aterrizar dispara `credential.revoked`, `credential.suspended` o
+`credential.unsuspended`. Si no aterriza, dispara
+[`credential.status-change-failed`](05-webhooks.md#credentialstatus-change-failed) y
+el estado **no cambia**.
 
 ---
 
@@ -301,7 +312,7 @@ transacción de anclaje no confirmó, y un verificador lo va a rechazar.
 
 | Recurso | Límite |
 |---|---|
-| `POST /api/v1/issuer/credential-offer` | 120 req/min por API key |
+| `POST /api/v1/issuer/credential-offer` | 120 req/min **por IP de origen** (no por API key: rotarla no reinicia el contador, y dos workspaces que salgan por la misma IP comparten el cupo). Al pasarse: `429 too_many_requests`. |
 | Vigencia de una oferta | 24 horas |
 | Vigencia de una sesión de verificación | 10 minutos |
 | `limit` en el listado de verificaciones | 200 |
@@ -319,6 +330,8 @@ transacción de anclaje no confirmó, y un verificador lo va a rechazar.
   "id": "b662aaad-d940-48fb-be9e-7194c76210ff",
   "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
   "status": "issued",
+  "pending_status": null,
+  "status_change_error": null,
   "issued_at": "2026-08-26T04:41:32Z",
   "expires_at": "2027-08-26T04:41:32Z",
   "schema": {
@@ -335,6 +348,8 @@ transacción de anclaje no confirmó, y un verificador lo va a rechazar.
 | `id` | uuid | El `credential_id`. |
 | `holder_did` | string \| null | `null` mientras esté `pending`. |
 | `status` | string | `pending`, `expired`, `issued`, `suspended`, `revoked`. |
+| `pending_status` | string \| null | El estado pedido por un `PUT .../status/…` cuya escritura on-chain todavía está en vuelo. `null` el resto del tiempo. |
+| `status_change_error` | string \| null | Por qué no aterrizó el último cambio pedido. `null` salvo que haya fallado. |
 | `issued_at` | string \| null | `null` mientras esté `pending`. |
 | `expires_at` | string | Vencimiento de la credencial (o de la oferta, si está `pending`). |
 | `schema` | object | Esquema con el que se emitió. |

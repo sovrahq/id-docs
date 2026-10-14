@@ -31,6 +31,7 @@ es un **documento**.
 | 8 | [Errores y troubleshooting](docs/guides/credentials/08-errores-y-troubleshooting.md) | Cada código de error y su solución. |
 | 9 | [Verificación sin Sovra](docs/guides/credentials/09-verificacion-sin-sovra.md) | Verificar contra SovraChain con el SDK. |
 | 10 | [Verificar por WhatsApp](docs/guides/credentials/10-whatsapp.md) | Deep link, QR, correlación y cotejo de identidad en el chat. |
+| 11 | [Emitir desde Moodle](docs/guides/credentials/11-moodle.md) | Credencial al completar un curso, desde un plugin local de Moodle. |
 
 ### 🪪 Credenciales mDoc (ISO 18013-5)
 
@@ -75,6 +76,7 @@ es un **documento**.
 ## 🧰 Recursos
 
 - [Boilerplate de WhatsApp](boilerplate/templates/whatsapp-meta/) — bot que verifica credenciales dentro del chat, directo contra la Cloud API de Meta. `npm run demo` corre la conversación entera sin credenciales.
+- [Boilerplate de Moodle](boilerplate/templates/moodle-local-plugin/) — plugin local (PHP) que emite una credencial de curso; la oferta se crea cuando el estudiante la pide. Probado en Moodle 4.5 y 5.1.
 - [Colección de Postman — Credenciales](docs/resources/sovra-credenciales.postman_collection.json) — importala y configurá `baseUrl` + `apiKey`.
 - [Colección de Postman — mDoc](docs/resources/sovra-mdoc.postman_collection.json) — requiere configurar `baseUrl`, `apiKey`, `schemaId`, `docType` y `namespace`.
 - [Colección de Postman — Documentos firmados](docs/resources/sovra-documentos-firmados.postman_collection.json) — importala y configurá `base_url`, `api_key`, `schema_id`.
@@ -90,7 +92,8 @@ los eventos no son compatibles con la API actual.
 > ⚠️ [`boilerplate/templates/nextjs-nestjs/`](boilerplate/templates/nextjs-nestjs/) todavía
 > apunta a la plataforma anterior (usa `x-api-key` y credenciales `did:quarkid`). Está
 > pendiente de migrar; mientras tanto, seguí las [guías](docs/guides/). El template
-> [`whatsapp-meta/`](boilerplate/templates/whatsapp-meta/) **sí** usa la API actual.
+> [`whatsapp-meta/`](boilerplate/templates/whatsapp-meta/) y
+> [`moodle-local-plugin/`](boilerplate/templates/moodle-local-plugin/) **sí** usan la API actual.
 
 ## 📝 Contribuir
 

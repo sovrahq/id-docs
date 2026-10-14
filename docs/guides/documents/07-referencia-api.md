@@ -99,7 +99,6 @@ claims, firma con la clave del emisor y ancla la firma on-chain.
 
 ```bash
 curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
-  --max-time 120 \
   -H "Authorization: Bearer $SOVRA_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -110,10 +109,15 @@ curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
   }'
 ```
 
-**`201 Created`** — el objeto [Document](#document).
+**`201 Created`** — el objeto [Document](#document), con `status: "signed"`,
+`tx_hash: null` y `anchored_at: null`.
 
-⏱ **Puede tardar hasta ~90 segundos.** Poné el timeout del cliente en 120 s. En test
-suele responder en ~3 s, pero el techo depende de la congestión de la cadena.
+⏱ **El anclaje on-chain corre en segundo plano.** La respuesta llega apenas el
+documento está firmado; el documento pasa a `anchored` (o a `failed`) después, y lo
+anuncia un webhook
+[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
+**`signed` no es entregable**: ver
+[el anclaje es asincrónico](03-emision-de-documentos.md#el-anclaje-es-asincrónico).
 
 **Errores**
 
@@ -250,7 +254,7 @@ integración:
 
 | Recurso | Límite |
 |---|---|
-| Latencia de la emisión | hasta ~90 s (timeout del cliente recomendado: 120 s) |
+| Latencia de la emisión | la respuesta no espera la cadena: vuelve `signed` y el anclaje sigue en segundo plano |
 | Layout de un documento | 3 MB |
 | Techo de un QR con el `credential` (nivel L) | ~2953 bytes |
 | Paginación del listado | no hay: devuelve todo |
@@ -282,6 +286,9 @@ Lo que devuelven `POST /issuer/documents`, `PUT …/visibility/…` y cada entra
               "version": "v1", "claims": [ /* … */ ] }
 }
 ```
+
+El ejemplo es un documento **ya anclado**; recién emitido vuelve con
+`status: "signed"`, `tx_hash: null` y `anchored_at: null`.
 
 `status`: `signed`, `anchored`, `failed` o `revoked`. **Solo `anchored` es un estado
 entregable.** El significado de cada campo, y si está o no cubierto por la firma, en

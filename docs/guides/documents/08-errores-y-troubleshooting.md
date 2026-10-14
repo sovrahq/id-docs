@@ -172,21 +172,22 @@ condición del entorno, no un fallo transitorio. Contactá al equipo de Sovra.
 
 ## Síntomas que no son errores de la API
 
-### El request se corta antes de responder
+### El documento se quedó en `signed`
 
-**La emisión puede tardar hasta ~90 segundos.** Si tu cliente HTTP tiene el timeout en
-el default (30 s en muchas librerías, 10 s en algunos gateways), la conexión se corta
-mientras Sovra todavía está anclando.
+**La emisión no espera a la cadena.** El `POST` responde `signed` y el anclaje corre
+en segundo plano, así que ver `signed` apenas emitís es lo esperado, no un error.
 
-| Dónde mirar | Qué poner |
+| Qué ves | Qué es |
 |---|---|
-| El cliente HTTP | 120 s (`--max-time 120` en curl) |
-| Un reverse proxy / load balancer delante tuyo | 120 s de read timeout |
-| Un API Gateway | Ojo: algunos tienen un techo duro de 29–30 s |
-| Un handler serverless | El timeout de la función, también en 120 s |
+| `signed` recién emitido | Normal: la transacción de anclaje todavía está en vuelo. **No lo entregues todavía.** |
+| `signed` mucho después | La transacción no aterrizó ni se dio por perdida. Consultá `GET /api/v1/issuer/documents`. |
+| `failed` | El anclaje se dio por perdido. El documento **no sirve**: un verificador lo rechaza con `NOT_ANCHORED`. Reemitilo. |
 
-> ⚠️ **Un timeout no significa que el documento no se emitió.** La firma y el anclaje
-> pueden haber terminado igual. Antes de reintentar, buscá en
+Para enterarte sin consultar, suscribí un endpoint de webhook a
+[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
+
+> ⚠️ **Un timeout de red no significa que el documento no se emitió.** La firma pudo
+> haber terminado igual. Antes de reintentar, buscá en
 > `GET /api/v1/issuer/documents` — si está ahí, reemitir crea un duplicado.
 
 ### La hoja se dibuja vacía
@@ -258,7 +259,7 @@ Cuando algo falla y no está claro dónde:
 - [ ] ¿El esquema es de kind **`document`**?
 - [ ] ¿El `schema_id` es el **slug legible**, no el UUID interno?
 - [ ] ¿Los `key` del objeto `claims` matchean letra por letra los del esquema?
-- [ ] ¿El timeout del cliente está en **120 s**?
+- [ ] ¿El documento quedó en `anchored`? `signed` todavía no es entregable.
 - [ ] Si dio timeout: ¿buscaste el documento en `GET /api/v1/issuer/documents` antes de reintentar?
 - [ ] ¿El `status` del documento es `anchored`?
 - [ ] Si es un `401` en la zona pública: ¿el documento está `public`?

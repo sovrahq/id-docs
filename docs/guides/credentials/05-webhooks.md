@@ -19,19 +19,36 @@ devuelve un QR, y el desenlace llega acá.
 
 ## Configuración
 
-En el dashboard, **Settings → Workspace**:
+En el dashboard, **Settings → Workspaces → *(tu workspace)* → Webhooks**. Pide rol
+de **administrador del workspace**, y se maneja sólo desde ahí: no hay endpoints de
+API key para crear ni listar webhooks.
+
+Un workspace tiene **hasta 10 endpoints**. Cada uno se configura con:
 
 | Campo | Descripción |
 |---|---|
-| **Webhook URL** | El endpoint HTTPS de tu servidor. Sin URL configurada, **no se envía nada** — los eventos simplemente se descartan. |
-| **Webhook secret** | El secreto HMAC con el que se firma cada entrega. Se muestra **una sola vez**, al generarlo o rotarlo. |
+| **URL** | El endpoint HTTPS de tu servidor. |
+| **Eventos** | Qué eventos recibe. **Lista explícita, sin comodín** — ver abajo. |
+| **Enabled** | Pausa las entregas sin borrar el endpoint ni rotar su secreto. |
+| **Secreto** | El secreto HMAC con el que se firma cada entrega de **ese** endpoint. Se muestra **una sola vez**, al crearlo o rotarlo. |
 
-Cada workspace tiene su propia URL y su propio secreto. Si integrás varios
-workspaces contra el mismo endpoint, usá el `workspace_id` del payload para elegir
-con qué secreto validar.
+> ⚠️ **La suscripción a eventos es explícita.** Un endpoint recibe únicamente los
+> eventos que marcaste: si no está suscripto a uno, ese evento **no se le entrega**
+> y no hay ningún error que lo delate. Es deliberado — un evento que se agregue al
+> [catálogo](#catálogo-de-eventos) más adelante no llega a un receptor que no fue
+> escrito para su payload. Cuando «no me llegan los webhooks», esto es lo primero
+> que hay que mirar.
 
-Podés rotar el secreto en cualquier momento desde **Settings → Webhook secret**. La
-rotación es inmediata: las entregas siguientes se firman con el nuevo.
+Sin ningún endpoint configurado —o con todos deshabilitados, o ninguno suscripto al
+evento— **no se envía nada**: los eventos simplemente se descartan.
+
+Cada endpoint tiene **su propio secreto** y reintenta por su cuenta: si uno falla,
+los demás no se frenan. Podés rotar un secreto en cualquier momento desde la
+fila del endpoint; la rotación es inmediata, las entregas siguientes se firman con
+el nuevo y el anterior deja de validar al instante.
+
+Si integrás varios workspaces contra el mismo endpoint, usá el `workspace_id` del
+payload para elegir con qué secreto validar.
 
 ## Estructura del payload
 
@@ -50,7 +67,7 @@ Todos los eventos comparten el mismo sobre:
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `event` | string | Tipo de evento (ver el [catálogo](#catálogo-de-eventos)). |
-| `id` | uuid | Identificador **único de esta entrega**. Usalo como clave de idempotencia. |
+| `id` | uuid | Identificador **del evento**. Es tu clave de idempotencia: lo comparten todos los reintentos de una entrega y todos los endpoints suscritos, así que un receptor que ya lo vio puede responder 200 sin volver a procesar. |
 | `timestamp` | string | Momento en que se generó el evento (ISO 8601, UTC). |
 | `workspace_id` | uuid | Workspace que originó el evento. |
 | `data` | object | Contenido específico del evento. |
@@ -146,6 +163,8 @@ async def sovra_webhook(request: Request):
 | [`credential.revoked`](#credentialrevoked--credentialsuspended--credentialunsuspended) | Se revocó una credencial (permanente). |
 | [`credential.suspended`](#credentialrevoked--credentialsuspended--credentialunsuspended) | Se suspendió una credencial (reversible). |
 | [`credential.unsuspended`](#credentialrevoked--credentialsuspended--credentialunsuspended) | Se reactivó una credencial suspendida. |
+| [`credential.status-change-failed`](#credentialstatus-change-failed) | Una revocación, suspensión o reactivación **no pudo registrarse on-chain**. |
+| [`document.status-changed`](#documentstatus-changed) | Un documento quedó anclado on-chain, o el anclaje falló. |
 | [`presentation.verified`](#presentationverified) | Una presentación pasó todas las validaciones. |
 | [`presentation.failed`](#presentationfailed) | Una presentación falló en algún paso. |
 
@@ -191,12 +210,20 @@ A partir de acá el workspace puede crear esquemas, ofertas y verificaciones.
 | `credential_id` | uuid | El mismo que devolvió `POST /credential-offer`. |
 | `holder_did` | string | DID del ciudadano. |
 | `schema_type` | string | El `credential_type` (`vct`) del esquema. |
-| `format` | string | Siempre `vc+sd-jwt`. |
-| `issued_at` / `expires_at` | string | ISO 8601. |
-| `credential` | string | **El SD-JWT firmado, completo.** |
+| `format` | string | `vc+sd-jwt` o `mso_mdoc`, según el esquema. **Es el campo por el que conviene bifurcar.** |
+| `doc_type` | string | **Sólo en `mso_mdoc`.** El docType ISO del mDoc; ver [emitir mDocs](../credentials-mdoc/03-emision-de-mdocs.md#paso-3--recibir-credentialissued). |
+| `issued_at` / `expires_at` | string | ISO 8601. `expires_at` es `null` si el esquema no declara vencimiento. |
+| `credential` | string | **El SD-JWT firmado.** |
+| `attachment` | object | Sólo si el esquema declara un claim de tipo adjunto: `{ "type": "attachment", "media_type": "application/pdf", "bytes": 148231, "claim": "<key>" }`. |
 
 > 🔴 **Única entrega.** El SD-JWT no se guarda del lado servidor ni se puede volver
 > a pedir. Persistilo acá si tu sistema lo necesita.
+
+> ℹ️ **Si el esquema tiene un claim de adjunto**, la copia que viaja en el webhook
+> **omite esa disclosure** y en su lugar llega `attachment`, que la describe. El JWT
+> y el resto de las disclosures no cambian, así que la credencial sigue siendo
+> válida; la cartera sí recibe el adjunto completo. Es para no mandar un PDF de
+> cientos de KB en cada entrega.
 
 ### `credential.revoked` / `credential.suspended` / `credential.unsuspended`
 
@@ -219,6 +246,76 @@ Los tres comparten forma:
 
 Se disparan tanto si el cambio se hizo por API como desde el dashboard, así que sirven
 para mantener sincronizados sistemas que no originaron la acción.
+
+**Llegan cuando la transacción aterriza**, no cuando se pide el cambio: el
+`PUT .../status/{status}` responde `202` y el estado se mueve después. Estos eventos
+son la confirmación de que efectivamente se movió; si no aterriza, llega
+[`credential.status-change-failed`](#credentialstatus-change-failed).
+
+### `credential.status-change-failed`
+
+El cambio de estado se escribe en la lista on-chain **en segundo plano**: el
+`PUT .../status/{status}` responde `202` y el estado se mueve recién cuando la
+transacción aterriza. Si nunca aterriza, llega este evento y la credencial **queda
+como estaba**.
+
+```json
+{
+  "event": "credential.status-change-failed",
+  "id": "…",
+  "timestamp": "2026-08-26T05:09:44.000000Z",
+  "workspace_id": "bfe85e0d-c2da-4ccd-bd99-d26827f7e45e",
+  "data": {
+    "credential_id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+    "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+    "schema_type": "VerifiableCredential",
+    "requested_status": "revoked",
+    "status": "issued",
+    "status_at": "2026-08-26T05:09:44Z"
+  }
+}
+```
+
+| Campo de `data` | Descripción |
+|---|---|
+| `requested_status` | El estado que se había pedido (`revoked`, `suspended` o `issued`). |
+| `status` | El estado que la credencial **sigue teniendo**. |
+
+> 🔴 **Una revocación que falla deja la credencial vigente.** Si revocar es una
+> obligación legal o de seguridad, suscribite a este evento y reintentá el `PUT`.
+> Ver [6. Ciclo de vida](06-ciclo-de-vida-y-revocacion.md).
+
+### `document.status-changed`
+
+Un documento firmado vuelve del `POST /api/v1/issuer/documents` como `signed` y su
+firma se ancla on-chain en segundo plano. Este evento anuncia el desenlace.
+
+```json
+{
+  "event": "document.status-changed",
+  "id": "…",
+  "timestamp": "2026-08-21T14:12:43.000000Z",
+  "workspace_id": "bfe85e0d-c2da-4ccd-bd99-d26827f7e45e",
+  "data": {
+    "document_id": "63813a91-1f2e-4a3c-9d7b-0f5c2e8a4b11",
+    "status": "anchored",
+    "schema_type": "ActaDeNacimiento",
+    "tx_hash": "0x9c93…",
+    "anchored_at": "2026-08-21T14:12:43Z",
+    "status_at": "2026-08-21T14:12:43Z"
+  }
+}
+```
+
+| Campo de `data` | Descripción |
+|---|---|
+| `status` | `anchored` (el único estado entregable) o `failed`. |
+| `tx_hash` | La transacción del anclaje. `null` si falló. |
+| `anchored_at` | Cuándo quedó anclado. `null` si falló. |
+
+> ⚠️ **Un `failed` significa que el documento no sirve**: un verificador rechaza un
+> documento sin anclar, así que hay que volver a emitirlo. Ver
+> [emitir documentos](../documents/03-emision-de-documentos.md).
 
 ### `presentation.verified`
 
@@ -278,6 +375,10 @@ para mantener sincronizados sistemas que no originaron la acción.
 
 **Timeout: 5 segundos.** Si tu endpoint tarda más, la entrega cuenta como fallida y
 entra en la cola de reintentos.
+
+El backoff crece rápido: los 8 intentos se agotan en **~1,5 horas** en total. Pasado
+eso la entrega se descarta y el evento no vuelve. Si tu receptor puede estar caído
+más tiempo que eso, no alcanza con el webhook: reconciliá consultando la API.
 
 ⚠️ La consecuencia práctica del 4xx: si tu validación de firma devuelve `401` porque
 el secreto está mal configurado, **perdés el evento para siempre**. Durante la puesta

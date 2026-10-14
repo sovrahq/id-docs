@@ -79,6 +79,12 @@ lock por derecho evita lo mismo ante dos pestañas o un doble clic.
 suelen estar detrás de firewalls de aplicación, a veces **con restricción por país**,
 y el aviso puede no llegar nunca.
 
+El endpoint se crea en **Settings → Workspaces → *(tu workspace)* → Webhooks**, y la
+suscripción a eventos es **explícita, sin comodín** ([guía 5](05-webhooks.md#configuración)):
+hay que marcar `credential.issued`, `credential.revoked`, `credential.suspended` y
+`credential.unsuspended`. Un endpoint sin esos eventos no recibe nada — y acá eso no
+se nota, porque la reconciliación tapa el agujero cinco minutos más tarde.
+
 El plugin no depende de él: una tarea programada consulta
 `GET /api/v1/issuer/credentials/{id}` cada 5 minutos para las ofertas abiertas, y una
 vez por día para las credenciales ya emitidas
@@ -134,6 +140,8 @@ Por la misma razón, la notificación se arma **en el idioma del estudiante**
       (el plugin sale por `\core\http_client`, que respeta esa lista).
 - [ ] La API key y el secreto del webhook se cargaron en la configuración
       (se guardan cifrados con la clave del sitio).
+- [ ] El endpoint del webhook está **suscripto a los cuatro eventos de credencial**.
+      Sin eso no llega ninguno, y la reconciliación lo disimula.
 - [ ] La **organización** de Sovra lleva el nombre que el estudiante tiene que leer
       como emisor.
 - [ ] «Probar conexión» en el reporte da *conexión correcta*.

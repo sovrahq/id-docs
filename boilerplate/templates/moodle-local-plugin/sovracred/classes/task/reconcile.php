@@ -31,7 +31,7 @@ class reconcile extends \core\task\scheduled_task {
     /** @var int Cada cuánto se vuelve a consultar una credencial emitida o suspendida. */
     const ISSUED_INTERVAL = DAYSECS;
 
-    /** @var int Cuánto se guardan los ids de entregas del webhook (Sovra reintenta durante minutos, no días). */
+    /** @var int Cuánto se guardan los ids de entregas del webhook (Sovra reintenta 8 veces, ~1,5 h en total). */
     const WEBHOOK_RETENTION = 30 * DAYSECS;
 
     /**

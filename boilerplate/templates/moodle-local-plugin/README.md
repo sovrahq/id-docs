@@ -93,8 +93,16 @@ la reconciliación; si Moodle ya calcula completitudes, ya lo tenés) y la
 |---|---|
 | Settings → API keys | Generá una API key (`sovra_sk_…`). |
 | Schemas | El esquema de la credencial y su diseño. Anotá su **slug** (`schema_id`) y los `key` exactos de sus campos. |
-| Settings → Workspace → Webhook URL | `https://tu-moodle/local/sovracred/webhook.php` *(opcional)* |
-| Settings → Workspace → Webhook secret | Generalo y copialo: **se muestra una sola vez**. *(opcional)* |
+| Settings → Workspaces → *(tu workspace)* → Webhooks | *(opcional)* **New endpoint** apuntando a `https://tu-moodle/local/sovracred/webhook.php`, suscripto a los cuatro eventos de credencial. El secreto del endpoint se **muestra una sola vez**: copialo ahí mismo. Pide rol de administrador del workspace. |
+
+> ⚠️ **La suscripción a eventos es explícita, no hay comodín.** Marcá
+> `credential.issued`, `credential.revoked`, `credential.suspended` y
+> `credential.unsuspended`. Un endpoint sin esos eventos no recibe **nada**, y como
+> acá el webhook es opcional no se nota: todo sigue funcionando por la tarea
+> programada, cinco minutos tarde, sin ningún error a la vista.
+>
+> Un workspace admite hasta 10 endpoints, cada uno con su URL, su secreto y su
+> propia lista de eventos; si uno falla, reintenta sin frenar a los demás.
 
 ### 2. En Moodle
 
@@ -272,15 +280,18 @@ available ──(el estudiante la pide)──▶ offered ──(la canjea)──
       emisor es el de la **organización** de Sovra, no el del workspace.
 - [ ] **Bloquear nombre, apellido y documento** para que el estudiante no los
       pueda editar (ver la advertencia en [Configuración](#2-en-moodle)).
-- [ ] **Webhook o no webhook.** Si el firewall permite el aviso de Sovra, configurar
-      URL y secreto. Si no, dejar el secreto vacío: las emisiones se confirman en
+- [ ] **Webhook o no webhook.** Si el firewall permite el aviso de Sovra, crear el
+      endpoint en Sovra **suscripto a los cuatro eventos de credencial** y cargar su
+      secreto acá. Si no, dejar el secreto vacío: las emisiones se confirman en
       hasta 5 minutos y las revocaciones en hasta un día.
 - [ ] **Cursos completados antes de instalar:**
       `php local/sovracred/cli/backfill.php` cuenta; `--run` los registra;
       `--run --notify` además avisa a cada estudiante.
 - [ ] **Revocación.** Este plugin refleja revocaciones y suspensiones (por webhook,
       o por la consulta diaria), pero no las inicia. Para revocar: consola de Sovra o
-      `PUT /api/v1/issuer/credentials/{id}/status/revoked`.
+      `PUT /api/v1/issuer/credentials/{id}/status/revoked`, que responde `202` y
+      aplica el cambio on-chain en segundo plano — el estado se mueve cuando la
+      transacción aterriza, no en la respuesta.
 - [ ] **El SD-JWT firmado no se guarda.** Llega una sola vez en el webhook
       `credential.issued` y Sovra no lo almacena. Si tu institución lo necesita
       (auditoría, reimpresión), guardalo en `classes/webhook.php`.

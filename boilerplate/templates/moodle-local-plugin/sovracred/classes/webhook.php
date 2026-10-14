@@ -127,6 +127,11 @@ class webhook {
             $eventtime = (int) $issuance->statustime;
         }
         if ($eventtime < (int) $issuance->statustime) {
+            // No pisa el estado, pero un issued demorado detrás de un revoked trae datos que no hay de otro modo.
+            $missing = issuance::missing_issue_data($issuance, $data);
+            if ($missing) {
+                issuance::update($issuance, $missing);
+            }
             return;
         }
 
@@ -139,6 +144,13 @@ class webhook {
             $issuedat = !empty($data['issued_at']) ? strtotime($data['issued_at']) : false;
             $changes['holderdid'] = $data['holder_did'] ?? null;
             $changes['timeissued'] = $issuedat ?: $eventtime;
+            $expiresat = !empty($data['expires_at']) ? strtotime($data['expires_at']) : false;
+            if ($expiresat) {
+                $changes['credexpires'] = $expiresat;
+            }
+        } else {
+            // revoked, suspended y unsuspended traen el holder_did: sirve si el issued todavía no llegó.
+            $changes += issuance::missing_issue_data($issuance, $data);
             // El SD-JWT firmado llega sólo en este evento ($data['credential']) y Sovra no lo guarda.
             // Este plugin no lo necesita y no lo conserva; si tu institución sí, guardalo acá.
         }

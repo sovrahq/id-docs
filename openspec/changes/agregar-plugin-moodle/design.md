@@ -36,11 +36,13 @@ Ver `proposal.md` — Why. Restricciones que dan forma a la solución:
 
 **Reconciliación cada 5 minutos**: hasta 100 ofertas abiertas por corrida, y hasta 50 credenciales emitidas o suspendidas que no se consultan hace más de un día (para reflejar revocaciones sin webhook). Siempre las consultadas hace más tiempo primero. La misma tarea borra los ids de entregas del webhook de más de 30 días.
 
+**Vencimiento calculado por el plugin.** La API sólo informa `expired` para ofertas sin canjear; una credencial emitida sigue `issued` después de su `expires_at`. El plugin guarda esa fecha (`credexpires`) y muestra «vencida» al leerla, sin un estado propio ni una tarea que lo escriba: así no hay nada que pueda quedar desincronizado.
+
 **Detección de dispositivo con `core_useragent::get_device_type()`** sólo para el orden de los elementos: ambos (QR y botón) están siempre presentes.
 
 ## Risks / Trade-offs
 
-- [El webhook nunca llega por el firewall] → la reconciliación confirma en ≤ 5 min; la página del estudiante también consulta el estado al reabrirla.
+- [El webhook nunca llega por el firewall] → la reconciliación confirma en ≤ 5 min mientras haya hasta 100 ofertas abiertas; con N ofertas abiertas, en ~5·⌈N/100⌉ min, porque cada corrida toma un lote de 100. Para Atenea no es un límite real (28.800 consultas por día contra ofertas que viven 24 h). La página del estudiante también consulta el estado al reabrirla.
 - [El nombre del campo del documento no se conoce] → configurable; si queda vacío, el error aparece en el reporte antes de que un estudiante choque con él.
 - [Atenea migra a Azure en ~1 mes] → el plugin no guarda nada del host; sólo cambia la URL del webhook en la consola.
 - [Moodle 5.1 movió el código a `public/`] → los plugins se instalan igual en `public/local/`; documentado en el README.

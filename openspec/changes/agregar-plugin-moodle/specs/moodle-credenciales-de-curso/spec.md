@@ -94,7 +94,7 @@ El plugin SHALL exponer un endpoint que no use la sesión de Moodle y que valide
 
 #### Scenario: Credencial emitida
 - **WHEN** llega `credential.issued` con firma válida para una oferta creada por el plugin
-- **THEN** el derecho pasa a «emitida» con el DID del titular y la fecha de emisión, y se responde 200
+- **THEN** el derecho pasa a «emitida» con el DID del titular, la fecha de emisión y la de vencimiento, y se responde 200
 
 #### Scenario: Firma inválida
 - **WHEN** llega una entrega con firma ausente o incorrecta
@@ -115,6 +115,10 @@ El plugin SHALL exponer un endpoint que no use la sesión de Moodle y que valide
 #### Scenario: Evento desordenado
 - **WHEN** llega un evento cuyo `timestamp` es anterior al del último cambio aplicado a ese derecho
 - **THEN** no pisa el estado actual
+
+#### Scenario: Emisión que llega después de la revocación
+- **WHEN** llega un `credential.issued` demorado para un derecho que ya figura «revocada» o «suspendida»
+- **THEN** el estado no cambia, pero se completan el DID del titular, la fecha de emisión y la de vencimiento si faltaban
 
 #### Scenario: Falla interna al aplicar el evento
 - **WHEN** la entrega tiene firma válida pero guardarla falla (por ejemplo, un error de la base)
@@ -150,6 +154,25 @@ Una tarea programada SHALL consultar a la API el estado de las ofertas creadas y
 #### Scenario: Revocación sin webhook
 - **WHEN** una credencial emitida fue revocada en Sovra y el aviso no llegó
 - **THEN** a más tardar al día siguiente el derecho figura como «revocada»
+
+#### Scenario: Datos de la emisión incompletos
+- **WHEN** la API informa una credencial `issued`, `suspended` o `revoked` y al derecho le faltan el DID del titular, la fecha de emisión o la de vencimiento
+- **THEN** se completan con los que informa la API
+
+### Requirement: Vencimiento de la credencial
+El plugin SHALL guardar la fecha de vencimiento de la credencial que informa Sovra (`expires_at`, en el aviso de emisión y en la consulta de estado). Una credencial emitida o suspendida cuya fecha ya pasó SHALL mostrarse como «vencida» en «Mis credenciales» y en el reporte del administrador, sin cambiar el estado guardado: Sovra no informa `expired` para una credencial ya emitida, ese estado lo calcula el plugin.
+
+#### Scenario: Credencial vigente
+- **WHEN** el estudiante abre la página con una credencial emitida que vence más adelante
+- **THEN** ve que está en su cartera y hasta cuándo vale
+
+#### Scenario: Credencial vencida
+- **WHEN** la fecha de vencimiento de una credencial emitida o suspendida ya pasó
+- **THEN** el estudiante ve que venció y en qué fecha, y el reporte la muestra como «Vencida»
+
+#### Scenario: Esquema sin vencimiento
+- **WHEN** Sovra no informa fecha de vencimiento
+- **THEN** la credencial sigue figurando «emitida» sin fecha de vencimiento
 
 ### Requirement: Conexión con la API de Sovra
 Toda llamada a la API SHALL autenticarse con `Authorization: Bearer sovra_sk_…` y SHALL salir por el cliente HTTP del núcleo de Moodle, que respeta la lista de hosts y puertos bloqueados de la seguridad HTTP del sitio. El plugin MUST NOT usar `x-api-key`, `did:quarkid` ni DIDComm. La API key y el secreto del webhook MUST NOT aparecer en registros, mensajes de error ni páginas.

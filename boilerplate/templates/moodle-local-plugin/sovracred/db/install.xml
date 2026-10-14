@@ -17,6 +17,7 @@
         <FIELD NAME="offerexpires" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="holderdid" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
         <FIELD NAME="timeissued" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="credexpires" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="expires_at de la credencial emitida, según Sovra; null si el esquema no vence"/>
         <FIELD NAME="statustime" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Hora (reloj de Sovra) del último evento aplicado; descarta eventos desordenados"/>
         <FIELD NAME="timechecked" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Última consulta del estado a la API; ordena la reconciliación"/>
         <FIELD NAME="lasterror" TYPE="text" NOTNULL="false" SEQUENCE="false"/>

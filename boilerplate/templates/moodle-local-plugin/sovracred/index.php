@@ -133,7 +133,7 @@ foreach ($rows as $row) {
     $table->data[] = [
         fullname($row),
         format_string($row->coursename),
-        get_string('status_' . $row->status, 'local_sovracred'),
+        get_string('status_' . (issuance::is_expired($row) ? 'expired' : $row->status), 'local_sovracred'),
         $row->timecompleted ? userdate($row->timecompleted, get_string('strftimedatetimeshort', 'langconfig')) : '',
         $row->status === issuance::OFFERED && $row->offerexpires
             ? userdate($row->offerexpires, get_string('strftimedatetimeshort', 'langconfig')) : '',

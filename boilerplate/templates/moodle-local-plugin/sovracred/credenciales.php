@@ -132,10 +132,20 @@ foreach ($records as $record) {
         $body .= html_writer::tag('p', get_string('offerexpires', 'local_sovracred',
             userdate($record->offerexpires, get_string('strftimedatetimeshort', 'langconfig'))), ['class' => 'small text-muted']);
 
+    } else if (issuance::is_expired($record)) {
+        // Sovra la sigue informando como emitida: el vencimiento lo calcula el plugin.
+        $body .= $OUTPUT->notification(get_string('status_expired_student', 'local_sovracred',
+            userdate($record->credexpires, get_string('strftimedate', 'langconfig'))),
+            \core\output\notification::NOTIFY_WARNING, false);
+
     } else if ($record->status === issuance::ISSUED) {
         $issuedtext = $record->timeissued
             ? get_string('status_issued_student', 'local_sovracred', userdate($record->timeissued, get_string('strftimedate', 'langconfig')))
             : get_string('status_issued_student_nodate', 'local_sovracred');
+        if (!empty($record->credexpires)) {
+            $issuedtext .= ' ' . get_string('validuntil', 'local_sovracred',
+                userdate($record->credexpires, get_string('strftimedate', 'langconfig')));
+        }
         $body .= $OUTPUT->notification($issuedtext, \core\output\notification::NOTIFY_SUCCESS, false);
 
     } else {

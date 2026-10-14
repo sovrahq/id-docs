@@ -225,4 +225,24 @@ final class issuance_test extends \advanced_testcase {
         }
         $this->assertSame('{"schema_id":"bogota-formacion","claims":{}}', (string) $this->history[0]['request']->getBody());
     }
+
+    /**
+     * Spec: «Vencimiento de la credencial». Sovra sigue informando issued después del expires_at.
+     */
+    public function test_vencimiento_de_la_credencial(): void {
+        $now = strtotime('2027-01-01T00:00:00Z');
+        $cases = [
+            'emitida y vigente' => [issuance::ISSUED, $now + DAYSECS, false],
+            'emitida y vencida' => [issuance::ISSUED, $now - DAYSECS, true],
+            'vence justo ahora' => [issuance::ISSUED, $now, true],
+            'suspendida y vencida' => [issuance::SUSPENDED, $now - DAYSECS, true],
+            'revocada y vencida' => [issuance::REVOKED, $now - DAYSECS, false],
+            'esquema sin vencimiento' => [issuance::ISSUED, null, false],
+            'oferta abierta' => [issuance::OFFERED, $now - DAYSECS, false],
+        ];
+        foreach ($cases as $name => [$status, $expires, $expected]) {
+            $record = (object) ['status' => $status, 'credexpires' => $expires];
+            $this->assertSame($expected, issuance::is_expired($record, $now), $name);
+        }
+    }
 }

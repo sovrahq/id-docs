@@ -61,10 +61,30 @@ final class reconcile_test extends \advanced_testcase {
         $this->mock->append($this->json_response(200, [
             'id' => $this->issuance->credentialid, 'status' => 'issued',
             'holder_did' => 'did:sovra:0xabc', 'issued_at' => '2026-10-08T10:00:00Z',
+            'expires_at' => '2027-10-08T10:00:00Z',
         ]));
         $current = $this->run_task();
         $this->assertSame(issuance::ISSUED, $current->status);
         $this->assertSame('did:sovra:0xabc', $current->holderdid);
+        $this->assertEquals(strtotime('2027-10-08T10:00:00Z'), $current->credexpires);
+    }
+
+    public function test_datos_de_la_emision_incompletos(): void {
+        // Revocada antes de que llegara el issued: sin DID, sin fecha de emisión ni de vencimiento.
+        $this->issuance = issuance::update($this->issuance, [
+            'status' => issuance::SUSPENDED, 'holderdid' => null, 'timeissued' => null, 'credexpires' => null,
+            'timechecked' => 0,
+        ]);
+        $this->mock->append($this->json_response(200, [
+            'id' => $this->issuance->credentialid, 'status' => 'revoked',
+            'holder_did' => 'did:sovra:0xabc', 'issued_at' => '2026-10-08T10:00:00Z',
+            'expires_at' => '2027-10-08T10:00:00Z',
+        ]));
+        $current = $this->run_task();
+        $this->assertSame(issuance::REVOKED, $current->status);
+        $this->assertSame('did:sovra:0xabc', $current->holderdid);
+        $this->assertEquals(strtotime('2026-10-08T10:00:00Z'), $current->timeissued);
+        $this->assertEquals(strtotime('2027-10-08T10:00:00Z'), $current->credexpires);
     }
 
     public function test_oferta_vencida_sin_canjear(): void {

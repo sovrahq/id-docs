@@ -62,7 +62,8 @@ final class webhook_test extends \advanced_testcase {
             string $credentialid = self::CREDID): string {
         return '{"event": "' . $event . '", "id": "' . $id . '", "timestamp": "' . $timestamp . '", ' .
             '"workspace_id": "ws", "data": {"credential_id": "' . $credentialid . '", ' .
-            '"holder_did": "did:sovra:0xabc", "issued_at": "2026-10-08T10:04:59Z", "credential": "eyJ...~"}}';
+            '"holder_did": "did:sovra:0xabc", "issued_at": "2026-10-08T10:04:59Z", "expires_at": "2027-10-08T10:04:59Z", ' .
+            '"credential": "eyJ...~"}}';
     }
 
     /**
@@ -83,6 +84,7 @@ final class webhook_test extends \advanced_testcase {
         $this->assertSame(issuance::ISSUED, $current->status);
         $this->assertSame('did:sovra:0xabc', $current->holderdid);
         $this->assertEquals(strtotime('2026-10-08T10:04:59Z'), $current->timeissued);
+        $this->assertEquals(strtotime('2027-10-08T10:04:59Z'), $current->credexpires);
     }
 
     public function test_firma_sobre_el_cuerpo_crudo(): void {
@@ -138,14 +140,26 @@ final class webhook_test extends \advanced_testcase {
     }
 
     public function test_evento_desordenado(): void {
-        $revoked = $this->body('credential.revoked', 'evt-r', '2026-10-08T12:00:00Z');
+        // Un revoked como los de Sovra: trae holder_did y status_at, no issued_at ni expires_at.
+        $revoked = '{"event": "credential.revoked", "id": "evt-r", "timestamp": "2026-10-08T12:00:00.000000Z", ' .
+            '"workspace_id": "ws", "data": {"credential_id": "' . self::CREDID . '", ' .
+            '"holder_did": "did:sovra:0xabc", "schema_type": "VerifiableCredential", "status_at": "2026-10-08T12:00:00Z"}}';
         $this->assertSame(200, webhook::handle($revoked, hmac::sign($revoked, self::SECRET), self::SECRET));
+        $current = $this->current();
+        $this->assertSame(issuance::REVOKED, $current->status);
+        $this->assertSame('did:sovra:0xabc', $current->holderdid);
+        $this->assertEmpty($current->timeissued);
 
         // El issued demorado, con timestamp anterior, llega después.
         $issued = $this->body('credential.issued', 'evt-i', '2026-10-08T10:05:00Z');
         $this->assertSame(200, webhook::handle($issued, hmac::sign($issued, self::SECRET), self::SECRET));
 
-        $this->assertSame(issuance::REVOKED, $this->current()->status);
+        // Spec: «Emisión que llega después de la revocación».
+        $current = $this->current();
+        $this->assertSame(issuance::REVOKED, $current->status);
+        $this->assertEquals(strtotime('2026-10-08T12:00:00Z'), $current->statustime);
+        $this->assertEquals(strtotime('2026-10-08T10:04:59Z'), $current->timeissued);
+        $this->assertEquals(strtotime('2027-10-08T10:04:59Z'), $current->credexpires);
     }
 
     public function test_fallo_al_aplicar_responde_500_y_libera_el_id(): void {

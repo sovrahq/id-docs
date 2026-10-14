@@ -26,3 +26,9 @@
 - [x] 5.1 README del boilerplate (instalación, configuración, Moodle local, prueba con billetera, próximos pasos), guía `11-moodle.md` y entrada en `boilerplate/README.md`
 - [x] 5.2 Recorrido punta a punta en Moodle 4.5 local contra el workspace de test: curso completado → notificación → página → oferta → QR y enlace → webhook simulado con firma buena y mala → reconciliación
 - [x] 5.3 `openspec validate agregar-plugin-moodle` en verde y PR abierto contra `main`
+
+## 6. Revisión del backend (PR #3)
+
+- [x] 6.1 Guardar `expires_at` de la credencial (`credexpires`, con paso de actualización) y mostrar «vencida»; verificar los escenarios de «Vencimiento de la credencial» con pruebas
+- [x] 6.2 Completar DID, fecha de emisión y vencimiento cuando la revocación llega antes que la emisión, por webhook y por reconciliación; verificar «Emisión que llega después de la revocación» y «Datos de la emisión incompletos» con pruebas
+- [x] 6.3 Acotar en `design.md` el «≤ 5 min» de la reconciliación al tamaño del lote

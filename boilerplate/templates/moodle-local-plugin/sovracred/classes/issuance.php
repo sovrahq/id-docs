@@ -12,6 +12,9 @@ namespace local_sovracred;
  *       ▲                                    │                         │
  *       └──────(Sovra informa: venció)───────┘                         └──▶ revoked
  *
+ * «Vencida» no es un estado guardado: Sovra sigue informando `issued` después del `expires_at`
+ * de la credencial. Se calcula al mostrarla, con is_expired().
+ *
  * La oferta se crea recién cuando el estudiante la pide: vence a las 24 h y es de un solo uso,
  * así que generarla al completar el curso haría que la mayoría venza sin usarse.
  *
@@ -246,12 +249,9 @@ class issuance {
         switch ($remote['status'] ?? '') {
             case 'issued':
                 $issuedat = !empty($remote['issued_at']) ? strtotime($remote['issued_at']) : false;
-                $changes = $checked + ['status' => self::ISSUED, 'lasterror' => null];
-                if (empty($issuance->holderdid)) {
-                    $changes['holderdid'] = $remote['holder_did'] ?? null;
-                }
-                if (empty($issuance->timeissued)) {
-                    $changes['timeissued'] = $issuedat ?: time();
+                $changes = $checked + ['status' => self::ISSUED, 'lasterror' => null] + self::missing_issue_data($issuance, $remote);
+                if (empty($issuance->timeissued) && empty($changes['timeissued'])) {
+                    $changes['timeissued'] = time();
                 }
                 if ($issuedat) {
                     $changes['statustime'] = max((int) $issuance->statustime, $issuedat);
@@ -268,8 +268,10 @@ class issuance {
                 ]);
             case 'suspended':
             case 'revoked':
-                // Sin hora de Sovra para este cambio: no se mueve statustime.
-                return self::update($issuance, $checked + ['status' => $remote['status'], 'lasterror' => null]);
+                // Sin hora de Sovra para este cambio: no se mueve statustime. Si la revocación llegó antes
+                // que la emisión, acá se completan los datos de la emisión que nunca se guardaron.
+                return self::update($issuance, $checked + ['status' => $remote['status'], 'lasterror' => null]
+                    + self::missing_issue_data($issuance, $remote));
             default:
                 // pending: todavía no la canjeó. Se anota la consulta para que la reconciliación rote.
                 return self::update($issuance, $checked);
@@ -292,6 +294,44 @@ class issuance {
         $issuance->timemodified = time();
         $DB->update_record(self::TABLE, (object) (['id' => $issuance->id, 'timemodified' => $issuance->timemodified] + $changes));
         return $issuance;
+    }
+
+    /**
+     * ¿La credencial está vencida? Sólo una emitida o suspendida puede estarlo.
+     *
+     * @param \stdClass $issuance
+     * @param int|null $now
+     * @return bool
+     */
+    public static function is_expired(\stdClass $issuance, ?int $now = null): bool {
+        return in_array($issuance->status, [self::ISSUED, self::SUSPENDED], true)
+            && !empty($issuance->credexpires) && (int) $issuance->credexpires <= ($now ?? time());
+    }
+
+    /**
+     * Los datos de la emisión que el derecho todavía no tiene y que Sovra informa.
+     *
+     * Sirve tanto para el `data` de un webhook como para la respuesta de GET /credentials/{id}:
+     * los dos usan `holder_did`, `issued_at` y `expires_at`.
+     *
+     * @param \stdClass $issuance
+     * @param array $data
+     * @return array Cambios a aplicar (vacío si no falta nada o Sovra no lo informa).
+     */
+    public static function missing_issue_data(\stdClass $issuance, array $data): array {
+        $changes = [];
+        if (empty($issuance->holderdid) && !empty($data['holder_did']) && is_string($data['holder_did'])) {
+            $changes['holderdid'] = $data['holder_did'];
+        }
+        foreach (['timeissued' => 'issued_at', 'credexpires' => 'expires_at'] as $field => $key) {
+            if (empty($issuance->$field) && !empty($data[$key]) && is_string($data[$key])) {
+                $time = strtotime($data[$key]);
+                if ($time) {
+                    $changes[$field] = $time;
+                }
+            }
+        }
+        return $changes;
     }
 
     /**

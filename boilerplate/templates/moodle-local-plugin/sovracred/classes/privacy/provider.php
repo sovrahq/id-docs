@@ -44,6 +44,7 @@ class provider implements
             'offerexpires' => 'privacy:metadata:issuance:offerexpires',
             'holderdid' => 'privacy:metadata:issuance:holderdid',
             'timeissued' => 'privacy:metadata:issuance:timeissued',
+            'credexpires' => 'privacy:metadata:issuance:credexpires',
             'lasterror' => 'privacy:metadata:issuance:lasterror',
         ], 'privacy:metadata:issuance');
 
@@ -118,6 +119,7 @@ class provider implements
                     'holderdid' => $record->holderdid,
                     'timecompleted' => $record->timecompleted ? \core_privacy\local\request\transform::datetime($record->timecompleted) : null,
                     'timeissued' => $record->timeissued ? \core_privacy\local\request\transform::datetime($record->timeissued) : null,
+                    'credexpires' => $record->credexpires ? \core_privacy\local\request\transform::datetime($record->credexpires) : null,
                 ];
             }
             writer::with_context($context)->export_data(

@@ -191,7 +191,9 @@ derecha la dice el servidor.
 
 - **a** y **b** se hacen desde el dashboard y requieren sesión. **No hay API para
   esto.**
-- **c** es una sola llamada que valida, firma y ancla. Puede tardar hasta ~90 s.
+- **c** es una sola llamada que valida y firma; vuelve `signed` y el anclaje sigue
+  en segundo plano, hasta que el documento queda `anchored`. **Sólo `anchored` es
+  entregable.**
 - **d** es opcional y deliberada: **todo documento nace privado.**
 - **e** puede ser el string `credential` o el enlace `/api/v1/documents/{id}`. Los
   dos caminos terminan en lo mismo.

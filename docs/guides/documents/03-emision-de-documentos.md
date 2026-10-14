@@ -1,13 +1,14 @@
 # 3. Emisión de documentos
 
-Emitir es **una sola llamada**. Sovra valida los claims contra el esquema, firma con
-la llave del emisor y ancla la firma on-chain, todo dentro del mismo request.
+Emitir es **una sola llamada**. Sovra valida los claims contra el esquema y firma con
+la llave del emisor, y eso es lo que vuelve en la respuesta. El anclaje on-chain de
+la firma corre **en segundo plano**, y el documento sirve recién cuando terminó.
 
 ## Tabla de contenidos
 
 1. [La llamada](#la-llamada)
 2. [El request](#el-request)
-3. [La latencia: hasta ~90 segundos](#la-latencia-hasta-90-segundos)
+3. [El anclaje es asincrónico](#el-anclaje-es-asincrónico)
 4. [La respuesta, campo por campo](#la-respuesta-campo-por-campo)
 5. [Qué guardar](#qué-guardar)
 6. [Estados del documento](#estados-del-documento)
@@ -27,7 +28,6 @@ Content-Type: application/json
 
 ```bash
 curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
-  --max-time 120 \
   -H "Authorization: Bearer $SOVRA_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -57,21 +57,31 @@ Los tipos de cada claim los declara el esquema (`date`, `number`, `string`,
 > `private` y hace falta una llamada explícita para publicarlo — ver
 > [4. Visibilidad y entrega](04-visibilidad-y-entrega.md).
 
-## La latencia: hasta ~90 segundos
+## El anclaje es asincrónico
 
-La emisión no es la de un `POST` normal, porque incluye el anclaje on-chain:
+El `POST` responde apenas el documento está firmado y guardado, con
+**`status: "signed"`**. La firma todavía no está en la cadena: `tx_hash` y
+`anchored_at` vienen en `null`.
 
-- **Poné el timeout del cliente en 120 s.** El default de muchas librerías HTTP
-  (30 s, o menos) corta la conexión antes de que la respuesta llegue.
-- **Mostrá progreso al usuario.** Un botón que parece colgado durante 40 segundos
-  invita a hacer doble clic, y cada clic emite otro documento.
-- **En el ambiente de test la respuesta suele llegar en ~3 segundos**, pero el techo
-  depende de la congestión de la cadena, no del caso feliz. No dimensiones el timeout
-  contra lo que medís en test.
+El anclaje corre en segundo plano. Cuando termina, el documento pasa a `anchored`
+—o a `failed` si la transacción nunca aterriza— y llega un webhook
+[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed) con
+el estado nuevo.
 
-Si tu arquitectura no tolera una llamada sincrónica larga, encolá la emisión en un
-worker y notificá a tu propia aplicación cuando termine: **no hay webhooks de
-documentos**, así que el resultado llega únicamente como respuesta de este request.
+> 🔴 **`signed` no es entregable.** Un verificador rechaza un documento sin anclar.
+> No lo muestres ni lo mandes hasta que esté `anchored`.
+
+Cómo enterarte de que pasó, en orden de preferencia:
+
+| Cómo | Cuándo conviene |
+|---|---|
+| El webhook `document.status-changed` | Siempre que puedas recibirlo: es inmediato y no cuesta nada. |
+| `GET /api/v1/issuer/documents` | Si no podés recibir webhooks (firewall, red cerrada). Consultá el `status` del `id` que guardaste. |
+
+En el ambiente de test el anclaje suele tardar unos segundos; el techo depende de la
+congestión de la cadena, así que no dimensiones nada contra lo que medís en test.
+Antes esta llamada esperaba el recibo de la transacción y podía durar ~90 segundos:
+si tu cliente tiene un `--max-time 120` heredado de esa época, ya no hace falta.
 
 ## La respuesta, campo por campo
 
@@ -80,7 +90,7 @@ documentos**, así que el resultado llega únicamente como respuesta de este req
 ```json
 {
   "id": "63813a91-6986-46bf-9f23-128a6598cd82",
-  "status": "anchored",
+  "status": "signed",
   "visibility": "private",
   "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3Nk…eyJjb250ZW50…~",
   "claims": {
@@ -90,9 +100,9 @@ documentos**, así que el resultado llega únicamente como respuesta de este req
     "isConfidential": false
   },
   "digest": "1043…",
-  "tx_hash": "0x9c93c1eec04ae7e4566b4ee394ac518b33c36b0ffd324276289e998eed72f8ca",
+  "tx_hash": null,
   "signed_at": "2026-08-21T14:12:34Z",
-  "anchored_at": "2026-08-21T14:12:43Z",
+  "anchored_at": null,
   "revoked_at": null,
   "issuer": {
     "did": "did:sovra:0xb516d2f945db504198d726bda2a01d19ecd3cc23",
@@ -117,12 +127,12 @@ dentro del `credential`) o si es una afirmación del servicio. Ver
 | Campo | Tipo | Qué es | Firmado |
 |---|---|---|---|
 | `id` | `uuid` | El identificador del documento. Se usa en las URLs (`/api/v1/documents/<id>`) y coincide con el claim `jti` de adentro del `credential`, así que una credencial no puede servirse bajo otro id. | Sí (como `jti`) |
-| `status` | `string` | El ciclo de vida. `anchored` = firmado y con la firma registrada on-chain: es el estado final exitoso. | No |
+| `status` | `string` | El ciclo de vida. Un documento recién emitido vuelve `signed`; `anchored` —firmado y con la firma registrada on-chain— es el estado final exitoso. | No |
 | `visibility` | `string` | `public` o `private`. Controla el acceso vía la API — ver [guía 4](04-visibilidad-y-entrega.md). | No |
 | `credential` | `string` | ★ **El documento en sí.** Un SD-JWT VC en base64url, autocontenido y verificable por cualquiera que lo tenga. Es el único campo que hay que conservar. | Es la firma |
 | `claims` | `object` | Los mismos claims ya decodificados, por conveniencia. No es prueba de nada: es lo que el servicio *dice* que dice el documento. | Sí, adentro del `credential` |
 | `digest` | `string` (hex) | El SHA-256 del *signing input* (los bytes que se firmaron). La huella del documento: la verificación lo recalcula y compara. Si alguien altera un byte, deja de coincidir. | No (se recalcula) |
-| `tx_hash` | `string` (`0x…`) | El hash de la transacción on-chain donde quedó anclada la firma. | No |
+| `tx_hash` | `string` (`0x…`) \| `null` | El hash de la transacción on-chain donde quedó anclada la firma. **`null` en la respuesta de la emisión**: la transacción todavía no salió. | No |
 | `signed_at` | `string` (ISO 8601) | Cuándo el emisor firmó. | Sí (como `iat`) |
 | `anchored_at` | `string` (ISO 8601) | Cuándo la firma quedó registrada en la cadena. En las pruebas, segundos después de firmar. | No |
 | `revoked_at` | `string` \| `null` | `null` = vigente. Con fecha, el documento está revocado. | No |
@@ -170,7 +180,7 @@ En la práctica conviene guardar además:
 | Campo | Por qué |
 |---|---|
 | `id` | Para armar el enlace público y para cambiar la visibilidad después. |
-| `tx_hash` | Para linkear al explorer sin volver a consultar la API. |
+| `tx_hash` | Para linkear al explorer. **No viene en la respuesta de la emisión** (`null`): llega en el webhook `document.status-changed`, o se consulta después con `GET /api/v1/issuer/documents`. |
 | `digest` | Se puede recalcular del `credential`, pero tenerlo a mano evita el cómputo. |
 
 Todo eso también se puede recuperar más tarde con
@@ -191,6 +201,9 @@ el `credential` completo de cada documento.
 > ⚠️ **Solo `anchored` es un estado entregable.** Un `failed` significa que la firma
 > existe pero no quedó registrada en la cadena, y un verificador que corra el check
 > de anclaje lo va a rechazar (`NOT_ANCHORED`). No lo reenvíes: reemitilo.
+
+Cada paso de `signed` a `anchored` o a `failed` se anuncia con un webhook
+[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
 
 ## Listar los documentos del workspace
 

@@ -225,7 +225,9 @@ Antes de pasar a emitir:
 - [ ] *(Opcional)* El esquema tiene un layout diseñado.
 - [ ] Tenés una API key `sovra_sk_…` guardada de forma segura.
 - [ ] `GET /api/v1/issuer/documents` responde `200`.
-- [ ] El timeout de tu cliente HTTP está en **120 s** — la emisión puede tardar ~90 s.
+- [ ] Sabés cómo vas a enterarte de que un documento quedó `anchored`: el webhook
+      `document.status-changed`, o consultando `GET /api/v1/issuer/documents`. La
+      emisión responde `signed`, y `signed` no es entregable.
 
 ---
 

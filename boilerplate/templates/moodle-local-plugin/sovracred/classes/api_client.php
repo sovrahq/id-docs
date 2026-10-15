@@ -11,7 +11,7 @@ namespace local_sovracred;
  * Usa \core\http_client (Guzzle del núcleo), que respeta la lista de hosts y puertos bloqueados de
  * Administración del sitio → Seguridad → Seguridad HTTP, y que en las pruebas se reemplaza por uno simulado.
  *
- * Referencia: docs/guides/credentials/03-emision-de-credenciales.md
+ * Referencia: docs/guides/credentials/04-emision-de-credenciales.md
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra

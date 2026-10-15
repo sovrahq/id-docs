@@ -194,7 +194,7 @@ derecha la dice el servidor.
 ```
 
 - **a** se puede hacer desde el dashboard **o por API**, con
-  [`POST /api/v1/issuer/schemas`](07-referencia-api.md#esquemas-de-kind-document). **b**
+  [`POST /api/v1/issuer/schemas`](08-referencia-api.md#esquemas-de-kind-document). **b**
   es solo dashboard: el layout no tiene endpoints.
 - **c** valida y firma, y devuelve enseguida con `status: "signed"`.
 - **c'** es el anclaje on-chain, que corre aparte. **Hasta que llegue
@@ -204,7 +204,7 @@ derecha la dice el servidor.
 - **e** puede ser el string `credential` o el enlace `/api/v1/documents/{id}`. Los
   dos caminos terminan en lo mismo.
 - **f** corre del lado de quien recibe, contra la cadena. **No hay un endpoint que
-  responda "válido" o "inválido"** — ver [6. Verificación](06-verificacion.md).
+  responda "válido" o "inválido"** — ver [7. Verificación](07-verificacion.md).
 
 ## Qué hace tu servidor y qué hace Sovra
 

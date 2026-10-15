@@ -1,4 +1,4 @@
-# 4. Verificación de mDocs
+# 5. Verificación de mDocs
 
 El endpoint es el mismo que para SD-JWT. Lo que varía es el `format` del DCQL y,
 principalmente, **la forma de denominar un claim**: un elemento mDoc se compone
@@ -242,7 +242,7 @@ las llaves que la cuenta del holder autoriza **en el momento presente**.
 ```
 
 La lista completa de valores de `error` figura en
-[Errores y troubleshooting](06-errores-y-troubleshooting.md#errores-de-presentación).
+[Errores y troubleshooting](07-errores-y-troubleshooting.md#errores-de-presentación).
 
 > El campo `holder_did` presenta valor `null` cuando el fallo se produce antes de
 > poder identificar al holder, como en los casos de `malformed_vp_token`,
@@ -364,4 +364,4 @@ app.post("/webhooks/sovra", verificarFirmaHmac, (req, res) => {
 
 ---
 
-**Anterior:** [← 3. Emisión de mDocs](03-emision-de-mdocs.md) · **Siguiente:** [5. Referencia de la API →](05-referencia-api.md)
+**Anterior:** [← 4. Emisión de mDocs](04-emision-de-mdocs.md) · **Siguiente:** [6. Referencia de la API →](06-referencia-api.md)

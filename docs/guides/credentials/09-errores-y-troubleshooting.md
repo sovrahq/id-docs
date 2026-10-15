@@ -1,4 +1,4 @@
-# 8. Errores y troubleshooting
+# 9. Errores y troubleshooting
 
 ## Tabla de contenidos
 
@@ -67,7 +67,7 @@ endpoint corra:
 | 422 | `validation_error` | El body no pasó la validación. `details` da el detalle por campo. | Corregí el body. **Omitir la clave `validity_period` al crear un esquema cae acá:** tiene que estar presente, aunque sea en `null`. |
 | 422 | `invalid_valid_until` | `valid_until` es `null`, está malformado o quedó en el pasado. | Mandá una fecha futura, u omitilo para usar el `validity_period` del esquema. |
 | 422 | `invalid_claim_values` | Un adjunto no es un data URI de PDF válido, o pasa los 560.000 bytes. | `details` lista `"<key>: <motivo>"`. |
-| 422 | `unencodable_claims` | **Solo mDoc:** un valor no se puede codificar en CBOR (un número no entero, una fecha que no es ISO). | Ver los [tipos de claim](../credentials-mdoc/05-referencia-api.md#tipos-de-claim). |
+| 422 | `unencodable_claims` | **Solo mDoc:** un valor no se puede codificar en CBOR (un número no entero, una fecha que no es ISO). | Ver los [tipos de claim](../credentials-mdoc/06-referencia-api.md#tipos-de-claim). |
 | 422 | `document_signer_required` | El esquema declara su propio docType y el workspace no tiene document signer. | Registralo desde el dashboard. |
 | 422 | `bitmap_exhausted` | No hay índices libres en la lista de estado. | Poco frecuente. Reportalo a Sovra. |
 | 429 | `too_many_requests` | Pasaste las **120 req/min de tu IP** en `POST /credential-offer`. **No viene `Retry-After`.** | Esperá y reintentá con backoff. |
@@ -80,12 +80,12 @@ endpoint corra:
 | 404 | `credential_not_found` | El UUID no existe en el workspace, o no es un UUID válido. | Verificá el `credential_id`. |
 | 422 | `credential_not_yet_issued` | El id corresponde a una oferta `pending`. | No hay credencial que revocar todavía. |
 | 409 | `status_change_pending` | Otro cambio de esta credencial **todavía no confirmó on-chain**. Se admite uno a la vez. | Esperá el webhook `credential.revoked` / `.suspended` / `.unsuspended`, o el `credential.status-change-failed`. |
-| 422 | `invalid_status_transition` | La transición no está permitida. | Ver la [tabla de transiciones](06-ciclo-de-vida-y-revocacion.md#transiciones-permitidas). Revocar dos veces cae acá. |
+| 422 | `invalid_status_transition` | La transición no está permitida. | Ver la [tabla de transiciones](07-ciclo-de-vida-y-revocacion.md#transiciones-permitidas). Revocar dos veces cae acá. |
 
 > ⚠️ **`PUT …/status/…` responde `202`, no `200`.** El cambio se escribe on-chain en
 > segundo plano: el `202` solo confirma que el pedido se aceptó, con el destino en
 > `pending_status`. Si la escritura falla tras 5 intentos, llega
-> [`credential.status-change-failed`](05-webhooks.md#credentialstatus-change-failed) y
+> [`credential.status-change-failed`](06-webhooks.md#credentialstatus-change-failed) y
 > el estado **queda como estaba**. Un `202` nunca es prueba de que algo se revocó.
 
 ### Verificación
@@ -318,9 +318,9 @@ Qué mirar:
 
 > ⚠️ Decodificar **no verifica nada**. Cualquiera puede fabricar un JWT con el
 > contenido que quiera. Para verificar de verdad hace falta comprobar la firma contra
-> la llave del emisor: usá la [API de verificación](04-verificacion-de-credenciales.md)
-> o el [SDK on-chain](09-verificacion-sin-sovra.md).
+> la llave del emisor: usá la [API de verificación](05-verificacion-de-credenciales.md)
+> o el [SDK on-chain](10-verificacion-sin-sovra.md).
 
 ---
 
-**Anterior:** [← 7. Referencia de la API](07-referencia-api.md) · **Siguiente:** [9. Verificación sin Sovra →](09-verificacion-sin-sovra.md)
+**Anterior:** [← 8. Referencia de la API](08-referencia-api.md) · **Siguiente:** [10. Verificación sin Sovra →](10-verificacion-sin-sovra.md)

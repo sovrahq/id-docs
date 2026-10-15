@@ -1,4 +1,4 @@
-# 4. Verificación de credenciales
+# 5. Verificación de credenciales
 
 Verificar también son tres movimientos: **creás una sesión** con la consulta DCQL,
 **mostrás un QR**, y **recibís un webhook** con el veredicto.
@@ -235,7 +235,7 @@ pidió `first_name` pero la credencial tiene el claim como `fist_name` — un er
 tipeo en el esquema, no un problema de la credencial ni del ciudadano.
 
 La lista completa de valores de `error`, con causa y solución de cada uno, está en
-[8. Errores y troubleshooting](08-errores-y-troubleshooting.md#errores-de-presentación).
+[9. Errores y troubleshooting](09-errores-y-troubleshooting.md#errores-de-presentación).
 
 > `holder_did` puede venir `null` cuando la falla ocurre antes de poder identificar
 > al holder (por ejemplo `malformed_vp_token` o `session_expired`).
@@ -388,4 +388,4 @@ app.post("/webhooks/sovra", verificarFirmaSovra, async (req, res) => {
 
 ---
 
-**Anterior:** [← 3. Emisión de credenciales](03-emision-de-credenciales.md) · **Siguiente:** [5. Webhooks →](05-webhooks.md)
+**Anterior:** [← 4. Emisión de credenciales](04-emision-de-credenciales.md) · **Siguiente:** [6. Webhooks →](06-webhooks.md)

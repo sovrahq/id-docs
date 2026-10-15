@@ -41,13 +41,14 @@ webhooks y el mismo estado publicado en **SovraChain**.
 | # | Guía | Propósito |
 |---|---|---|
 | 1 | [Introducción](01-introduccion.md) | Qué es un mDoc, docType y namespace, anatomía del `IssuerSigned`, el namespace meta, las dos rutas de confianza. |
-| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
-| 3 | [Emisión de mDocs](03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
-| 4 | [Verificación de mDocs](04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
-| 5 | [Referencia de la API](05-referencia-api.md) | Endpoints —incluida la creación del esquema—, objetos, tipos de claim, catálogo de elementos ISO. |
-| 6 | [Errores y troubleshooting](06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
-| 7 | [Verificación sin Sovra](07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
-| 8 | [Habilitar mDL ISO](08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
+| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, workspace aprovisionado, API key y webhook. Primera llamada. |
+| 3 | [Crear un esquema](03-crear-un-esquema.md) | `format: mso_mdoc`, los tipos de claim, `required` frente a `always shared`, la elección del docType y el namespace, versionado. |
+| 4 | [Emisión de mDocs](04-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
+| 5 | [Verificación de mDocs](05-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
+| 6 | [Referencia de la API](06-referencia-api.md) | Endpoints —incluida la creación del esquema—, objetos, tipos de claim, catálogo de elementos ISO. |
+| 7 | [Errores y troubleshooting](07-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
+| 8 | [Verificación sin Sovra](08-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
+| 9 | [Habilitar mDL ISO](09-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
 
 > La guía 8 es un trámite externo y opcional: solo hace falta si la credencial
 > debe llevar el docType `org.iso.18013.5.1.mDL`. Con el docType que genera Sovra
@@ -98,7 +99,7 @@ curl -X POST "$BASE_URL/api/v1/verifier/verifications" \
 ## Recursos
 
 - [Colección de Postman — mDoc](../../resources/sovra-mdoc.postman_collection.json) — impórtela y configure `baseUrl` y `apiKey`.
-- [Webhooks](../credentials/05-webhooks.md) — el catálogo de eventos y la firma HMAC son idénticos para ambos formatos.
+- [Webhooks](../credentials/06-webhooks.md) — el catálogo de eventos y la firma HMAC son idénticos para ambos formatos.
 - Especificación OpenAPI en vivo: `GET {baseUrl}/openapi/api`
 
 ---

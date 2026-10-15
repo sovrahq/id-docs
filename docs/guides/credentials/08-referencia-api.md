@@ -1,4 +1,4 @@
-# 7. Referencia de la API
+# 8. Referencia de la API
 
 Referencia completa de la API servidor-a-servidor de Sovra ID (`/api/v1`): emisión de
 credenciales y de documentos firmados, administración de esquemas y de su diseño en la
@@ -9,7 +9,7 @@ Queda afuera la API del dashboard (`/dashboard/*`, con sesión) y la de la walle
 
 **Buena parte de los resultados no llega en la respuesta, sino por webhook:** el
 anclaje de un documento, la emisión o el cambio de estado de una credencial, el
-desenlace de una verificación. Los eventos están en [5. Webhooks](05-webhooks.md).
+desenlace de una verificación. Los eventos están en [6. Webhooks](06-webhooks.md).
 
 ## Tabla de contenidos
 
@@ -163,6 +163,10 @@ vez.
 ---
 
 ## Esquemas
+
+> 📐 Esta sección es la referencia endpoint por endpoint. El recorrido explicado
+> —los dos caminos, los claims, el registro on-chain, el diseño— está en
+> [3. Crear un esquema](03-crear-un-esquema.md).
 
 Un esquema define un tipo de credencial: sus claims, su formato de serialización y
 cuánto vale lo que se emite con él. **Tiene dos identificadores**, y la confusión
@@ -469,7 +473,7 @@ después del canje.
 
 ### `POST /api/v1/issuer/credential-offer`
 
-Crea una oferta OID4VCI pre-autorizada. Ver [3. Emisión](03-emision-de-credenciales.md).
+Crea una oferta OID4VCI pre-autorizada. Ver [4. Emisión](04-emision-de-credenciales.md).
 
 **Rate limit:** 120 solicitudes por minuto por IP de origen.
 
@@ -564,7 +568,7 @@ es un UUID.
 
 **Pide** un cambio de estado. El cambio se escribe en la lista de estado on-chain en
 segundo plano, así que la respuesta es **`202`**: `status` todavía no cambió y el
-destino va en `pending_status`. Ver [6. Ciclo de vida](06-ciclo-de-vida-y-revocacion.md).
+destino va en `pending_status`. Ver [7. Ciclo de vida](07-ciclo-de-vida-y-revocacion.md).
 
 Cuando la transacción confirma, `status` se mueve y se envía `credential.revoked`,
 `credential.suspended` o `credential.unsuspended`. Si nunca confirma, se envía
@@ -613,7 +617,7 @@ como `presentation.verified` o `presentation.failed`, o consultando
 
 ### `POST /api/v1/verifier/verifications`
 
-Ver [4. Verificación](04-verificacion-de-credenciales.md).
+Ver [5. Verificación](05-verificacion-de-credenciales.md).
 
 **Body**
 
@@ -747,7 +751,7 @@ contexto que sirve para mostrar, no para confiar. Ver
 > 📑 **Resumen.** La documentación completa de documentos firmados —emisión,
 > visibilidad, renderizado, verificación, errores— está en
 > [`../documents/`](../documents/), y la referencia endpoint por endpoint en
-> [`../documents/07-referencia-api.md`](../documents/07-referencia-api.md).
+> [`../documents/08-referencia-api.md`](../documents/08-referencia-api.md).
 
 Un **documento** es una variante sin wallet: el emisor firma los datos directamente,
 sin holder y sin divulgación selectiva, y ancla la firma on-chain. Sirve para
@@ -782,7 +786,7 @@ sin disclosures, `<jwt>~`), `claims`, `digest`, `tx_hash`, `signed_at`,
 > `status: "signed"` y `tx_hash: null`. El anclaje corre en un job y el documento pasa
 > después a `anchored` —con `tx_hash` y `anchored_at`— o a `failed`. **Un verificador
 > rechaza un documento que no esté `anchored`**, así que esperá el webhook
-> [`document.status-changed`](05-webhooks.md#documentstatus-changed), o consultá
+> [`document.status-changed`](06-webhooks.md#documentstatus-changed), o consultá
 > `GET /documents`, antes de entregarlo.
 
 **Errores:** `404 schema_not_found`, `409 workspace_not_provisioned`,
@@ -935,8 +939,8 @@ Lo que devuelve `PUT …/design`.
 }
 ```
 
-Ver [las reglas de escritura](04-verificacion-de-credenciales.md#escribir-la-consulta-dcql).
+Ver [las reglas de escritura](05-verificacion-de-credenciales.md#escribir-la-consulta-dcql).
 
 ---
 
-**Anterior:** [← 6. Ciclo de vida y revocación](06-ciclo-de-vida-y-revocacion.md) · **Siguiente:** [8. Errores y troubleshooting →](08-errores-y-troubleshooting.md)
+**Anterior:** [← 7. Ciclo de vida y revocación](07-ciclo-de-vida-y-revocacion.md) · **Siguiente:** [9. Errores y troubleshooting →](09-errores-y-troubleshooting.md)

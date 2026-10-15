@@ -1,4 +1,4 @@
-# 3. Emisión de documentos
+# 4. Emisión de documentos
 
 Emitir es **una sola llamada**: Sovra valida los claims contra el esquema y firma con
 la llave del emisor, y responde al instante. **El anclaje on-chain corre después**, en
@@ -56,7 +56,7 @@ Los tipos de cada claim los declara el esquema (`date`, `number`, `string`,
 
 > **Todo documento nace privado.** Si omitís `visibility`, el documento queda
 > `private` y hace falta una llamada explícita para publicarlo — ver
-> [4. Visibilidad y entrega](04-visibilidad-y-entrega.md).
+> [5. Visibilidad y entrega](05-visibilidad-y-entrega.md).
 
 ## El anclaje es asincrónico
 
@@ -66,7 +66,7 @@ on-chain todavía no.
 
 El anclaje corre en un job aparte, que manda la transacción y espera su recibo.
 Después de eso el documento pasa a uno de dos estados finales, y **cada uno emite el
-webhook [`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed)**:
+webhook [`document.status-changed`](../credentials/06-webhooks.md#documentstatus-changed)**:
 
 | Estado final | Qué pasó | Qué trae |
 |---|---|---|
@@ -139,7 +139,7 @@ dentro del `credential`) o si es una afirmación del servicio. Ver
 |---|---|---|---|
 | `id` | `uuid` | El identificador del documento. Se usa en las URLs (`/api/v1/documents/<id>`) y coincide con el claim `jti` de adentro del `credential`, así que una credencial no puede servirse bajo otro id. | Sí (como `jti`) |
 | `status` | `string` | El ciclo de vida. **En la respuesta de emisión es siempre `signed`**; `anchored` —el estado final exitoso— llega después, por webhook. | No |
-| `visibility` | `string` | `public` o `private`. Controla el acceso vía la API — ver [guía 4](04-visibilidad-y-entrega.md). | No |
+| `visibility` | `string` | `public` o `private`. Controla el acceso vía la API — ver [guía 5](05-visibilidad-y-entrega.md). | No |
 | `credential` | `string` | ★ **El documento en sí.** Un SD-JWT VC en base64url, autocontenido y verificable por cualquiera que lo tenga. Es el único campo que hay que conservar. | Es la firma |
 | `claims` | `object` | Los mismos claims ya decodificados, por conveniencia. No es prueba de nada: es lo que el servicio *dice* que dice el documento. | Sí, adentro del `credential` |
 | `digest` | `string` (hex) | El SHA-256 del *signing input* (los bytes que se firmaron). La huella del documento, **y la clave bajo la cual la firma queda anclada**: la verificación lo recalcula y compara. Si alguien altera un byte, deja de coincidir. | No (se recalcula) |
@@ -259,7 +259,7 @@ invalidar**: es el mecanismo real para dar de baja un documento emitido, y es
 distinto de volverlo `private` (eso cierra el enlace, no las copias).
 
 > ⚠️ **La API no expone un endpoint de revocación.** Los endpoints disponibles son
-> los de la [referencia](07-referencia-api.md); ninguno revoca. La baja se gestiona desde el dashboard. Si necesitás revocar por API,
+> los de la [referencia](08-referencia-api.md); ninguno revoca. La baja se gestiona desde el dashboard. Si necesitás revocar por API,
 > confirmalo con el equipo de Sovra antes de diseñar el flujo.
 
 ## Errores
@@ -285,8 +285,8 @@ El sobre de error es siempre el mismo:
 ```
 
 La tabla completa, con qué endpoints devuelven qué, está en
-[8. Errores y troubleshooting](08-errores-y-troubleshooting.md).
+[9. Errores y troubleshooting](09-errores-y-troubleshooting.md).
 
 ---
 
-**Anterior:** [← 2. Primeros pasos](02-primeros-pasos.md) · **Siguiente:** [4. Visibilidad y entrega →](04-visibilidad-y-entrega.md)
+**Anterior:** [← 3. Crear un esquema](03-crear-un-esquema.md) · **Siguiente:** [5. Visibilidad y entrega →](05-visibilidad-y-entrega.md)

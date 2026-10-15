@@ -1,4 +1,4 @@
-# 8. Errores y troubleshooting
+# 9. Errores y troubleshooting
 
 ## Tabla de contenidos
 
@@ -24,7 +24,7 @@ Siempre el mismo, en los cuatro endpoints:
 ## Tabla completa
 
 Los endpoints se referencian por su número de sección en
-[7. Referencia de la API](07-referencia-api.md).
+[8. Referencia de la API](08-referencia-api.md).
 
 | Respuesta | Endpoints | Causa | Qué revisar |
 |---|---|---|---|
@@ -82,7 +82,7 @@ Dos salidas:
 
 Y una tercera, si lo que necesitás es que el destinatario lo tenga sin publicarlo:
 **mandale el string `credential`.** El `credential` no depende de la visibilidad —
-ver [4. Visibilidad y entrega](04-visibilidad-y-entrega.md#los-caminos-de-entrega).
+ver [5. Visibilidad y entrega](05-visibilidad-y-entrega.md#los-caminos-de-entrega).
 
 ### `404 document_not_found`
 
@@ -201,7 +201,7 @@ job aparte.
 El 90 % de las veces es la **suscripción**. La lista de eventos de cada endpoint es
 explícita y **no hay comodín**: un endpoint creado antes de que este evento existiera
 no lo recibe hasta que alguien lo suscriba en **Settings → Webhooks**. Ver
-[la guía de webhooks](../credentials/05-webhooks.md#endpoints-y-suscripciones).
+[la guía de webhooks](../credentials/06-webhooks.md#endpoints-y-suscripciones).
 
 Lo demás: que el endpoint esté `enabled`, que responda `2xx` en menos de 5 segundos, y
 que **no devuelva `4xx`** — un `4xx` descarta el evento sin reintentos. Pasados los
@@ -212,7 +212,7 @@ que **no devuelva `4xx`** — un `4xx` descarta el evento sin reintentos. Pasado
 
 El JSON llegó bien pero los campos aparecen en blanco: **`schema.claims[]` trae solo
 definiciones, no valores.** Los valores están dentro del `credential`. Ver
-[5. Renderizado](05-renderizado.md#las-tres-cosas-que-el-json-no-trae).
+[6. Renderizado](06-renderizado.md#las-tres-cosas-que-el-json-no-trae).
 
 ### El navegador bloquea la llamada (CORS)
 
@@ -222,7 +222,7 @@ Estás llamando a la **zona emisor** desde el navegador. El preflight
 
 No es configurable de tu lado, y no debería serlo: la API key no puede vivir en el
 navegador. Necesitás un proxy en tu servidor, con una whitelist explícita de rutas —
-ver [5. Renderizado](05-renderizado.md#boilerplate-de-referencia).
+ver [6. Renderizado](06-renderizado.md#boilerplate-de-referencia).
 
 La **zona pública** sí responde `Access-Control-Allow-Origin: *` y se puede llamar
 directo.
@@ -237,14 +237,14 @@ header_b64 . payload_b64 . firma ← no
 header_b64 . payload_b64 . firma ~ ← no
 ```
 
-Ver [5. Renderizado](05-renderizado.md#calcular-el-digest). Compará en minúsculas e
+Ver [6. Renderizado](06-renderizado.md#calcular-el-digest). Compará en minúsculas e
 ignorando un eventual prefijo `0x`.
 
 ### El QR no se genera
 
 El `credential` supera el techo del encoder (~2953 bytes en corrección nivel L). Pasa
 con esquemas de muchos claims o con valores largos. Ver
-[5. Renderizado](05-renderizado.md#por-qué-el-qr-lleva-el-credential-y-no-un-link).
+[6. Renderizado](06-renderizado.md#por-qué-el-qr-lleva-el-credential-y-no-un-link).
 
 ### El documento verifica pero el verificador lo rechaza
 
@@ -258,14 +258,14 @@ Revisá el `status`. **Solo `anchored` es un estado entregable:**
 
 Y si el error es `ISSUER_NOT_TRUSTED`: la firma valida, pero el emisor no está
 autorizado en el Issuer Registry para ese `vct`. Es una cuestión de aprovisionamiento
-del workspace, no del documento — ver [6. Verificación](06-verificacion.md#los-cinco-checks-contra-la-cadena).
+del workspace, no del documento — ver [7. Verificación](07-verificacion.md#los-cinco-checks-contra-la-cadena).
 
 ### Volví el documento a privado y sigue circulando
 
 Correcto y esperado. **`visibility` restringe los endpoints, no el artefacto.** Un
 `credential` ya entregado sigue siendo legible y verificable por quien lo tenga, para
 siempre. Para invalidar el documento existe la revocación. Ver
-[4. Visibilidad y entrega](04-visibilidad-y-entrega.md#qué-restringe-la-visibilidad-y-qué-no).
+[5. Visibilidad y entrega](05-visibilidad-y-entrega.md#qué-restringe-la-visibilidad-y-qué-no).
 
 ## Checklist de diagnóstico
 
@@ -287,4 +287,4 @@ Cuando algo falla y no está claro dónde:
 
 ---
 
-**Anterior:** [← 7. Referencia de la API](07-referencia-api.md) · **Volver al [índice](README.md)**
+**Anterior:** [← 8. Referencia de la API](08-referencia-api.md) · **Volver al [índice](README.md)**

@@ -1,8 +1,8 @@
-# 6. Errores y troubleshooting
+# 7. Errores y troubleshooting
 
 Este documento recoge únicamente lo específico de mDoc. Los errores comunes a
 ambos formatos —autenticación, workspace y ciclo de vida— figuran en
-[Errores de credenciales](../credentials/08-errores-y-troubleshooting.md).
+[Errores de credenciales](../credentials/09-errores-y-troubleshooting.md).
 
 ## Tabla de contenidos
 
@@ -22,7 +22,7 @@ ambos formatos —autenticación, workspace y ciclo de vida— figuran en
 | `error` | Causa | Solución |
 |---|---|---|
 | `undefined_iso_elements` | Un `key` que `org.iso.18013.5.1` no define. | El namespace ISO es cerrado. Los campos propios deben alojarse en **un namespace propio, adicional**. |
-| `wrong_iso_element_type` | El identificador existe pero con otro tipo. El caso más habitual es `portrait` declarado `string` en lugar de `bytes`. | Véase el [catálogo de elementos](05-referencia-api.md#elementos-del-namespace-iso). |
+| `wrong_iso_element_type` | El identificador existe pero con otro tipo. El caso más habitual es `portrait` declarado `string` en lugar de `bytes`. | Véase el [catálogo de elementos](06-referencia-api.md#elementos-del-namespace-iso). |
 | `schema_id must be lowercase alphanumeric, - or _` | El `schema_id` de un esquema mDoc contiene caracteres fuera de `^[a-z0-9][a-z0-9_-]*$`. | Se convierte en un segmento del docType; un punto en su interior añadiría un nivel. |
 | `doc_type must be a reverse-DNS identifier` | El docType no corresponde al patrón DNS inverso. | Por ejemplo, `org.iso.18013.5.1.mDL`. |
 | `mdoc is only available for credential schemas` | Se seleccionó `format: mso_mdoc` con `kind: document`. | Un documento se firma directamente a un PDF, sin wallet ni holder: un mDoc no puede expresar ese modelo. |
@@ -40,7 +40,7 @@ ambos formatos —autenticación, workspace y ciclo de vida— figuran en
 |---|---|---|---|
 | 422 | `unencodable_claims` | Un valor no admite codificación como CBOR de ISO 18013-5. El campo `details` identifica las claves. | Véase la tabla siguiente. |
 | 422 | `missing_claims` | Falta un claim `required`. | El campo `details` contiene la lista. |
-| 422 | `document_signer_required` | El esquema declara un docType ISO y el workspace carece de document signer. | Véase la [guía 8](08-habilitar-mdl-iso.md). |
+| 422 | `document_signer_required` | El esquema declara un docType ISO y el workspace carece de document signer. | Véase la [guía 9](09-habilitar-mdl-iso.md). |
 | 422 | `wrong_schema_kind` | El esquema es de kind `document`. | Un mDoc es siempre `credential`. |
 
 ### Causas de `unencodable_claims`
@@ -188,7 +188,7 @@ raíz o registrar un signer:
 
 La tabla completa de valores de `reason`, con la acción correctiva
 correspondiente a cada uno, figura en
-[Habilitar mDL ISO](08-habilitar-mdl-iso.md#anexo-2-cuando-el-registro-es-rechazado).
+[Habilitar mDL ISO](09-habilitar-mdl-iso.md#anexo-2-cuando-el-registro-es-rechazado).
 
 ## Incidencias frecuentes
 
@@ -266,4 +266,4 @@ Elementos que deben verificarse, en orden:
 
 ---
 
-**Anterior:** [← 5. Referencia de la API](05-referencia-api.md) · **Siguiente:** [7. Verificación sin Sovra →](07-verificacion-sin-sovra.md)
+**Anterior:** [← 6. Referencia de la API](06-referencia-api.md) · **Siguiente:** [8. Verificación sin Sovra →](08-verificacion-sin-sovra.md)

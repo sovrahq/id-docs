@@ -1,4 +1,4 @@
-# 11. Emitir desde Moodle
+# 12. Emitir desde Moodle
 
 Las guías 3 a 6 describen la emisión en abstracto: creás una oferta, mostrás un QR,
 recibís un webhook. Esta guía la baja a un **LMS concreto —Moodle—**, donde la
@@ -55,7 +55,7 @@ sequenceDiagram
 ## Decisión 1 — la oferta se crea cuando el estudiante la pide
 
 Una oferta **vence a las 24 horas y es de un solo uso**
-([guía 3](03-emision-de-credenciales.md#la-respuesta-campo-por-campo)). Crearla al
+([guía 4](04-emision-de-credenciales.md#la-respuesta-campo-por-campo)). Crearla al
 completarse el curso —que Moodle calcula con el cron, a veces de madrugada— haría
 que la mayoría venza antes de que el estudiante la vea.
 
@@ -80,7 +80,7 @@ suelen estar detrás de firewalls de aplicación, a veces **con restricción por
 y el aviso puede no llegar nunca.
 
 El endpoint se crea en **Settings → Workspaces → *(tu workspace)* → Webhooks**, y la
-suscripción a eventos es **explícita, sin comodín** ([guía 5](05-webhooks.md#endpoints-y-suscripciones)):
+suscripción a eventos es **explícita, sin comodín** ([guía 6](06-webhooks.md#endpoints-y-suscripciones)):
 hay que marcar `credential.issued`, `credential.revoked`, `credential.suspended` y
 `credential.unsuspended`. Un endpoint sin esos eventos no recibe nada — y acá eso no
 se nota, porque la reconciliación tapa el agujero cinco minutos más tarde.
@@ -88,7 +88,7 @@ se nota, porque la reconciliación tapa el agujero cinco minutos más tarde.
 El plugin no depende de él: una tarea programada consulta
 `GET /api/v1/issuer/credentials/{id}` cada 5 minutos para las ofertas abiertas, y una
 vez por día para las credenciales ya emitidas
-([guía 3](03-emision-de-credenciales.md#consultar-el-estado-de-una-emisión)):
+([guía 4](04-emision-de-credenciales.md#consultar-el-estado-de-una-emisión)):
 
 | `status` | Qué hace el plugin |
 |---|---|
@@ -105,7 +105,7 @@ corrida.
 ## Decisión 3 — qué responder al webhook
 
 Un **4xx hace que Sovra descarte el evento sin reintentar**
-([guía 5](05-webhooks.md#entrega-y-reintentos)). El plugin responde:
+([guía 6](06-webhooks.md#entrega-y-reintentos)). El plugin responde:
 
 | Situación | Respuesta | Por qué |
 |---|---|---|
@@ -150,4 +150,4 @@ Por la misma razón, la notificación se arma **en el idioma del estudiante**
 
 ---
 
-**Anterior:** [← 10. Verificar por WhatsApp](10-whatsapp.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/moodle-local-plugin/`](../../../boilerplate/templates/moodle-local-plugin/)**
+**Anterior:** [← 11. Verificar por WhatsApp](11-whatsapp.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/moodle-local-plugin/`](../../../boilerplate/templates/moodle-local-plugin/)**

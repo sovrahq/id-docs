@@ -1,4 +1,4 @@
-# 5. Webhooks
+# 6. Webhooks
 
 Los webhooks son **el mecanismo principal** para conocer el desenlace de todo lo que
 es asincrónico: un documento que se ancla, una revocación que llega a la cadena, un
@@ -642,7 +642,7 @@ este evento**, con `session_expired`.
 | `doctype_mismatch` | El docType del mdoc no es el que pidió la consulta. |
 | `missing_required_claim:<path>` | La credencial no lleva un claim que la consulta pidió. |
 
-Ver también la [tabla completa de errores](08-errores-y-troubleshooting.md#errores-de-presentación).
+Ver también la [tabla completa de errores](09-errores-y-troubleshooting.md#errores-de-presentación).
 
 ## Buenas prácticas
 
@@ -776,4 +776,4 @@ async function manejar({ event, data }) {
 
 ---
 
-**Anterior:** [← 4. Verificación de credenciales](04-verificacion-de-credenciales.md) · **Siguiente:** [6. Ciclo de vida y revocación →](06-ciclo-de-vida-y-revocacion.md)
+**Anterior:** [← 5. Verificación de credenciales](05-verificacion-de-credenciales.md) · **Siguiente:** [7. Ciclo de vida y revocación →](07-ciclo-de-vida-y-revocacion.md)

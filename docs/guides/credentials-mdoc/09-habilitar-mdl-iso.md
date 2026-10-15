@@ -1,4 +1,4 @@
-# 8. Habilitar mDL ISO
+# 9. Habilitar mDL ISO
 
 Esta guía se aplica **únicamente** si la credencial debe llevar el docType oficial
 de ISO, `org.iso.18013.5.1.mDL`. Es el caso de una licencia de conducir que aspire
@@ -6,7 +6,7 @@ a ser leída por lectores de terceros, fuera de Sovra.
 
 > **Si el docType es el generado por Sovra** (`io.sovra.…`), no hace falta nada de
 > esto y se puede emitir de inmediato. Es la opción por defecto y cubre la mayoría
-> de los casos. Véase [Elección del docType](02-primeros-pasos.md#elección-del-doctype).
+> de los casos. Véase [Elección del docType](03-crear-un-esquema.md#elección-del-doctype).
 
 ## Por qué hace falta un trámite
 
@@ -281,4 +281,4 @@ idempotente.
 
 ---
 
-**Anterior:** [← 7. Verificación sin Sovra](07-verificacion-sin-sovra.md) · **Volver al [índice](README.md)**
+**Anterior:** [← 8. Verificación sin Sovra](08-verificacion-sin-sovra.md) · **Volver al [índice](README.md)**

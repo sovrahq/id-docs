@@ -11,7 +11,7 @@ namespace local_sovracred;
  * El cuerpo se firma byte por byte, tal como llegó: decodificar y volver a codificar el JSON cambia
  * el orden y los espacios, y la firma deja de coincidir.
  *
- * Referencia: docs/guides/credentials/05-webhooks.md
+ * Referencia: docs/guides/credentials/06-webhooks.md
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra

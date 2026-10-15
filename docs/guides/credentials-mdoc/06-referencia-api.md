@@ -1,4 +1,4 @@
-# 5. Referencia de la API
+# 6. Referencia de la API
 
 ## Tabla de contenidos
 
@@ -42,10 +42,13 @@ El esquema `Bearer` es sensible a mayúsculas. La clave se crea en
 
 ## Esquemas
 
+> 📐 El recorrido explicado —los tipos de claim, `always shared`, la elección del
+> docType y del namespace— está en [3. Crear un esquema](03-crear-un-esquema.md).
+
 Un esquema mDoc se crea con los mismos endpoints que cualquier otro; lo que lo
 convierte en mDoc es `format: "mso_mdoc"`. La referencia completa de los cuatro
 endpoints —objeto Schema, versionado con `base_version`, borrado— reside en
-[`../credentials/07-referencia-api.md#esquemas`](../credentials/07-referencia-api.md#esquemas).
+[`../credentials/08-referencia-api.md#esquemas`](../credentials/08-referencia-api.md#esquemas).
 A continuación, lo que resulta propio de mDoc.
 
 ### `POST /api/v1/issuer/schemas`
@@ -104,7 +107,7 @@ La revisión agrega una versión nueva y requiere `base_version`; el borrado alc
 **todas las versiones** y se rechaza con `409 schema_in_use` si alguna registra ofertas
 o credenciales emitidas. `format`, `doc_type` y `namespace` **no son modificables** en
 una revisión. Detalle en
-[`../credentials/07-referencia-api.md#esquemas`](../credentials/07-referencia-api.md#esquemas).
+[`../credentials/08-referencia-api.md#esquemas`](../credentials/08-referencia-api.md#esquemas).
 
 ## Emisor
 
@@ -148,7 +151,7 @@ Consulta por `credential_id`.
 ### `PUT /api/v1/issuer/credentials/{id}/status/{status}`
 
 Modifica el estado de una credencial emitida. Idéntico al caso de SD-JWT; véase
-[Ciclo de vida y revocación](../credentials/06-ciclo-de-vida-y-revocacion.md).
+[Ciclo de vida y revocación](../credentials/07-ciclo-de-vida-y-revocacion.md).
 
 | `{status}` | Efecto | Reversible |
 |---|---|---|
@@ -280,7 +283,7 @@ equivalente de la columna de observaciones de una licencia de plástico. El valo
 de `code` lo **define la autoridad emisora** —ISO no fija un catálogo—, y `sign`
 y `value` lo cuantifican cuando la restricción admite una cantidad. Los tres son
 de tipo texto. Explicado con ejemplos en la
-[guía de emisión](03-emision-de-mdocs.md#codes-las-restricciones-de-cada-categoría).
+[guía de emisión](04-emision-de-mdocs.md#codes-las-restricciones-de-cada-categoría).
 
 ## Elementos del namespace ISO
 
@@ -454,4 +457,4 @@ IssuerSigned
 
 ---
 
-**Anterior:** [← 4. Verificación de mDocs](04-verificacion-de-mdocs.md) · **Siguiente:** [6. Errores y troubleshooting →](06-errores-y-troubleshooting.md)
+**Anterior:** [← 5. Verificación de mDocs](05-verificacion-de-mdocs.md) · **Siguiente:** [7. Errores y troubleshooting →](07-errores-y-troubleshooting.md)

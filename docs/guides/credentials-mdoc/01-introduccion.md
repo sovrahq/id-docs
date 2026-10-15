@@ -65,7 +65,7 @@ Sovra contempla dos casos:
 | Valor | `io.sovra.<dirección-del-workspace>.<schema_id>.1` | Por ejemplo `org.iso.18013.5.1.mDL` |
 | Namespace | La misma cadena que el docType | Distinta — `org.iso.18013.5.1` |
 | Quién lo determina | Sovra, a partir del esquema | El operador, al crear el esquema |
-| Requisito | Ninguno | Un **document signer** registrado ([guía 8](08-habilitar-mdl-iso.md)) |
+| Requisito | Ninguno | Un **document signer** registrado ([guía 9](09-habilitar-mdl-iso.md)) |
 | Atribución al emisor | La dirección está contenida en el docType | La cadena `x5chain` del certificado |
 
 > El docType se deriva en lugar de aceptarse como entrada por tres motivos:
@@ -196,7 +196,7 @@ momento de la emisión, con dos consecuencias:
   debe divulgar una credencial ya emitida.
 
 En el dashboard, estos elementos se identifican con la etiqueta **`always
-shared`**. Véase [Primeros pasos](02-primeros-pasos.md#required-frente-a-always-shared).
+shared`**. Véase [Primeros pasos](03-crear-un-esquema.md#required-frente-a-always-shared).
 
 ## El flujo completo, de extremo a extremo
 
@@ -284,7 +284,7 @@ La sesión tiene una vigencia de **10 minutos**.
 | Firmar el MSO (`COSE_Sign1`, ES256, llave en KMS) | Sovra |
 | Almacenar la credencial | La wallet del ciudadano — **Sovra no almacena el mDoc firmado** |
 | Seleccionar qué elementos se comparten | El ciudadano, salvo los `always shared` |
-| Validar una presentación | Sovra, o un verificador propio (véase la [guía 7](07-verificacion-sin-sovra.md)) |
+| Validar una presentación | Sovra, o un verificador propio (véase la [guía 8](08-verificacion-sin-sovra.md)) |
 | Publicar el estado de revocación | Sovra, en SovraChain |
 
 > ⚠️ **El mDoc firmado se entrega una única vez**, en el webhook

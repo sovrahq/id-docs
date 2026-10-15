@@ -10,7 +10,7 @@ DCQL, `Authorization: Bearer sovra_sk_...`.
 
 > **Alcance:** este boilerplate asume que el ciudadano **ya tiene la credencial**
 > en su wallet. Solo verifica. La emisión está en
-> [`03-emision-de-credenciales.md`](../../../docs/guides/credentials/03-emision-de-credenciales.md).
+> [`04-emision-de-credenciales.md`](../../../docs/guides/credentials/04-emision-de-credenciales.md).
 
 ## La conversación
 
@@ -236,7 +236,7 @@ idle ──(cualquier mensaje)─────▶ awaiting_presentation   [link +
 ## Referencias
 
 - [Guías de credenciales de Sovra](../../../docs/guides/credentials/) — la fuente de verdad de la API.
-- [4. Verificación de credenciales](../../../docs/guides/credentials/04-verificacion-de-credenciales.md) — DCQL, las dos URIs, qué valida Sovra.
-- [5. Webhooks](../../../docs/guides/credentials/05-webhooks.md) — firma HMAC, reintentos, catálogo de eventos.
-- [8. Errores y troubleshooting](../../../docs/guides/credentials/08-errores-y-troubleshooting.md) — cada código de error y su solución.
+- [4. Verificación de credenciales](../../../docs/guides/credentials/05-verificacion-de-credenciales.md) — DCQL, las dos URIs, qué valida Sovra.
+- [5. Webhooks](../../../docs/guides/credentials/06-webhooks.md) — firma HMAC, reintentos, catálogo de eventos.
+- [8. Errores y troubleshooting](../../../docs/guides/credentials/09-errores-y-troubleshooting.md) — cada código de error y su solución.
 - [Cloud API de Meta](https://developers.facebook.com/docs/whatsapp/cloud-api) — referencia oficial.

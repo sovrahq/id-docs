@@ -1,4 +1,4 @@
-# 9. Verificación sin Sovra
+# 10. Verificación sin Sovra
 
 Las guías anteriores describen la **verificación hospedada**: creás una sesión, Sovra
 valida y te avisa por webhook. Es el camino más simple y el recomendado para empezar.
@@ -24,7 +24,7 @@ ni tener credenciales de Sovra, ni depender de su disponibilidad.
 
 | Situación | Camino |
 |---|---|
-| Integración típica: mostrás un QR y esperás el resultado | **Hospedada** ([guía 4](04-verificacion-de-credenciales.md)) |
+| Integración típica: mostrás un QR y esperás el resultado | **Hospedada** ([guía 5](05-verificacion-de-credenciales.md)) |
 | No podés depender de la disponibilidad de un tercero | On-chain |
 | Verificás en un entorno aislado, con acceso RPC pero sin API keys | On-chain |
 | Auditar por tu cuenta una credencial que ya guardaste | On-chain |
@@ -173,7 +173,7 @@ claim `credentialStatus` trae el índice, y el `iss` trae el DID del emisor cuyo
 `0x…` es la dirección.
 
 También podés hacerlo sin SDK, descargando la lista firmada desde
-[`GET /api/v1/status/{issuer_did}/{purpose}`](06-ciclo-de-vida-y-revocacion.md#consultar-la-lista-de-estado)
+[`GET /api/v1/status/{issuer_did}/{purpose}`](07-ciclo-de-vida-y-revocacion.md#consultar-la-lista-de-estado)
 — aunque eso sí depende de la API de Sovra.
 
 ## Códigos de error del SDK
@@ -219,4 +219,4 @@ para re-auditar credenciales guardadas o para verificar en un entorno aislado.
 
 ---
 
-**Anterior:** [← 8. Errores y troubleshooting](08-errores-y-troubleshooting.md) · **Siguiente:** [10. Verificar por WhatsApp →](10-whatsapp.md)
+**Anterior:** [← 9. Errores y troubleshooting](09-errores-y-troubleshooting.md) · **Siguiente:** [11. Verificar por WhatsApp →](11-whatsapp.md)

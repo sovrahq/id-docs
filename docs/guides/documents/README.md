@@ -19,13 +19,14 @@ cadena, sin depender de la API de Sovra.
 | # | Guía | Para qué sirve |
 |---|---|---|
 | 1 | [Introducción](01-introduccion.md) | Qué es un documento firmado, documento vs. credencial, anatomía del `credential`, las dos capas de confianza. |
-| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, las dos zonas de la API, workspace y DID, el esquema de kind `document`, el layout, API key. |
-| 3 | [Emisión de documentos](03-emision-de-documentos.md) | `POST /issuer/documents`, el anclaje asincrónico y su webhook, la respuesta campo por campo, qué guardar, el listado. |
-| 4 | [Visibilidad y entrega](04-visibilidad-y-entrega.md) | Publicar y despublicar, qué restringe y qué no, la lectura pública, los caminos de entrega. |
-| 5 | [Renderizado de la hoja](05-renderizado.md) | El objeto `layout`, la geometría, el saneo, la franja de procedencia, el QR. |
-| 6 | [Verificación](06-verificacion.md) | Por qué no hay un endpoint, los nueve checks, el SDK, códigos de error. |
-| 7 | [Referencia de la API](07-referencia-api.md) | Los endpoints de documentos y de esquemas, los objetos, los límites, la colección de Postman. |
-| 8 | [Errores y troubleshooting](08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
+| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, las dos zonas de la API, workspace y DID, API key. Primera llamada. |
+| 3 | [Crear un esquema](03-crear-un-esquema.md) | El esquema de kind `document`, los claims, el layout de la hoja, el registro on-chain, versionado. |
+| 4 | [Emisión de documentos](04-emision-de-documentos.md) | `POST /issuer/documents`, el anclaje asincrónico y su webhook, la respuesta campo por campo, qué guardar, el listado. |
+| 5 | [Visibilidad y entrega](05-visibilidad-y-entrega.md) | Publicar y despublicar, qué restringe y qué no, la lectura pública, los caminos de entrega. |
+| 6 | [Renderizado de la hoja](06-renderizado.md) | El objeto `layout`, la geometría, el saneo, la franja de procedencia, el QR. |
+| 7 | [Verificación](07-verificacion.md) | Por qué no hay un endpoint, los nueve checks, el SDK, códigos de error. |
+| 8 | [Referencia de la API](08-referencia-api.md) | Los endpoints de documentos y de esquemas, los objetos, los límites, la colección de Postman. |
+| 9 | [Errores y troubleshooting](09-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 
 ## Atajo: el flujo en una pantalla
 
@@ -72,7 +73,7 @@ curl -s "$BASE_URL/api/v1/documents/$DOCUMENT_ID"
 2. **La emisión responde enseguida, pero el anclaje es asincrónico.** El `201` llega
    con `status: "signed"` y `tx_hash: null`. **Un verificador rechaza cualquier
    documento que no esté `anchored`**, así que esperá el webhook
-   [`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed)
+   [`document.status-changed`](../credentials/06-webhooks.md#documentstatus-changed)
    antes de entregarlo.
 3. **Todo documento nace privado**, y `visibility` **restringe los endpoints, no el
    artefacto**: volver a privado cierra el enlace, no las copias ya entregadas.

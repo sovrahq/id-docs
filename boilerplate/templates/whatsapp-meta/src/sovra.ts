@@ -8,7 +8,7 @@ import { CLAIMS, CREDENTIAL_LABEL } from "./credential.js";
  *
  * Este boilerplate asume que el ciudadano YA TIENE la credencial en su wallet:
  * solo usa la zona de verificación (`/api/v1/verifier/...`). La emisión está en
- * docs/guides/credentials/03-emision-de-credenciales.md.
+ * docs/guides/credentials/04-emision-de-credenciales.md.
  */
 
 export interface VerificationSession {
@@ -122,7 +122,7 @@ export interface PresentationFailed {
 /**
  * Traduce el `error` técnico a algo que un ciudadano pueda entender y accionar.
  * El catálogo completo está en
- * docs/guides/credentials/08-errores-y-troubleshooting.md.
+ * docs/guides/credentials/09-errores-y-troubleshooting.md.
  */
 export function explainError(error: string): string {
   if (error.startsWith("missing_required_claim:")) {

@@ -15,7 +15,7 @@ namespace local_sovracred;
  * El webhook es opcional: si no llega (el firewall del sitio lo bloquea), la tarea de reconciliación
  * confirma igual las emisiones.
  *
- * Referencia: docs/guides/credentials/05-webhooks.md
+ * Referencia: docs/guides/credentials/06-webhooks.md
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra

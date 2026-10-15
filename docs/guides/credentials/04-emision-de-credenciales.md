@@ -1,4 +1,4 @@
-# 3. Emisión de credenciales
+# 4. Emisión de credenciales
 
 Emitir una credencial son tres movimientos: **creás una oferta**, **mostrás un QR**,
 y **recibís un webhook** cuando el ciudadano la acepta.
@@ -163,7 +163,7 @@ Cuando la credencial queda en la wallet, tu servidor recibe:
 > necesita — para auditar, reimprimir o verificar por tu cuenta — **guardalo al
 > recibir este evento**.
 
-Ver [5. Webhooks](05-webhooks.md) para la validación de la firma HMAC y la política
+Ver [6. Webhooks](06-webhooks.md) para la validación de la firma HMAC y la política
 de reintentos.
 
 ## Consultar el estado de una emisión
@@ -203,7 +203,7 @@ curl -s "$BASE_URL/api/v1/issuer/credentials/b662aaad-d940-48fb-be9e-7194c76210f
 ```
 
 Estados posibles: `pending`, `expired` (la oferta venció sin canjearse), `issued`,
-`suspended`, `revoked`. Ver [6. Ciclo de vida](06-ciclo-de-vida-y-revocacion.md).
+`suspended`, `revoked`. Ver [7. Ciclo de vida](07-ciclo-de-vida-y-revocacion.md).
 
 Y para listar todo lo emitido por el workspace:
 
@@ -295,4 +295,4 @@ app.post("/webhooks/sovra", verificarFirmaSovra, async (req, res) => {
 
 ---
 
-**Anterior:** [← 2. Primeros pasos](02-primeros-pasos.md) · **Siguiente:** [4. Verificación de credenciales →](04-verificacion-de-credenciales.md)
+**Anterior:** [← 3. Crear un esquema](03-crear-un-esquema.md) · **Siguiente:** [5. Verificación de credenciales →](05-verificacion-de-credenciales.md)

@@ -1,4 +1,4 @@
-# 6. Ciclo de vida y revocación
+# 7. Ciclo de vida y revocación
 
 Una credencial emitida no es inmutable: se puede **suspender** temporalmente o
 **revocar** de forma permanente. El estado se publica en SovraChain, así que
@@ -100,7 +100,7 @@ Lo que pasa después:
 | | |
 |---|---|
 | **Si la transacción confirma** | `status` se mueve al destino, `pending_status` se limpia, y se dispara el webhook correspondiente: `credential.revoked`, `credential.suspended` o `credential.unsuspended`. |
-| **Si no confirma tras 5 intentos** | `status` **queda como estaba**, `pending_status` se limpia, el motivo queda en `status_change_error`, y se dispara [`credential.status-change-failed`](05-webhooks.md#credentialstatus-change-failed). Recién entonces se puede volver a pedir el cambio. |
+| **Si no confirma tras 5 intentos** | `status` **queda como estaba**, `pending_status` se limpia, el motivo queda en `status_change_error`, y se dispara [`credential.status-change-failed`](06-webhooks.md#credentialstatus-change-failed). Recién entonces se puede volver a pedir el cambio. |
 
 Los intentos intermedios fallan en silencio: no hay webhook hasta el desenlace.
 
@@ -168,7 +168,7 @@ verificando.
 
 **Independencia.** El mapa vive en la cadena. Un verificador con acceso RPC a
 SovraChain comprueba revocación **sin llamar a la API de Sovra** —
-ver [9. Verificación sin Sovra](09-verificacion-sin-sovra.md).
+ver [10. Verificación sin Sovra](10-verificacion-sin-sovra.md).
 
 Cada credencial lleva las dos URLs embebidas en su claim `credentialStatus`, así que
 un verificador siempre sabe dónde mirar.
@@ -206,4 +206,4 @@ Not Modified` cuando nada cambió — es lo que hace un verificador que consulta
 
 ---
 
-**Anterior:** [← 5. Webhooks](05-webhooks.md) · **Siguiente:** [7. Referencia de la API →](07-referencia-api.md)
+**Anterior:** [← 6. Webhooks](06-webhooks.md) · **Siguiente:** [8. Referencia de la API →](08-referencia-api.md)

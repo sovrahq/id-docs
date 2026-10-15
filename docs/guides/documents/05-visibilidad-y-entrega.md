@@ -1,4 +1,4 @@
-# 4. Visibilidad y entrega
+# 5. Visibilidad y entrega
 
 Un documento nace privado. Publicarlo es siempre una decisión deliberada, y lo que
 esa decisión cambia —y lo que **no** cambia— es el malentendido más caro posible en
@@ -41,7 +41,7 @@ curl -s -X PUT -H "Authorization: Bearer $SOVRA_API_KEY" \
 
 **`200 OK`** devuelve el mismo objeto que la emisión, con `visibility` actualizada.
 Todos los campos y su significado están en
-[la tabla de la guía 3](03-emision-de-documentos.md#la-respuesta-campo-por-campo).
+[la tabla de la guía 4](04-emision-de-documentos.md#la-respuesta-campo-por-campo).
 
 | Campo | Qué cambia |
 |---|---|
@@ -67,7 +67,7 @@ Y las tres suposiciones que hay que desarmar:
 | Suposición | Realidad |
 |---|---|
 | *"Privado = los bytes son secretos"* | **No.** Un `credential` ya entregado sigue siendo legible y verificable por quien lo tenga, para siempre. |
-| *"Volver a privado revoca el documento"* | **No.** Cierra el enlace, no las copias. Para invalidar el documento existe la revocación (`revoked_at`) — ver [guía 3](03-emision-de-documentos.md#revocación). |
+| *"Volver a privado revoca el documento"* | **No.** Cierra el enlace, no las copias. Para invalidar el documento existe la revocación (`revoked_at`) — ver [guía 4](04-emision-de-documentos.md#revocación). |
 | *"La visibilidad es parte del documento"* | **No.** No está cubierta por la firma. Es un atributo del servicio. |
 
 > En resumen: **privado significa "el enlace por sí solo no basta", nunca "los bytes
@@ -248,7 +248,7 @@ Dos cosas sobre el orden, que no son lo mismo: **el orden de las claves** del JS
 el que devuelve el servicio y no hay que asumirlo estable, pero **el orden de
 `layout.elements[]` sí es significativo** — es el orden de pintado, y no coincide con
 el orden visual de la hoja (acá `content` se dibuja después de `Confidencial`). Ver
-[5. Renderizado](05-renderizado.md).
+[6. Renderizado](06-renderizado.md).
 
 | Campo | Tipo | Qué es | Firmado |
 |---|---|---|---|
@@ -259,7 +259,7 @@ el orden visual de la hoja (acá `content` se dibuja después de `Confidencial`)
 | `issuer.name` | `string` | Nombre visible del emisor. **Solo informativo.** | No |
 | `schema.name` | `string` | Nombre humano del esquema. Versión reducida: acá **no** vienen el UUID ni el `credential_type`. | No |
 | `schema.claims[]` | `array<object>` | Definición de cada campo: `key`, `label`, `type`, `required`, `disclosable`. | No |
-| `layout` | `object` | Instrucciones de cómo dibujar la hoja — ver [5. Renderizado](05-renderizado.md). | No |
+| `layout` | `object` | Instrucciones de cómo dibujar la hoja — ver [6. Renderizado](06-renderizado.md). | No |
 | `anchor.status` | `string` | `anchored` = la firma quedó registrada on-chain. | No |
 | `anchor.tx_hash` | `string` (`0x…`) | Hash de la transacción del anclaje. | No |
 | `anchor.anchored_at` | `string` (ISO 8601) | Cuándo quedó anclada. | No |
@@ -267,11 +267,11 @@ el orden visual de la hoja (acá `content` se dibuja después de `Confidencial`)
 > ⚠️ **`schema.claims[]` trae solo *definiciones*, no valores.** El `1234567` y el
 > `"Contenido de Prueba"` están dentro del `credential`, no en esta respuesta. Es la
 > sorpresa número uno al integrar el renderizado — ver
-> [5. Renderizado](05-renderizado.md#las-tres-cosas-que-el-json-no-trae).
+> [6. Renderizado](06-renderizado.md#las-tres-cosas-que-el-json-no-trae).
 
 ## Diferencias con la respuesta de emisión
 
-| Solo en la emisión ([§3](03-emision-de-documentos.md)) | Solo en la lectura pública |
+| Solo en la emisión ([§4](04-emision-de-documentos.md)) | Solo en la lectura pública |
 |---|---|
 | `claims` decodificados | `layout` |
 | `visibility` | |
@@ -291,7 +291,7 @@ lo mismo**:
 | Camino | Qué le mandás | Cuándo conviene |
 |---|---|---|
 | **El string** | El `credential` completo: por correo, en un archivo, en un QR impreso, embebido en un PDF | Cuando querés que el documento sobreviva a la API. No requiere que el documento sea público, ni que Sovra esté en línea. |
-| **El enlace** | `$BASE_URL/api/v1/documents/{id}` | Cuando querés una URL compartible. Requiere `visibility: "public"`, y del lado de quien la abre hace falta renderizar el JSON — ver [5. Renderizado](05-renderizado.md). |
+| **El enlace** | `$BASE_URL/api/v1/documents/{id}` | Cuando querés una URL compartible. Requiere `visibility: "public"`, y del lado de quien la abre hace falta renderizar el JSON — ver [6. Renderizado](06-renderizado.md). |
 
 Un par de consecuencias prácticas:
 
@@ -327,4 +327,4 @@ Un par de consecuencias prácticas:
 
 ---
 
-**Anterior:** [← 3. Emisión de documentos](03-emision-de-documentos.md) · **Siguiente:** [5. Renderizado de la hoja →](05-renderizado.md)
+**Anterior:** [← 4. Emisión de documentos](04-emision-de-documentos.md) · **Siguiente:** [6. Renderizado de la hoja →](06-renderizado.md)

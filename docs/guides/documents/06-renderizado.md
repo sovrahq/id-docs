@@ -1,4 +1,4 @@
-# 5. Renderizado de la hoja
+# 6. Renderizado de la hoja
 
 El `layout` que devuelve la lectura pública existe para que **un tercero pueda
 mostrar la hoja con el diseño del emisor**. Esta guía es cómo recorrerlo — y las
@@ -247,7 +247,7 @@ Dos cosas que ese boilerplate **no** hace, y conviene saber antes de copiarlo:
 
 - **No verifica la firma.** Dibuja lo que dice el `credential`; no comprueba que el
   `credential` esté firmado por quien dice. Sin ese check, **un documento adulterado
-  se ve igual que uno legítimo** — ver [6. Verificación](06-verificacion.md).
+  se ve igual que uno legítimo** — ver [7. Verificación](07-verificacion.md).
 - **No emite.** Eso es la zona emisor, y necesita la API key, que no puede vivir en el
   navegador.
 
@@ -265,4 +265,4 @@ Una nota de arquitectura que sale de ahí y aplica a cualquier front:
 
 ---
 
-**Anterior:** [← 4. Visibilidad y entrega](04-visibilidad-y-entrega.md) · **Siguiente:** [6. Verificación →](06-verificacion.md)
+**Anterior:** [← 5. Visibilidad y entrega](05-visibilidad-y-entrega.md) · **Siguiente:** [7. Verificación →](07-verificacion.md)

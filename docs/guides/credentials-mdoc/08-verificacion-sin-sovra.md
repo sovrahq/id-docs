@@ -1,9 +1,9 @@
-# 7. Verificación sin Sovra
+# 8. Verificación sin Sovra
 
 Procedimiento para verificar un mDoc contra la cadena y contra anclas de
 confianza propias, sin dependencia de la API de Sovra. Constituye el equivalente
 mDoc de
-[Verificación sin Sovra para SD-JWT](../credentials/09-verificacion-sin-sovra.md).
+[Verificación sin Sovra para SD-JWT](../credentials/10-verificacion-sin-sovra.md).
 
 ## Tabla de contenidos
 
@@ -35,7 +35,7 @@ mDoc de
 
 **Acceso RPC a SovraChain** y las direcciones de los registros, coincidentes con
 las empleadas para SD-JWT y recogidas en la
-[tabla de la guía de credenciales](../credentials/09-verificacion-sin-sovra.md#qué-necesitás).
+[tabla de la guía de credenciales](../credentials/10-verificacion-sin-sovra.md#qué-necesitás).
 
 **Y, exclusivamente para la verificación de docTypes ISO, las anclas de
 confianza:** los certificados raíz IACA que la organización acepta. Véase el
@@ -253,4 +253,4 @@ esta función, cada integrador implementaría el mismo bucle de base64.
 
 ---
 
-**Anterior:** [← 6. Errores y troubleshooting](06-errores-y-troubleshooting.md) · **Siguiente:** [8. Habilitar mDL ISO →](08-habilitar-mdl-iso.md)
+**Anterior:** [← 7. Errores y troubleshooting](07-errores-y-troubleshooting.md) · **Siguiente:** [9. Habilitar mDL ISO →](09-habilitar-mdl-iso.md)

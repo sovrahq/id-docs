@@ -1,4 +1,4 @@
-# 10. Verificar por WhatsApp
+# 11. Verificar por WhatsApp
 
 Las guías anteriores muestran el patrón hospedado: creás una sesión, mostrás un QR,
 recibís un webhook. Esta guía lo baja a un canal concreto —**WhatsApp**— y resuelve
@@ -11,7 +11,7 @@ Node + TypeScript + Express, habla directo con la Cloud API de Meta, sin BSP.
 
 > Asume que el ciudadano **ya tiene la credencial** en su wallet. Si además tenés que
 > emitirla, el flujo de oferta está en
-> [3. Emisión de credenciales](03-emision-de-credenciales.md).
+> [4. Emisión de credenciales](04-emision-de-credenciales.md).
 
 ## Tabla de contenidos
 
@@ -60,7 +60,7 @@ sequenceDiagram
 ```
 
 La parte de Sovra es exactamente la de
-[4. Verificación de credenciales](04-verificacion-de-credenciales.md): una sesión,
+[5. Verificación de credenciales](05-verificacion-de-credenciales.md): una sesión,
 un DCQL, un webhook. Lo que cambia es el envoltorio.
 
 **No le preguntes nada al ciudadano antes del link.** Es la tentación más común
@@ -212,7 +212,7 @@ app.post("/webhooks/sovra", express.raw({ type: "application/json" }), (req, res
 });
 ```
 
-El detalle completo está en [5. Webhooks](05-webhooks.md#validar-la-firma-hmac).
+El detalle completo está en [6. Webhooks](06-webhooks.md#validar-la-firma-hmac).
 
 ## Configuración en Meta
 
@@ -265,4 +265,4 @@ aprobación tarda. Pedila con tiempo.
 
 ---
 
-**Anterior:** [← 9. Verificación sin Sovra](09-verificacion-sin-sovra.md) · **Siguiente:** [11. Emitir desde Moodle →](11-moodle.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/whatsapp-meta/`](../../../boilerplate/templates/whatsapp-meta/)**
+**Anterior:** [← 10. Verificación sin Sovra](10-verificacion-sin-sovra.md) · **Siguiente:** [12. Emitir desde Moodle →](12-moodle.md) · **Volver al [índice](README.md)** · **Código: [`boilerplate/templates/whatsapp-meta/`](../../../boilerplate/templates/whatsapp-meta/)**

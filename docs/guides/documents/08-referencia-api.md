@@ -1,4 +1,4 @@
-# 7. Referencia de la API
+# 8. Referencia de la API
 
 Referencia completa de la API de documentos firmados: **los cuatro endpoints del
 documento en sí, más los de esquemas** que hacen falta para crear el molde con el que
@@ -6,7 +6,7 @@ se firma.
 
 La referencia completa de `/api/v1` —credenciales, verificaciones, diseño de la
 tarjeta en la wallet— está en
-[`../credentials/07-referencia-api.md`](../credentials/07-referencia-api.md).
+[`../credentials/08-referencia-api.md`](../credentials/08-referencia-api.md).
 
 ## Tabla de contenidos
 
@@ -111,13 +111,16 @@ revocar — ver [lo que no existe](#lo-que-no-existe).
 
 ## Esquemas de kind `document`
 
+> 📐 El recorrido explicado —el asistente, los claims, el layout, el registro
+> on-chain— está en [3. Crear un esquema](03-crear-un-esquema.md).
+
 Un documento se firma contra un esquema de `kind: "document"`. **Ese esquema ya se
 puede crear por API**, con los mismos endpoints que un esquema de credencial: la
 diferencia está en el campo `kind`.
 
 La referencia completa de los cuatro endpoints —definición de claim, objeto Schema,
 versionado con `base_version`, errores— está en
-[`../credentials/07-referencia-api.md#esquemas`](../credentials/07-referencia-api.md#esquemas).
+[`../credentials/08-referencia-api.md#esquemas`](../credentials/08-referencia-api.md#esquemas).
 Acá va lo que cambia para documentos.
 
 ### Crear el esquema
@@ -163,7 +166,7 @@ asociado a la versión del esquema; las versiones nuevas lo heredan.
 
 `GET /api/v1/issuer/schemas` lo devuelve en el campo `layout` (solo en el listado), y
 `GET /api/v1/documents/{id}` lo devuelve para que puedas dibujar la hoja → ver
-[5. Renderizado](05-renderizado.md).
+[6. Renderizado](06-renderizado.md).
 
 El **diseño** (`PUT /schemas/{schema_id}/design`) es otra cosa: es cómo se dibuja una
 tarjeta en la wallet, y **no aplica a un documento**, que no vive en ninguna wallet.
@@ -204,10 +207,10 @@ curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
 > 🔴 **La emisión devuelve al instante; el anclaje, no.** El anclaje corre en un job y
 > el documento pasa después a `anchored` —con `tx_hash` y `anchored_at`— o a `failed`,
 > después de 5 intentos. Cada transición emite
-> [`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
+> [`document.status-changed`](../credentials/06-webhooks.md#documentstatus-changed).
 > **Un verificador rechaza un documento que no esté `anchored`**, así que esperá el
 > webhook, o consultá `GET /issuer/documents`, antes de entregarlo. Ver
-> [3. Emisión](03-emision-de-documentos.md#el-anclaje-es-asincrónico).
+> [4. Emisión](04-emision-de-documentos.md#el-anclaje-es-asincrónico).
 
 **Errores**
 
@@ -225,7 +228,7 @@ curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
 | `422 validation_error` | El documento no pudo guardarse. |
 | `503 chain_not_configured` | No hay registro de firmas configurado: **se niega a firmar algo que no podría anclar**. Intencional. |
 
-Ver [3. Emisión de documentos](03-emision-de-documentos.md).
+Ver [4. Emisión de documentos](04-emision-de-documentos.md).
 
 ---
 
@@ -261,7 +264,7 @@ sigue siendo verificable por quien lo tenga.
 | `404 document_not_found` | Id inexistente, malformado, o de otro workspace. |
 | `422 invalid_visibility` | El último segmento del path no es `public` ni `private`. |
 
-Ver [4. Visibilidad y entrega](04-visibilidad-y-entrega.md).
+Ver [5. Visibilidad y entrega](05-visibilidad-y-entrega.md).
 
 ---
 
@@ -334,7 +337,7 @@ curl -s "$BASE_URL/api/v1/documents/$DOCUMENT_ID"
 | `401 authentication_required` | El documento es privado y no hay sesión válida. Se devuelve **incluso cuando el header traía una API key**: una integración lee sus propios documentos por `GET /api/v1/issuer/documents`. |
 | `404 document_not_found` | Id inexistente, malformado, o de otro workspace. No distingue entre los tres casos, a propósito. |
 
-Ver [4. Visibilidad y entrega](04-visibilidad-y-entrega.md#leer-un-documento-la-zona-pública).
+Ver [5. Visibilidad y entrega](05-visibilidad-y-entrega.md#leer-un-documento-la-zona-pública).
 
 ---
 
@@ -345,11 +348,11 @@ integración:
 
 | No hay | Por qué / qué usar en cambio |
 |---|---|
-| **Endpoint de verificación** | Un veredicto habría que creerlo. La verificación corre del lado de quien verifica, contra la cadena → [6. Verificación](06-verificacion.md). |
+| **Endpoint de verificación** | Un veredicto habría que creerlo. La verificación corre del lado de quien verifica, contra la cadena → [7. Verificación](07-verificacion.md). |
 | **Endpoints de layout** | La geometría de la hoja se define en el dashboard, con sesión. El **esquema** sí se crea por API → [arriba](#esquemas-de-kind-document). |
 | **Búsqueda ni filtros** | `?digest=`, `/by-digest/` y `/search` no existen; los query params se ignoran. Indexá del lado tuyo a partir del listado. |
 | **Paginación** | El listado devuelve todo. |
-| **Endpoint de revocación** | `revoked_at` y `status: "revoked"` existen, pero **ningún endpoint los setea**: la baja se gestiona desde el dashboard → [guía 3](03-emision-de-documentos.md#revocación). |
+| **Endpoint de revocación** | `revoked_at` y `status: "revoked"` existen, pero **ningún endpoint los setea**: la baja se gestiona desde el dashboard → [guía 4](04-emision-de-documentos.md#revocación). |
 | **Un `GET` de un documento propio por la zona emisor** | El listado es el único camino del lado emisor; para uno solo, la zona pública. |
 | **Reintento del anclaje** | Un documento `failed` no se puede reanclar: hay que volver a emitirlo. |
 
@@ -400,7 +403,7 @@ vienen con `status: "signed"`, `tx_hash: null` y `anchored_at: null`.
 entregable.** El `id` coincide con el claim `jti` de adentro del `credential`, y el
 `digest` —el SHA-256 del signing input— es la clave bajo la cual la firma queda
 anclada. El significado de cada campo, y si está o no cubierto por la firma, en
-[la tabla de la guía 3](03-emision-de-documentos.md#la-respuesta-campo-por-campo).
+[la tabla de la guía 4](04-emision-de-documentos.md#la-respuesta-campo-por-campo).
 
 ### PublicDocument
 
@@ -424,7 +427,7 @@ No trae `claims` decodificados, ni `visibility`, ni `signed_at`/`revoked_at`, ni
 `schema.schema_id`/`credential_type`. Los valores de los campos salen del
 `credential`, **que es lo único que se sostiene por sí mismo**: el resto es contexto
 para mostrar, no para confiar. Ver
-[las diferencias](04-visibilidad-y-entrega.md#diferencias-con-la-respuesta-de-emisión).
+[las diferencias](05-visibilidad-y-entrega.md#diferencias-con-la-respuesta-de-emisión).
 
 ### Schema
 
@@ -446,7 +449,7 @@ Lo que devuelven los endpoints de esquemas. Los campos relevantes para documento
 | `layout` | `object` \| `null` | **Solo en el listado:** el layout de la hoja, definido en el dashboard. |
 
 La tabla completa está en
-[`../credentials/07-referencia-api.md#schema`](../credentials/07-referencia-api.md#schema).
+[`../credentials/08-referencia-api.md#schema`](../credentials/08-referencia-api.md#schema).
 
 ### Claim definition
 
@@ -516,4 +519,4 @@ la integración, es la respuesta correcta para un documento privado.**
 
 ---
 
-**Anterior:** [← 6. Verificación](06-verificacion.md) · **Siguiente:** [8. Errores y troubleshooting →](08-errores-y-troubleshooting.md)
+**Anterior:** [← 7. Verificación](07-verificacion.md) · **Siguiente:** [9. Errores y troubleshooting →](09-errores-y-troubleshooting.md)

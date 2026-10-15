@@ -1,4 +1,4 @@
-# 3. Emisión de mDocs
+# 4. Emisión de mDocs
 
 El procedimiento consta de tres pasos: crear la oferta, mostrar el QR y recibir
 el webhook.
@@ -285,7 +285,7 @@ El payload corresponde al mismo evento empleado para SD-JWT, con dos diferencias
 | `credential` | El `IssuerSigned` en **CBOR, base64url sin padding**. No es un JWT y no contiene puntos ni caracteres `~`. |
 
 El resto del catálogo de eventos, las cabeceras y la validación de la firma HMAC
-son idénticos a los de las credenciales: [Webhooks](../credentials/05-webhooks.md).
+son idénticos a los de las credenciales: [Webhooks](../credentials/06-webhooks.md).
 
 > ⚠️ **Constituye la única entrega.** Sovra no conserva el mDoc firmado y no
 > existe endpoint para solicitarlo nuevamente. Si el sistema receptor lo
@@ -326,7 +326,7 @@ mismos endpoints.
 > se mueve recién cuando la transacción confirma, momento en el que se emite el webhook
 > correspondiente. Si no confirma tras cinco intentos, se emite
 > `credential.status-change-failed` y el estado **queda como estaba**. Véase
-> [Ciclo de vida y revocación](../credentials/06-ciclo-de-vida-y-revocacion.md#cambiar-el-estado).
+> [Ciclo de vida y revocación](../credentials/07-ciclo-de-vida-y-revocacion.md#cambiar-el-estado).
 
 ```bash
 # Revocar — permanente, sin reversión posible.
@@ -354,7 +354,7 @@ propósitos —revocación y suspensión—, exactamente igual que el array
 `credentialStatus` del SD-JWT.
 
 El detalle completo figura en
-[Ciclo de vida y revocación](../credentials/06-ciclo-de-vida-y-revocacion.md).
+[Ciclo de vida y revocación](../credentials/07-ciclo-de-vida-y-revocacion.md).
 
 ## Errores al crear la oferta
 
@@ -367,10 +367,10 @@ El detalle completo figura en
 | 422 | `missing_claims` | Faltan claims `required`. El campo `details` contiene la lista. |
 | 422 | `unencodable_claims` | Un valor no admite codificación como CBOR de ISO 18013-5. El campo `details` identifica las claves. |
 | 422 | `wrong_schema_kind` | El esquema es de kind `document`. Un mDoc es siempre `credential`. |
-| 422 | `document_signer_required` | El esquema declara un docType ISO y el workspace carece de document signer registrado. Véase la [guía 8](08-habilitar-mdl-iso.md). |
+| 422 | `document_signer_required` | El esquema declara un docType ISO y el workspace carece de document signer registrado. Véase la [guía 9](09-habilitar-mdl-iso.md). |
 
 El detalle de cada uno figura en
-[Errores y troubleshooting](06-errores-y-troubleshooting.md).
+[Errores y troubleshooting](07-errores-y-troubleshooting.md).
 
 ## Ejemplo completo en Node.js
 
@@ -446,4 +446,4 @@ app.post("/webhooks/sovra", verificarFirmaHmac, (req, res) => {
 
 ---
 
-**Anterior:** [← 2. Primeros pasos](02-primeros-pasos.md) · **Siguiente:** [4. Verificación de mDocs →](04-verificacion-de-mdocs.md)
+**Anterior:** [← 3. Crear un esquema](03-crear-un-esquema.md) · **Siguiente:** [5. Verificación de mDocs →](05-verificacion-de-mdocs.md)

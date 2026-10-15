@@ -317,8 +317,8 @@ Fuera de esta primera versión, en orden de valor:
 
 ## Referencias
 
-- [3. Emisión de credenciales](../../../docs/guides/credentials/03-emision-de-credenciales.md) — la oferta, el QR, `credential.issued`.
-- [5. Webhooks](../../../docs/guides/credentials/05-webhooks.md) — firma HMAC, reintentos, el 4xx que descarta.
-- [6. Ciclo de vida](../../../docs/guides/credentials/06-ciclo-de-vida-y-revocacion.md) — estados y revocación.
-- [11. Moodle](../../../docs/guides/credentials/11-moodle.md) — la guía corta.
+- [4. Emisión de credenciales](../../../docs/guides/credentials/04-emision-de-credenciales.md) — la oferta, el QR, `credential.issued`.
+- [6. Webhooks](../../../docs/guides/credentials/06-webhooks.md) — firma HMAC, reintentos, el 4xx que descarta.
+- [7. Ciclo de vida](../../../docs/guides/credentials/07-ciclo-de-vida-y-revocacion.md) — estados y revocación.
+- [12. Moodle](../../../docs/guides/credentials/12-moodle.md) — la guía corta.
 - [Documentación de desarrollo de Moodle](https://moodledev.io/docs/apis/plugintypes/local) — plugins locales.

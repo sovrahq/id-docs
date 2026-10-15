@@ -1,4 +1,4 @@
-# 6. Verificación
+# 7. Verificación
 
 ## Tabla de contenidos
 
@@ -26,8 +26,8 @@ la propiedad que hace que el documento sirva: el servicio puede caerse, cambiar 
 dominio o dejar de existir, y el documento sigue siendo verificable.
 
 Es también la diferencia estructural con las credenciales, donde Sovra ofrece
-[verificación hospedada](../credentials/04-verificacion-de-credenciales.md) además del
-[camino on-chain](../credentials/09-verificacion-sin-sovra.md). Para documentos, el
+[verificación hospedada](../credentials/05-verificacion-de-credenciales.md) además del
+[camino on-chain](../credentials/10-verificacion-sin-sovra.md). Para documentos, el
 camino on-chain es el único.
 
 ## Los nueve checks
@@ -103,7 +103,7 @@ const digest = [...new Uint8Array(hash)]
 
 Sobre el **signing input**, no sobre el `credential` completo: incluir la firma o la
 `~` da otro hash, que no coincide con nada de lo que hay en la cadena. Ver
-[5. Renderizado](05-renderizado.md#calcular-el-digest).
+[6. Renderizado](06-renderizado.md#calcular-el-digest).
 
 ### `issuer` — la dirección
 
@@ -176,7 +176,7 @@ el anclaje.
 > ⚠️ **Confirmá con el equipo de Sovra el punto de entrada para documentos y la
 > disponibilidad del paquete en tu entorno** antes de diseñar la integración. La
 > verificación de *presentaciones* de credenciales está documentada en
-> [`../credentials/09-verificacion-sin-sovra.md`](../credentials/09-verificacion-sin-sovra.md);
+> [`../credentials/10-verificacion-sin-sovra.md`](../credentials/10-verificacion-sin-sovra.md);
 > un documento no tiene holder, así que no lleva `expectedNonce`, `expectedAudience`
 > ni KB-JWT, y su flujo agrega en cambio los checks de anclaje.
 
@@ -208,7 +208,7 @@ Los códigos de la familia `KB_*`, `HOLDER_*`, `DISCLOSURE_MISMATCH` y
 `SUBJECT_KEY_MISMATCH` son de presentaciones de credenciales y **no aplican a
 documentos**: no hay holder, no hay disclosures y no hay key binding. La tabla
 completa está en
-[`../credentials/09-verificacion-sin-sovra.md`](../credentials/09-verificacion-sin-sovra.md#códigos-de-error-del-sdk).
+[`../credentials/10-verificacion-sin-sovra.md`](../credentials/10-verificacion-sin-sovra.md#códigos-de-error-del-sdk).
 
 ## Qué NO prueba una verificación exitosa
 
@@ -229,4 +229,4 @@ autoría, no titularidad.**
 
 ---
 
-**Anterior:** [← 5. Renderizado de la hoja](05-renderizado.md) · **Siguiente:** [7. Referencia de la API →](07-referencia-api.md)
+**Anterior:** [← 6. Renderizado de la hoja](06-renderizado.md) · **Siguiente:** [8. Referencia de la API →](08-referencia-api.md)

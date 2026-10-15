@@ -122,7 +122,7 @@ ejemplo decodifican a:
 > verificador pide `first_name`, la verificación falla con
 > `missing_required_claim:first_name` — aunque el dato "esté". El `key` del esquema
 > es un contrato literal entre emisor y verificador; ver
-> [Errores y troubleshooting](08-errores-y-troubleshooting.md#missing_required_claim).
+> [Errores y troubleshooting](09-errores-y-troubleshooting.md#missing_required_claim).
 
 ## El flujo completo, de punta a punta
 
@@ -188,7 +188,7 @@ La sesión de verificación vive **10 minutos**.
 | Firmar la credencial (ES256, llave en KMS) | Sovra |
 | Guardar la credencial | La wallet del ciudadano — **Sovra no almacena el SD-JWT firmado** |
 | Elegir qué campos se comparten | El ciudadano, en la wallet |
-| Validar una presentación | Sovra (o tu propio verificador, ver [guía 9](09-verificacion-sin-sovra.md)) |
+| Validar una presentación | Sovra (o tu propio verificador, ver [guía 10](10-verificacion-sin-sovra.md)) |
 | Publicar el estado de revocación | Sovra, en SovraChain |
 | Reaccionar a los eventos | Tu servidor, vía webhooks |
 

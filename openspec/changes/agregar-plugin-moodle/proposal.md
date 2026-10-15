@@ -8,7 +8,7 @@ Las instituciones que forman con Moodle —la Agencia Atenea en Bogotá es la pr
 - Al completarse un curso, el plugin registra el **derecho** del estudiante y le avisa con una notificación de Moodle. **La oferta OID4VCI se crea recién cuando el estudiante la pide** desde «Mis credenciales», porque vence a las 24 h y es de un solo uso.
 - Un endpoint de webhook propio (firma HMAC sobre el cuerpo crudo, idempotente) y una **tarea programada de reconciliación** que hace al webhook opcional (el firewall de Atenea restringe por país).
 - Un reporte para el administrador con pendientes, diagnóstico de conexión y reintento.
-- Guía nueva `docs/guides/credentials/11-moodle.md` y la entrada en `boilerplate/README.md`.
+- Guía nueva `docs/guides/credentials/12-moodle.md` y la entrada en `boilerplate/README.md`.
 - Se inicializa OpenSpec en el repo (`openspec/`), que no lo tenía.
 
 Stack: el estándar de Sovra para aplicaciones con escala (Elixir/Phoenix) **no aplica** — un plugin de Moodle sólo puede escribirse en PHP, dentro del propio Moodle.

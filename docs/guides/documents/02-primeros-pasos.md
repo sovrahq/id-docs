@@ -86,11 +86,15 @@ Lo ves en **Settings → Workspace**: cuando aparece el DID, el workspace está 
 
 ## Paso 3 — Crear el esquema de documento
 
-Un **esquema** define qué claims lleva el documento. Se crea **desde el dashboard**
-(menú **Schemas**), no por API: la API servidor-a-servidor emite, pero el modelo de
-datos y el diseño se definen en la consola.
+Un **esquema** define qué claims lleva el documento. Hay dos caminos:
 
-El asistente tiene cuatro pasos: **Metadata → Claims → Layout → Review**.
+| | |
+|---|---|
+| **Dashboard** (menú **Schemas**) | El asistente completo, **y el único lugar donde se diseña el layout**. Es el camino recomendado. |
+| **API** ([`POST /api/v1/issuer/schemas`](07-referencia-api.md#esquemas-de-kind-document)) | Para provisionar el esquema desde tu código. Hay que mandar `"kind": "document"`. **El layout queda sin definir**, y sin layout el documento se sirve igual pero no hay hoja para renderizar. |
+
+El asistente del dashboard tiene cuatro pasos:
+**Metadata → Claims → Layout → Review**.
 
 ### Metadata
 
@@ -150,7 +154,13 @@ versión con la que se emitieron y siguen siendo válidos. Al emitir, Sovra usa 
 la versión más reciente de ese `schema_id`.
 
 Dos campos **no** pueden cambiar entre versiones: el **Schema ID** (es estable) y el
-**Credential type** (es el `vct`, y los verificadores lo reconocen).
+**Credential type** (es el `vct`, y los verificadores lo reconocen). Tampoco el `kind`
+ni el `format`.
+
+Por API la revisión es
+[`PUT /api/v1/issuer/schemas/{schema_id}`](07-referencia-api.md#esquemas-de-kind-document),
+que pide un `base_version` y devuelve `409 schema_revision_conflict` si alguien publicó
+otra versión mientras editabas. **La versión nueva hereda el layout de la anterior.**
 
 ## Paso 4 — Diseñar el layout
 
@@ -221,13 +231,15 @@ Antes de pasar a emitir:
 - [ ] Tenés acceso al dashboard del entorno.
 - [ ] El workspace muestra un DID `did:sovra:0x…`.
 - [ ] Hay al menos un esquema de kind **`document`**, y anotaste su `schema_id`.
+- [ ] Ese esquema figura como **`registered`** en `GET /api/v1/issuer/schemas`. Mientras
+      esté `pending`, emitir devuelve `409 schema_registration_pending`.
 - [ ] Anotaste los `key` y los `type` de cada claim, y cuáles son `required`.
 - [ ] *(Opcional)* El esquema tiene un layout diseñado.
 - [ ] Tenés una API key `sovra_sk_…` guardada de forma segura.
 - [ ] `GET /api/v1/issuer/documents` responde `200`.
-- [ ] Sabés cómo vas a enterarte de que un documento quedó `anchored`: el webhook
-      `document.status-changed`, o consultando `GET /api/v1/issuer/documents`. La
-      emisión responde `signed`, y `signed` no es entregable.
+- [ ] Hay un endpoint de webhook suscrito a **`document.status-changed`**: es la señal
+      de que un documento quedó anclado y ya se puede entregar. Si no podés recibir
+      webhooks, tu plan es consultar `GET /api/v1/issuer/documents`.
 
 ---
 

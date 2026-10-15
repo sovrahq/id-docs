@@ -10,10 +10,10 @@ en dos formatos. Son tres rutas de lectura:
 | Quién la guarda | La wallet del ciudadano | Quien la recibe: un archivo, un enlace, un papel |
 | Divulgación selectiva | ✅ El ciudadano elige campo por campo | ❌ Todos los claims van a la vista |
 | Prueba de posesión | ✅ Passkey del ciudadano (KB-JWT) | ❌ Prueba autoría, no titularidad |
-| Emisión | OID4VCI (QR de oferta) | Una llamada HTTP |
+| Emisión | OID4VCI (QR de oferta) | Una llamada HTTP, y después el anclaje on-chain |
 | Presentación | OID4VP + DCQL (QR de verificación) | Se manda el string o el enlace |
 | Verificación | Hospedada por Sovra, u on-chain | On-chain, siempre |
-| Webhooks | ✅ `credential.issued`, `presentation.verified`, … | ❌ El resultado llega en la respuesta del `POST` |
+| Webhooks | ✅ `credential.issued`, `presentation.verified`, … | ✅ `document.status-changed` cuando el anclaje se resuelve |
 | Casos típicos | Licencias, identidad, membresías, títulos habilitantes | Certificados, constancias, actas, comprobantes |
 
 **La regla práctica:** si el dato es sobre una persona y ella decide cuándo y cuánto
@@ -38,12 +38,12 @@ Emisión por **OID4VCI**, verificación por **OID4VP + DCQL**, revocación por
 | # | Guía | Para qué sirve |
 |---|---|---|
 | 1 | [Introducción](credentials/01-introduccion.md) | Qué es una credencial verificable, los tres roles, y cómo se ve el flujo completo. |
-| 2 | [Primeros pasos](credentials/02-primeros-pasos.md) | Entornos, workspace, DID, esquemas, API key, webhook. Primera llamada. |
+| 2 | [Primeros pasos](credentials/02-primeros-pasos.md) | Entornos, workspace, DID, esquemas (dashboard o API), API key, webhook. Primera llamada. |
 | 3 | [Emisión de credenciales](credentials/03-emision-de-credenciales.md) | Crear la oferta, mostrar el QR, recibir el `credential.issued`. |
 | 4 | [Verificación de credenciales](credentials/04-verificacion-de-credenciales.md) | Crear la sesión OID4VP, escribir el DCQL, leer el resultado. |
-| 5 | [Webhooks](credentials/05-webhooks.md) | Todos los eventos, sus payloads y cómo validar la firma HMAC. |
+| 5 | [Webhooks](credentials/05-webhooks.md) | Los nueve eventos, sus payloads, las suscripciones por endpoint, la firma HMAC y los reintentos. |
 | 6 | [Ciclo de vida y revocación](credentials/06-ciclo-de-vida-y-revocacion.md) | Estados de una credencial, revocar, suspender, reactivar. |
-| 7 | [Referencia de la API](credentials/07-referencia-api.md) | Todos los endpoints, parámetros y respuestas. |
+| 7 | [Referencia de la API](credentials/07-referencia-api.md) | Todos los endpoints —esquemas, diseño, emisión, verificación—, parámetros y respuestas. |
 | 8 | [Errores y troubleshooting](credentials/08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 | 9 | [Verificación sin Sovra](credentials/09-verificacion-sin-sovra.md) | Verificar contra la cadena, sin depender de la API de Sovra. |
 | 10 | [Verificar por WhatsApp](credentials/10-whatsapp.md) | Llevar la verificación al chat: deep link, QR, correlación y cotejo de identidad. |
@@ -71,26 +71,26 @@ claim se nombra con dos segmentos, `[namespace, identificador]`.
 | 2 | [Primeros pasos](credentials-mdoc/02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
 | 3 | [Emisión de mDocs](credentials-mdoc/03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
 | 4 | [Verificación de mDocs](credentials-mdoc/04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
-| 5 | [Referencia de la API](credentials-mdoc/05-referencia-api.md) | Endpoints, objetos, tipos de claim, catálogo de elementos ISO. |
+| 5 | [Referencia de la API](credentials-mdoc/05-referencia-api.md) | Endpoints —incluida la creación del esquema—, objetos, tipos de claim, catálogo de elementos ISO. |
 | 6 | [Errores y troubleshooting](credentials-mdoc/06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
 | 7 | [Verificación sin Sovra](credentials-mdoc/07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
 | 8 | [Habilitar mDL ISO](credentials-mdoc/08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
 
 ## 📑 [`documents/`](documents/) — Documentos firmados
 
-Una sola llamada valida, firma y **ancla on-chain**. El `credential` resultante es un
-string autocontenido: quien lo recibe lo verifica contra la cadena, no preguntándole
-al servicio que lo emitió.
+Una sola llamada valida y firma, y el **anclaje on-chain** se completa después, en
+segundo plano. El `credential` resultante es un string autocontenido: quien lo recibe
+lo verifica contra la cadena, no preguntándole al servicio que lo emitió.
 
 | # | Guía | Para qué sirve |
 |---|---|---|
 | 1 | [Introducción](documents/01-introduccion.md) | Qué es un documento firmado, documento vs. credencial, anatomía del `credential`, las dos capas de confianza. |
 | 2 | [Primeros pasos](documents/02-primeros-pasos.md) | Entornos, las dos zonas de la API, el esquema de kind `document`, el layout, API key. |
-| 3 | [Emisión de documentos](documents/03-emision-de-documentos.md) | `POST /issuer/documents`, la latencia de ~90 s, la respuesta campo por campo, qué guardar. |
+| 3 | [Emisión de documentos](documents/03-emision-de-documentos.md) | `POST /issuer/documents`, el anclaje asincrónico y su webhook, la respuesta campo por campo, qué guardar. |
 | 4 | [Visibilidad y entrega](documents/04-visibilidad-y-entrega.md) | Publicar y despublicar, qué restringe y qué no, la lectura pública, los caminos de entrega. |
 | 5 | [Renderizado de la hoja](documents/05-renderizado.md) | El objeto `layout`, la geometría, el saneo, la franja de procedencia, el QR. |
 | 6 | [Verificación](documents/06-verificacion.md) | Por qué no hay un endpoint, los nueve checks, el SDK, códigos de error. |
-| 7 | [Referencia de la API](documents/07-referencia-api.md) | Los cuatro endpoints, los objetos, los límites, la colección de Postman. |
+| 7 | [Referencia de la API](documents/07-referencia-api.md) | Los endpoints de documentos y de esquemas, los objetos, los límites, la colección de Postman. |
 | 8 | [Errores y troubleshooting](documents/08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 
 ---
@@ -101,7 +101,8 @@ al servicio que lo emitió.
 |---|---|
 | **Entornos** | Test: `https://test-api-sovra.flagonsa.com` · Producción: `https://api.sovra.io` |
 | **Autenticación** | `Authorization: Bearer sovra_sk_...` — el esquema es sensible a mayúsculas |
-| **Dashboard** | Los esquemas, los layouts, las API keys y el webhook se configuran ahí. No hay API para eso |
+| **Esquemas** | Se crean en el dashboard **o por API** (`POST /api/v1/issuer/schemas`). El diseño de la tarjeta, también (`PUT …/design`) |
+| **Dashboard** | Los layouts de documento, las API keys, los webhooks, los document signers y las raíces IACA se configuran solo ahí |
 | **Formato** | SD-JWT VC (`vc+sd-jwt`) o mDoc (`mso_mdoc`, ISO 18013-5), firma ES256, llaves en KMS |
 | **Cadena** | SovraChain: DID Registry, Issuer Registry, estado de las credenciales |
 | **OpenAPI** | `GET {baseUrl}/openapi/api` — la fuente de verdad si algo acá queda desactualizado |

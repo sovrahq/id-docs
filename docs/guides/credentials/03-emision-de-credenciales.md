@@ -37,8 +37,9 @@ Content-Type: application/json
 
 | Campo | Tipo | Obligatorio | Descripción |
 |---|---|---|---|
-| `schema_id` | string | ✅ | El `schema_id` del esquema (el slug, no el UUID). Se usa siempre su **última versión**. |
-| `claims` | object | — | Los valores de la credencial, `key` → valor. Si se omite, equivale a `{}`. |
+| `schema_id` | string | ✅ | El `schema_id` del esquema (el slug, no el UUID). Se usa siempre su **última versión**. **Omitirlo no es un `422`, es un `500`.** |
+| `claims` | object | — | Los valores de la credencial, `key` → valor. Si se omite, equivale a `{}`. Tiene que ser un objeto: un string o un array también terminan en `500`. |
+| `valid_until` | string | — | Vencimiento absoluto en ISO 8601, a futuro, que **pisa el `validity_period` del esquema**. Omitilo para usar el del esquema; **`null` se rechaza** con `422 invalid_valid_until`. |
 
 Sobre `claims`:
 
@@ -49,7 +50,9 @@ Sobre `claims`:
 - Los valores viajan tal cual se envían. Fechas como texto ISO (`"1815-12-10"`),
   booleanos como booleanos.
 
-**Rate limit:** 120 solicitudes por minuto por API key.
+**Rate limit:** 120 solicitudes por minuto **por IP de origen** —no por API key—, y se
+cuentan por separado en cada nodo de la API. Por encima, `429 too_many_requests`, **sin
+cabecera `Retry-After`**: esperá y reintentá.
 
 ```bash
 curl -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
@@ -217,11 +220,18 @@ curl -s "$BASE_URL/api/v1/issuer/credentials" \
 | HTTP | `error` | Causa | Solución |
 |---|---|---|---|
 | 401 | `invalid_api_key` | Falta el header, la clave está mal o fue revocada. | Revisá `Authorization: Bearer sovra_sk_...`. |
+| 403 | `workspace_inactive` / `organization_inactive` | El tenant está desactivado. La clave sigue siendo válida: lo que se frena es el tenant. | Reactivarlo desde el dashboard. |
 | 404 | `schema_not_found` | El `schema_id` no existe en este workspace. | Usá el slug del esquema, no el UUID ni el nombre visible. |
-| 404 | `workspace_not_found` | La API key apunta a un workspace inexistente. | Regenerá la clave. |
 | 409 | `workspace_not_provisioned` | El DID todavía no terminó de generarse. | Esperá unos minutos y reintentá. |
+| 409 | `schema_registration_pending` | El tipo de credencial **se sigue registrando on-chain**. | Esperá unos segundos; el estado se ve en `GET /api/v1/issuer/schemas`. |
+| 409 | `schema_registration_failed` | El tipo no pudo registrarse: con ese esquema no se puede emitir nada. | Creá el esquema de nuevo. |
+| 422 | `invalid_valid_until` | `valid_until` es `null`, está malformado o quedó en el pasado. | Mandá una fecha futura, u omitilo. |
 | 422 | `missing_claims` | Falta al menos un claim `required`. `details` los lista. | Completá los campos que faltan. |
 | 422 | `wrong_schema_kind` | El esquema es de kind `document`, no `credential`. | Los documentos no se emiten a una wallet. |
+| 422 | `invalid_claim_values` | Un adjunto no es un data URI de PDF válido, o pasa los 560.000 bytes. | `details` lista `"<key>: <motivo>"`. |
+| 422 | `document_signer_required` | El esquema declara su propio docType y el workspace no tiene document signer. | Registralo desde el dashboard. |
+| 422 | `bitmap_exhausted` | La lista de estado del workspace está llena. | Contactá al equipo de Sovra. |
+| 429 | `too_many_requests` | Pasaste las 120 req/min de tu IP. | Esperá y reintentá. |
 
 Ejemplo de `422 missing_claims`:
 

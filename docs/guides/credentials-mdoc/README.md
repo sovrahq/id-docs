@@ -44,7 +44,7 @@ webhooks y el mismo estado publicado en **SovraChain**.
 | 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, creación del esquema mDoc, tipos de claim, `required` frente a `always shared`, API key, webhook. |
 | 3 | [Emisión de mDocs](03-emision-de-mdocs.md) | Creación de la oferta, codificación de cada tipo, el QR, el webhook `credential.issued`. |
 | 4 | [Verificación de mDocs](04-verificacion-de-mdocs.md) | El DCQL `mso_mdoc`, las rutas `[namespace, elemento]`, lectura del resultado. |
-| 5 | [Referencia de la API](05-referencia-api.md) | Endpoints, objetos, tipos de claim, catálogo de elementos ISO. |
+| 5 | [Referencia de la API](05-referencia-api.md) | Endpoints —incluida la creación del esquema—, objetos, tipos de claim, catálogo de elementos ISO. |
 | 6 | [Errores y troubleshooting](06-errores-y-troubleshooting.md) | Cada código de error, su causa y su solución. |
 | 7 | [Verificación sin Sovra](07-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
 | 8 | [Habilitar mDL ISO](08-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |

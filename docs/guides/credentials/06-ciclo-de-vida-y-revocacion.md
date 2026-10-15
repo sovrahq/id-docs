@@ -87,32 +87,34 @@ curl -X PUT "$BASE_URL/api/v1/issuer/credentials/$CREDENTIAL_ID/status/issued" \
 `202 Accepted`:
 
 ```json
-{
-  "id": "b662aaad-d940-48fb-be9e-7194c76210ff",
-  "status": "issued",
-  "pending_status": "revoked"
-}
+{ "id": "b662aaad-d940-48fb-be9e-7194c76210ff", "status": "issued", "pending_status": "revoked" }
 ```
 
-> 🔴 **`202`, no `200`: el cambio todavía no pasó.** La escritura en la lista
-> on-chain sale del request y corre en segundo plano, porque esperar el recibo de
-> una transacción puede durar más que la petición. En la respuesta, `status` es el
-> estado que la credencial **sigue teniendo** y `pending_status` el que pediste.
+> 🔴 **Un `202` no es un cambio de estado: es un pedido aceptado.** Fijate en la
+> respuesta de arriba: `status` sigue en `issued` y el destino está en
+> `pending_status`. La escritura en la lista de estado on-chain corre en segundo
+> plano.
 
-`status` se mueve cuando la transacción aterriza, y recién entonces llega el webhook
-correspondiente — `credential.revoked`, `credential.suspended` o
-`credential.unsuspended` — también si el cambio se hizo desde el dashboard en vez de
-por API.
+Lo que pasa después:
 
-**Si nunca aterriza**, llega
-[`credential.status-change-failed`](05-webhooks.md#credentialstatus-change-failed),
-`status` queda como estaba y el motivo aparece en `status_change_error`. Para una
-revocación eso significa que **la credencial sigue vigente**: si revocar es una
-obligación legal, suscribite a ese evento y reintentá.
+| | |
+|---|---|
+| **Si la transacción confirma** | `status` se mueve al destino, `pending_status` se limpia, y se dispara el webhook correspondiente: `credential.revoked`, `credential.suspended` o `credential.unsuspended`. |
+| **Si no confirma tras 5 intentos** | `status` **queda como estaba**, `pending_status` se limpia, el motivo queda en `status_change_error`, y se dispara [`credential.status-change-failed`](05-webhooks.md#credentialstatus-change-failed). Recién entonces se puede volver a pedir el cambio. |
 
-Mientras la escritura está en vuelo, `GET /api/v1/issuer/credentials/{id}` devuelve
-el `status` viejo con `pending_status` puesto. Es la forma de consultar si ya pasó
-sin depender del webhook.
+Los intentos intermedios fallan en silencio: no hay webhook hasta el desenlace.
+
+**Una credencial admite un cambio pendiente a la vez.** Pedir otro mientras el
+primero está en vuelo devuelve `409 status_change_pending`.
+
+Los webhooks se disparan igual si el cambio se hizo desde el dashboard en vez de por
+API, así que sirven para mantener sincronizados sistemas que no originaron la acción.
+
+> ⚠️ **Si revocás por API, suscribite a `credential.status-change-failed`.** Sin ese
+> evento, una revocación que nunca llegó a la cadena se ve exactamente igual que una
+> que sí llegó: el `202` ya lo recibiste en los dos casos. Lo mismo se ve consultando
+> `GET /api/v1/issuer/credentials/{id}` y mirando `pending_status` y
+> `status_change_error`.
 
 Con la API key del workspace alcanza. (En el dashboard, la misma operación pide rol
 de administrador del workspace.)
@@ -125,7 +127,7 @@ de administrador del workspace.)
 | 401 | `invalid_api_key` | Autorización ausente o inválida. |
 | 404 | `credential_not_found` | El UUID no existe en este workspace, o no es un UUID válido. |
 | 409 | `workspace_not_provisioned` | El workspace todavía no tiene DID. |
-| 409 | `status_change_pending` | Ya hay un cambio de estado de esta credencial escribiéndose on-chain. Esperá a que aterrice (o falle) antes de pedir otro. |
+| 409 | `status_change_pending` | Otro cambio de esta credencial todavía no confirmó. Esperá el webhook. |
 | 422 | `credential_not_yet_issued` | El id corresponde a una oferta `pending`: no hay credencial que revocar. |
 | 422 | `invalid_status_transition` | La transición no está permitida (por ejemplo, revocar algo ya revocado). |
 
@@ -139,10 +141,12 @@ se ve normal. Lo que cambia es que ya no pasa la verificación:
 | `revoked` | `presentation.failed` con `error: "credential_revoked"` |
 | `suspended` | `presentation.failed` con `error: "credential_suspended"` |
 
-Una vez que el cambio aterriza en la cadena el corte es inmediato: el estado se
-consulta on-chain en cada verificación, no hay caché intermedia del lado del
-verificador de Sovra. Lo que no es instantáneo es el aterrizaje — entre el `202` y
-el webhook de confirmación la credencial **todavía verifica**.
+El corte es inmediato **desde que el cambio llegó a la cadena**: el estado se consulta
+on-chain en cada verificación, y no hay caché intermedia del lado del verificador de
+Sovra. Pero entre el `202` y esa confirmación hay una ventana en la que la credencial
+**todavía verifica bien**, porque el bit on-chain no cambió. Si tu caso de uso no
+tolera esa ventana, tratá la credencial como revocada en tu propio sistema desde el
+`202`, y usá el webhook solo para confirmar.
 
 ## Cómo se publica el estado on-chain
 

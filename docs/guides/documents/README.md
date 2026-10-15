@@ -20,21 +20,21 @@ cadena, sin depender de la API de Sovra.
 |---|---|---|
 | 1 | [Introducción](01-introduccion.md) | Qué es un documento firmado, documento vs. credencial, anatomía del `credential`, las dos capas de confianza. |
 | 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, las dos zonas de la API, workspace y DID, el esquema de kind `document`, el layout, API key. |
-| 3 | [Emisión de documentos](03-emision-de-documentos.md) | `POST /issuer/documents`, el anclaje asincrónico, la respuesta campo por campo, qué guardar, el listado. |
+| 3 | [Emisión de documentos](03-emision-de-documentos.md) | `POST /issuer/documents`, el anclaje asincrónico y su webhook, la respuesta campo por campo, qué guardar, el listado. |
 | 4 | [Visibilidad y entrega](04-visibilidad-y-entrega.md) | Publicar y despublicar, qué restringe y qué no, la lectura pública, los caminos de entrega. |
 | 5 | [Renderizado de la hoja](05-renderizado.md) | El objeto `layout`, la geometría, el saneo, la franja de procedencia, el QR. |
 | 6 | [Verificación](06-verificacion.md) | Por qué no hay un endpoint, los nueve checks, el SDK, códigos de error. |
-| 7 | [Referencia de la API](07-referencia-api.md) | Los cuatro endpoints, los objetos, los límites, la colección de Postman. |
+| 7 | [Referencia de la API](07-referencia-api.md) | Los endpoints de documentos y de esquemas, los objetos, los límites, la colección de Postman. |
 | 8 | [Errores y troubleshooting](08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 
 ## Atajo: el flujo en una pantalla
 
 ```bash
-# 0. Prerrequisitos: un esquema de kind `document` en el dashboard, y una API key.
+# 0. Prerrequisitos: un esquema `registered` de kind `document`, y una API key.
 export BASE_URL="https://test-api-sovra.flagonsa.com"
 export SOVRA_API_KEY="sovra_sk_..."
 
-# 1. Emitir. Valida y firma; vuelve `signed` y el anclaje sigue en segundo plano.
+# 1. Emitir. Valida y firma, y devuelve enseguida.
 curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
   -H "Authorization: Bearer $SOVRA_API_KEY" \
   -H 'Content-Type: application/json' \
@@ -43,8 +43,14 @@ curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
     "claims": { "date": "20-08-2026", "idDocument": 1234567,
                 "content": "Contenido de Prueba", "isConfidential": false }
   }'
-# → 201 { "id": "...", "status": "anchored", "credential": "eyJhbGci…~", ... }
+# → 201 { "id": "...", "status": "signed", "tx_hash": null, "credential": "eyJhbGci…~", ... }
 #   ★ Guardá `credential`: ese string ES el documento.
+#   ⚠️ `signed` todavía NO es entregable.
+
+# 1'. Esperar el anclaje: el webhook `document.status-changed` con status anchored.
+#     Sin webhooks, consultá el listado hasta ver `anchored`:
+curl -s "$BASE_URL/api/v1/issuer/documents" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
 
 # 2. Publicarlo (opcional — todo documento nace privado).
 curl -s -X PUT -H "Authorization: Bearer $SOVRA_API_KEY" \
@@ -63,9 +69,11 @@ curl -s "$BASE_URL/api/v1/documents/$DOCUMENT_ID"
 1. **`credential` es lo único que importa guardar.** Todo el resto de la respuesta es
    la afirmación del propio servicio y se puede volver a pedir. Si tu integración
    persiste un solo campo, es ese.
-2. **La emisión vuelve `signed`, no `anchored`.** El anclaje on-chain corre en
-   segundo plano y lo anuncia el webhook `document.status-changed`. Un documento
-   `signed` todavía **no es entregable**: un verificador lo rechaza.
+2. **La emisión responde enseguida, pero el anclaje es asincrónico.** El `201` llega
+   con `status: "signed"` y `tx_hash: null`. **Un verificador rechaza cualquier
+   documento que no esté `anchored`**, así que esperá el webhook
+   [`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed)
+   antes de entregarlo.
 3. **Todo documento nace privado**, y `visibility` **restringe los endpoints, no el
    artefacto**: volver a privado cierra el enlace, no las copias ya entregadas.
 4. **No hay endpoint de verificación, a propósito.** Un veredicto habría que creerlo;

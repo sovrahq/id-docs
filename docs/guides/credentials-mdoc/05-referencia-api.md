@@ -4,13 +4,14 @@
 
 1. [Convenciones](#convenciones)
 2. [Autenticación](#autenticación)
-3. [Emisor](#emisor)
-4. [Verificador](#verificador)
-5. [Configuración del esquema mDoc](#configuración-del-esquema-mdoc)
-6. [Tipos de claim](#tipos-de-claim)
-7. [Elementos del namespace ISO](#elementos-del-namespace-iso)
-8. [El namespace meta](#el-namespace-meta)
-9. [Objetos](#objetos)
+3. [Esquemas](#esquemas)
+4. [Emisor](#emisor)
+5. [Verificador](#verificador)
+6. [Configuración del esquema mDoc](#configuración-del-esquema-mdoc)
+7. [Tipos de claim](#tipos-de-claim)
+8. [Elementos del namespace ISO](#elementos-del-namespace-iso)
+9. [El namespace meta](#el-namespace-meta)
+10. [Objetos](#objetos)
 
 ---
 
@@ -25,11 +26,10 @@
 | **OpenAPI** | `GET {baseUrl}/openapi/api` — la fuente de verdad. |
 
 > **No existen endpoints específicos de mDoc en la API servidor-a-servidor.** La
-> emisión y la verificación se realizan a través de los mismos endpoints que una
-> credencial SD-JWT; el formato lo determina el esquema. Las operaciones
-> específicas de mDoc —creación del esquema, registro del document signer y
-> admisión de una raíz IACA— residen en el **dashboard**, no en la API de
-> integración.
+> creación del esquema, la emisión y la verificación se realizan a través de los
+> mismos endpoints que una credencial SD-JWT; **el formato lo determina el esquema**,
+> mediante su campo `format`. Lo que sí reside únicamente en el **dashboard** es el
+> registro del document signer y la admisión de una raíz IACA.
 
 ## Autenticación
 
@@ -39,6 +39,72 @@ Authorization: Bearer sovra_sk_...
 
 El esquema `Bearer` es sensible a mayúsculas. La clave se crea en
 **Settings → API keys** y su alcance se limita a un workspace.
+
+## Esquemas
+
+Un esquema mDoc se crea con los mismos endpoints que cualquier otro; lo que lo
+convierte en mDoc es `format: "mso_mdoc"`. La referencia completa de los cuatro
+endpoints —objeto Schema, versionado con `base_version`, borrado— reside en
+[`../credentials/07-referencia-api.md#esquemas`](../credentials/07-referencia-api.md#esquemas).
+A continuación, lo que resulta propio de mDoc.
+
+### `POST /api/v1/issuer/schemas`
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "licencia-de-conducir",
+    "credential_type": "DrivingLicence",
+    "name": "Licencia de Conducir",
+    "format": "mso_mdoc",
+    "namespace": "org.iso.18013.5.1",
+    "validity_period": "10y",
+    "claims": [
+      {"key": "family_name", "type": "string", "required": true, "disclosable": false},
+      {"key": "given_name",  "type": "string", "required": true, "disclosable": false},
+      {"key": "birth_date",  "type": "date",   "required": true, "disclosable": false},
+      {"key": "age_over_18", "type": "boolean", "required": false, "disclosable": true}
+    ]
+  }'
+```
+
+Las restricciones propias del formato:
+
+| Campo | Observaciones |
+|---|---|
+| `format` | **`"mso_mdoc"`.** En su ausencia el esquema nace `vc+sd-jwt`. **Inmutable de por vida**, y su envío en una revisión no produce efecto alguno. |
+| `kind` | Ha de ser `credential`, el valor por omisión. **mDoc no admite `document`.** |
+| `schema_id` | Aplicable únicamente a mDoc: ha de satisfacer `^[a-z0-9][a-z0-9_-]*$`, por cuanto se incorpora como segmento del docType. |
+| `doc_type` | Opcional, en DNS inverso. Su declaración **exige un document signer registrado**: en su defecto, la creación devuelve `409 document_signer_required`. En su ausencia, el docType se genera. |
+| `namespace` | Opcional, en DNS inverso. En su ausencia, idéntico al docType. Para ISO, `org.iso.18013.5.1`. |
+| `validity_period` | **La clave ha de estar presente**, aun con valor `null`; su omisión constituye un `422`. En mDoc, la ausencia de un período se resuelve con una vigencia de 1 año, por cuanto ISO exige `validUntil`. |
+| `claims[].type` | **En mDoc el tipo se exige al codificar** (véase [Tipos de claim](#tipos-de-claim)), a diferencia de `vc+sd-jwt`, donde resulta indicativo. |
+| `claims[].disclosable` | `false` = **`always shared`**: el holder no puede retenerlo. |
+| `attachment` | **No admitido.** Es exclusivo de `vc+sd-jwt`. |
+
+**`201`** — el objeto Schema con `registration_status: "pending"`, y con `doc_type`
+en `null` hasta que el workspace esté aprovisionado.
+
+> 🔴 **No resulta posible emitir con un esquema que no se encuentre `registered`.** El
+> tipo de credencial se registra on-chain en segundo plano; mientras ello ocurre, la
+> creación de una oferta devuelve `409 schema_registration_pending`. **No existe
+> webhook de registro**: ha de consultarse `GET /api/v1/issuer/schemas`.
+
+### `GET /api/v1/issuer/schemas`
+
+Devuelve una entrada **por versión**, de la más antigua a la más reciente. Es el único
+lugar donde constan `registration_status`, `registration_error` y el `doc_type`
+efectivamente generado, de modo que **es la consulta que corresponde efectuar
+inmediatamente después de crear el esquema**.
+
+### `PUT /api/v1/issuer/schemas/{schema_id}` · `DELETE /api/v1/issuer/schemas/{id}`
+
+La revisión agrega una versión nueva y requiere `base_version`; el borrado alcanza
+**todas las versiones** y se rechaza con `409 schema_in_use` si alguna registra ofertas
+o credenciales emitidas. `format`, `doc_type` y `namespace` **no son modificables** en
+una revisión. Detalle en
+[`../credentials/07-referencia-api.md#esquemas`](../credentials/07-referencia-api.md#esquemas).
 
 ## Emisor
 
@@ -52,7 +118,8 @@ Crea una oferta OID4VCI preautorizada. Si el `schema_id` designa un esquema
 | Campo | Tipo | Obligatorio | Observaciones |
 |---|---|---|---|
 | `schema_id` | string | ✅ | El slug del esquema, no su UUID. Se emplea la última versión. |
-| `claims` | object | ❌ | Valores **en estructura plana, indexados por `key`**. El namespace lo determina Sovra. |
+| `claims` | object | ❌ | Valores **en estructura plana, indexados por `key`**. El namespace lo determina Sovra. Ha de ser un objeto; en su defecto, el request constituye un `500`. |
+| `valid_until` | string | ❌ | ISO 8601, a futuro. Pisa el `validity_period` del esquema. **`null` se rechaza.** |
 
 **`201`**
 
@@ -64,11 +131,15 @@ Crea una oferta OID4VCI preautorizada. Si el `schema_id` designa un esquema
 | `expires_at` | 24 horas. |
 | `credential` | Vista previa **sin firmar**. |
 
-**Errores:** `401 invalid_api_key` · `404 schema_not_found` · `404 workspace_not_found` ·
-`409 workspace_not_provisioned` · `422 missing_claims` · `422 unencodable_claims` ·
-`422 wrong_schema_kind` · `422 document_signer_required`
+**Errores:** `401 invalid_api_key` · `404 schema_not_found` ·
+`409 workspace_not_provisioned` · `409 schema_registration_pending` ·
+`409 schema_registration_failed` · `422 invalid_valid_until` · `422 missing_claims` ·
+`422 unencodable_claims` · `422 wrong_schema_kind` · `422 document_signer_required` ·
+`422 bitmap_exhausted` · `429 too_many_requests`
 
-Límite de tasa: 120 solicitudes por minuto y API key.
+Límite de tasa: **120 solicitudes por minuto y por IP de origen**, computadas de
+manera independiente en cada nodo de la API. Por encima, `429 too_many_requests`, sin
+cabecera `Retry-After`.
 
 ### `GET /api/v1/issuer/credentials/{id}`
 
@@ -92,11 +163,20 @@ Modifica el estado de una credencial emitida. Idéntico al caso de SD-JWT; véas
 Únicamente resulta aplicable a una credencial `suspended`; sobre una revocada,
 `issued` devuelve `422 invalid_status_transition`.
 
-**Respuesta `200`:** `{ "id": "<uuid>", "status": "<nuevo estado>" }`
+**Respuesta `202`:** `{ "id": "<uuid>", "status": "<estado actual>", "pending_status": "<destino>" }`
+
+> ⚠️ **La respuesta es un `202`, no un `200`: el estado no ha cambiado todavía.** La
+> escritura en la lista de estado on-chain corre en segundo plano, y el destino consta
+> en `pending_status`. Cuando la transacción confirma, el estado se mueve y se emite
+> `credential.revoked`, `credential.suspended` o `credential.unsuspended`; si no
+> confirma tras cinco intentos, se emite `credential.status-change-failed`,
+> `pending_status` se limpia y el motivo queda en `status_change_error`. **Hasta
+> entonces, un verificador sigue leyendo el estado anterior.** Se admite **un cambio
+> pendiente por credencial**.
 
 **Errores:** `400 unknown_status` · `404 credential_not_found` ·
-`422 credential_not_yet_issued` · `422 invalid_status_transition` ·
-`409 workspace_not_provisioned`
+`409 status_change_pending` · `409 workspace_not_provisioned` ·
+`422 credential_not_yet_issued` · `422 invalid_status_transition`
 
 En mDoc, el índice de la lista de estado reside en
 `io.sovra.meta.1/status_list_index`, y **un único índice sirve a ambos
@@ -134,8 +214,9 @@ diagnóstico.
 
 ## Configuración del esquema mDoc
 
-Se define desde el dashboard. Los campos relevantes para el formato son los
-siguientes:
+Se define desde el dashboard, o bien con
+[`POST /api/v1/issuer/schemas`](#post-apiv1issuerschemas). Los campos relevantes para
+el formato son los siguientes:
 
 | Campo | Valores | Observaciones |
 |---|---|---|

@@ -31,10 +31,14 @@ Los endpoints se referencian por su número de sección en
 | `401 invalid_api_key` | `POST`, `PUT`, `GET /issuer` | Key desconocida, malformada o revocada — o el esquema no era literalmente `Bearer` | Que el header diga `Bearer` con **B** mayúscula |
 | `401 authentication_required` | `GET /documents/{id}` | Documento privado, sin sesión. Se devuelve **incluso cuando el header traía una API key** | Publicar el documento, o abrirlo desde el dashboard |
 | `404 document_not_found` | `PUT`, `GET /documents/{id}` | Id inexistente, malformado, o de otro workspace. No distingue entre los tres casos, a propósito | El id y el workspace al que pertenece la key |
+| `404 schema_not_found` | `POST` | No hay esquema con ese `schema_id` en este workspace | El slug, y el workspace al que pertenece la key |
 | `409 workspace_not_provisioned` | `POST`, `GET /issuer` | El workspace todavía no tiene DID ni claves | Aprovisionar el workspace desde el dashboard |
+| `409 schema_registration_pending` | `POST` | El tipo de credencial **se sigue registrando on-chain**; nada se puede emitir todavía | `registration_status` en `GET /api/v1/issuer/schemas`. **No hay webhook de registro** |
+| `409 schema_registration_failed` | `POST` | El registro del tipo agotó sus reintentos | `registration_error`. Hay que crear el esquema de nuevo |
 | `422 wrong_schema_kind` | `POST` | El esquema es de kind `credential` (con holder), no `document` | Usar un esquema de documentos |
 | `422 missing_claims` | `POST` | Falta un claim requerido. La respuesta lista cuáles | Los `required` de `schema.claims[]` |
 | `422 invalid_visibility` | `POST`, `PUT` | El valor no es `public` ni `private` | El último segmento del path, o el campo del body |
+| `422 invalid_valid_until` | `POST` | `valid_until` es `null`, está malformado o quedó en el pasado | El campo del body, o omitilo |
 | `503 chain_not_configured` | `POST` | No hay registro de firmas configurado: se niega a firmar | Es intencional — prefiere fallar antes que emitir algo no anclable |
 
 ## Cada error en detalle
@@ -172,23 +176,37 @@ condición del entorno, no un fallo transitorio. Contactá al equipo de Sovra.
 
 ## Síntomas que no son errores de la API
 
-### El documento se quedó en `signed`
+### El documento se queda en `signed` y nunca pasa a `anchored`
 
-**La emisión no espera a la cadena.** El `POST` responde `signed` y el anclaje corre
-en segundo plano, así que ver `signed` apenas emitís es lo esperado, no un error.
+**Es el síntoma normal mientras el anclaje está en cola, no un error.** La emisión
+responde al instante con `status: "signed"` y `tx_hash: null`; el anclaje corre en un
+job aparte.
 
-| Qué ves | Qué es |
+| | |
 |---|---|
-| `signed` recién emitido | Normal: la transacción de anclaje todavía está en vuelo. **No lo entregues todavía.** |
-| `signed` mucho después | La transacción no aterrizó ni se dio por perdida. Consultá `GET /api/v1/issuer/documents`. |
-| `failed` | El anclaje se dio por perdido. El documento **no sirve**: un verificador lo rechaza con `NOT_ANCHORED`. Reemitilo. |
+| **Cuánto tarda** | Normalmente uno o dos bloques. El throughput tiene un techo —del orden de 5 documentos por bloque y por nodo—, así que **un lote grande puede tardar varios minutos**. |
+| **Nada lo marca `failed` por tardar** | Un documento en cola sigue en `signed` hasta que su job corre. |
+| **Cuándo sí hay un problema** | Cuando llega `document.status-changed` con `status: "failed"`: el anclaje agotó sus **5 intentos**. Ese documento hay que **volver a emitirlo**; no se puede reanclar. |
 
-Para enterarte sin consultar, suscribí un endpoint de webhook a
-[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
+> ⚠️ **No reemitas por impaciencia.** Un `signed` que todavía no ancló y un `failed`
+> se ven parecido desde afuera, pero solo el segundo hay que repetir. Mirá el `status`
+> en `GET /api/v1/issuer/documents`, o esperá el webhook.
 
-> ⚠️ **Un timeout de red no significa que el documento no se emitió.** La firma pudo
-> haber terminado igual. Antes de reintentar, buscá en
+> ⚠️ **Un timeout de red tampoco significa que el documento no se emitió.** La firma
+> pudo haber terminado igual. Antes de reintentar, buscalo en
 > `GET /api/v1/issuer/documents` — si está ahí, reemitir crea un duplicado.
+
+### No llega el webhook `document.status-changed`
+
+El 90 % de las veces es la **suscripción**. La lista de eventos de cada endpoint es
+explícita y **no hay comodín**: un endpoint creado antes de que este evento existiera
+no lo recibe hasta que alguien lo suscriba en **Settings → Webhooks**. Ver
+[la guía de webhooks](../credentials/05-webhooks.md#endpoints-y-suscripciones).
+
+Lo demás: que el endpoint esté `enabled`, que responda `2xx` en menos de 5 segundos, y
+que **no devuelva `4xx`** — un `4xx` descarta el evento sin reintentos. Pasados los
+8 intentos (~1,5 horas) el evento se perdió, y el plan B es
+`GET /api/v1/issuer/documents`.
 
 ### La hoja se dibuja vacía
 
@@ -259,9 +277,11 @@ Cuando algo falla y no está claro dónde:
 - [ ] ¿El esquema es de kind **`document`**?
 - [ ] ¿El `schema_id` es el **slug legible**, no el UUID interno?
 - [ ] ¿Los `key` del objeto `claims` matchean letra por letra los del esquema?
-- [ ] ¿El documento quedó en `anchored`? `signed` todavía no es entregable.
-- [ ] Si dio timeout: ¿buscaste el documento en `GET /api/v1/issuer/documents` antes de reintentar?
-- [ ] ¿El `status` del documento es `anchored`?
+- [ ] ¿El esquema está **`registered`** en `GET /api/v1/issuer/schemas`?
+- [ ] ¿El `status` del documento es **`anchored`**? Un `signed` todavía no se entrega.
+- [ ] Si quedó en `signed` hace rato: ¿esperaste el webhook en vez de reemitir?
+- [ ] Si dio timeout de red: ¿buscaste el documento en `GET /api/v1/issuer/documents` antes de reintentar?
+- [ ] ¿Hay un endpoint suscrito a **`document.status-changed`** y habilitado?
 - [ ] Si es un `401` en la zona pública: ¿el documento está `public`?
 - [ ] Si la hoja sale vacía: ¿los valores los estás leyendo del `credential`?
 

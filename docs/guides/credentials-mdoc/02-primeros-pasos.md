@@ -1,7 +1,7 @@
 # 2. Primeros pasos
 
 Requisitos para emitir el primer mDoc: un workspace aprovisionado, un esquema de
-formato `mso_mdoc`, una API key y un webhook.
+formato `mso_mdoc` —creado en el dashboard o por API—, una API key y un webhook.
 
 ## Tabla de contenidos
 
@@ -54,7 +54,11 @@ en el dashboard y cualquier llamada responde:
 
 ## Paso 2 — Crear un esquema mDoc
 
-Los esquemas se crean **desde el dashboard** (menú **Schemas**), no por API.
+Los esquemas se crean **desde el dashboard** (menú **Schemas**) o bien **por API**,
+con [`POST /api/v1/issuer/schemas`](05-referencia-api.md#post-apiv1issuerschemas): lo
+que determina el formato es el campo `format`, con valor `"mso_mdoc"`. El dashboard es
+el camino recomendado para el primer esquema, por cuanto el asistente valida el
+namespace ISO elemento por elemento.
 
 En el asistente, el campo determinante es **Format**:
 
@@ -254,7 +258,16 @@ emitieron, y al crear una oferta se emplea siempre la más reciente de ese
 > se deriva del esquema y se firma dentro de cada credencial que ya reside en la
 > wallet de un ciudadano: una revisión que lo modificara las dejaría huérfanas.
 
-En el dashboard, esta acción corresponde al botón **Revise (v2)**.
+En el dashboard, esta acción corresponde al botón **Revise (v2)**; por API, a
+[`PUT /api/v1/issuer/schemas/{schema_id}`](05-referencia-api.md#put-apiv1issuerschemasschema_id--delete-apiv1issuerschemasid),
+que exige un `base_version` y rechaza con `409 schema_revision_conflict` toda revisión
+que no parta de la última versión.
+
+> 🔴 **Un esquema recién creado no admite emisión.** Nace en
+> `registration_status: "pending"` mientras su tipo de credencial se registra
+> on-chain; la creación de una oferta devuelve `409 schema_registration_pending` hasta
+> que pase a `registered`. **No existe webhook de registro**: ha de consultarse
+> `GET /api/v1/issuer/schemas`.
 
 ## Paso 3 — API key y webhook
 
@@ -262,7 +275,9 @@ Idénticos a los de cualquier credencial:
 
 - **API key**: Settings → API keys. Prefijo `sovra_sk_`, se muestra **una única
   vez**. Se envía como `Authorization: Bearer sovra_sk_...`.
-- **Webhook**: Settings → Webhook. Una URL HTTPS y un secreto para la firma HMAC.
+- **Webhook**: Settings → Webhooks. Hasta 10 endpoints, cada uno con su URL HTTPS, su
+  propio secreto `whsec_…` para la firma HMAC y **su lista explícita de eventos
+  suscritos**: no hay comodín, de modo que un evento no suscrito no se entrega.
 
 El detalle figura en [Primeros pasos de credenciales](../credentials/02-primeros-pasos.md#paso-4--crear-una-api-key)
 y en [Webhooks](../credentials/05-webhooks.md).

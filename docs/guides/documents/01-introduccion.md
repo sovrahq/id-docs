@@ -42,10 +42,10 @@ cadena. Lo que cambia es quién custodia el artefacto y cómo se presenta.
 | **Quién lo guarda** | Quien lo recibe: un archivo, un enlace, un papel | La wallet del ciudadano |
 | **Hay holder** | No. No hay claim `cnf`, no hay llave del destinatario | Sí, atado a la passkey del ciudadano |
 | **Divulgación selectiva** | No. Todos los claims van en el payload, a la vista | Sí. El ciudadano elige campo por campo |
-| **Protocolo de emisión** | Una llamada HTTP. Sin QR de oferta | OID4VCI (`openid-credential-offer://`) |
+| **Protocolo de emisión** | Una llamada HTTP, y después un anclaje asincrónico. Sin QR de oferta | OID4VCI (`openid-credential-offer://`) |
 | **Protocolo de presentación** | Ninguno: se manda el string o el enlace | OID4VP + DCQL |
 | **Cómo se verifica** | Contra la cadena, por quien lo tenga | Sesión de verificación, o contra la cadena |
-| **Webhooks** | No hay eventos de documentos | `credential.issued`, `presentation.verified`, … |
+| **Webhooks** | `document.status-changed`, cuando el anclaje se resuelve | `credential.issued`, `presentation.verified`, … |
 | **Se puede reimprimir** | Sí: `GET /api/v1/issuer/documents` devuelve el `credential` completo | No. El SD-JWT firmado se entrega una sola vez |
 
 La regla práctica: **si el dato es sobre una persona y ella decide cuándo y cuánto
@@ -172,15 +172,19 @@ derecha la dice el servidor.
 ## El flujo completo, de punta a punta
 
 ```
-  Dashboard                    API                      Destinatario
-  ─────────                    ───                      ────────────
+  Dashboard / API              API                      Destinatario
+  ───────────────              ───                      ────────────
   a. Definir el esquema
      (kind: document)
   b. Diseñar el layout
-     (opcional)
+     (opcional, solo dashboard)
                         c. POST /issuer/documents
-                           → valida, firma, ancla
-                           → devuelve el credential
+                           → valida y firma
+                           → devuelve status: signed
+                        c'. (en background)
+                            el anclaje on-chain
+                            → document.status-changed
+                            → status: anchored
                         d. PUT …/visibility/public
                            (opcional)
                                                   e. Recibe el credential
@@ -189,11 +193,13 @@ derecha la dice el servidor.
                                                      la cadena
 ```
 
-- **a** y **b** se hacen desde el dashboard y requieren sesión. **No hay API para
-  esto.**
-- **c** es una sola llamada que valida y firma; vuelve `signed` y el anclaje sigue
-  en segundo plano, hasta que el documento queda `anchored`. **Sólo `anchored` es
-  entregable.**
+- **a** se puede hacer desde el dashboard **o por API**, con
+  [`POST /api/v1/issuer/schemas`](07-referencia-api.md#esquemas-de-kind-document). **b**
+  es solo dashboard: el layout no tiene endpoints.
+- **c** valida y firma, y devuelve enseguida con `status: "signed"`.
+- **c'** es el anclaje on-chain, que corre aparte. **Hasta que llegue
+  `document.status-changed` con `status: "anchored"`, el documento no se puede
+  entregar:** un verificador lo rechaza.
 - **d** es opcional y deliberada: **todo documento nace privado.**
 - **e** puede ser el string `credential` o el enlace `/api/v1/documents/{id}`. Los
   dos caminos terminan en lo mismo.

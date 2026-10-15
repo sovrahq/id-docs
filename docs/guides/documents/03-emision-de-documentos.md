@@ -1,8 +1,8 @@
 # 3. Emisión de documentos
 
-Emitir es **una sola llamada**. Sovra valida los claims contra el esquema y firma con
-la llave del emisor, y eso es lo que vuelve en la respuesta. El anclaje on-chain de
-la firma corre **en segundo plano**, y el documento sirve recién cuando terminó.
+Emitir es **una sola llamada**: Sovra valida los claims contra el esquema y firma con
+la llave del emisor, y responde al instante. **El anclaje on-chain corre después**, en
+segundo plano, y hasta que confirme el documento todavía no se puede entregar.
 
 ## Tabla de contenidos
 
@@ -47,8 +47,9 @@ curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
 | Campo | Tipo | Obligatorio | Qué es |
 |---|---|---|---|
 | `schema_id` | `string` | ✅ | El identificador **legible** del esquema (el `schema.schema_id` del dashboard), no el UUID interno. |
-| `claims` | `object` | ✅ | Un par `key: valor` por cada claim del esquema. Los `required` no pueden faltar. |
+| `claims` | `object` | — | Un par `key: valor` por cada claim del esquema. Los `required` no pueden faltar. **Las claves que el esquema no declara se descartan antes de firmar**, y los valores se firman tal como los mandás: `"42"` y `42` son documentos distintos. |
 | `visibility` | `string` | — | `"private"` (default) o `"public"`. |
+| `valid_until` | `string` | — | ISO 8601, a futuro. Se firma como `exp` y pisa el `validity_period` del esquema. **`null` se rechaza**: omitilo para usar el del esquema. |
 
 Los tipos de cada claim los declara el esquema (`date`, `number`, `string`,
 `boolean`) y se validan durante la emisión.
@@ -59,29 +60,39 @@ Los tipos de cada claim los declara el esquema (`date`, `number`, `string`,
 
 ## El anclaje es asincrónico
 
-El `POST` responde apenas el documento está firmado y guardado, con
-**`status: "signed"`**. La firma todavía no está en la cadena: `tx_hash` y
-`anchored_at` vienen en `null`.
+**El `POST` devuelve enseguida, pero no devuelve un documento entregable.** El `201`
+llega con `status: "signed"` y `tx_hash: null`: la firma ya existe, el registro
+on-chain todavía no.
 
-El anclaje corre en segundo plano. Cuando termina, el documento pasa a `anchored`
-—o a `failed` si la transacción nunca aterriza— y llega un webhook
-[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed) con
-el estado nuevo.
+El anclaje corre en un job aparte, que manda la transacción y espera su recibo.
+Después de eso el documento pasa a uno de dos estados finales, y **cada uno emite el
+webhook [`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed)**:
 
-> 🔴 **`signed` no es entregable.** Un verificador rechaza un documento sin anclar.
-> No lo muestres ni lo mandes hasta que esté `anchored`.
+| Estado final | Qué pasó | Qué trae |
+|---|---|---|
+| `anchored` | La firma quedó registrada en el registro de firmas on-chain. | `tx_hash` y `anchored_at` |
+| `failed` | El anclaje se dio por vencido **después de 5 intentos fallidos**. | `tx_hash: null` |
 
-Cómo enterarte de que pasó, en orden de preferencia:
+Tres cosas que conviene tener claras:
 
-| Cómo | Cuándo conviene |
-|---|---|
-| El webhook `document.status-changed` | Siempre que puedas recibirlo: es inmediato y no cuesta nada. |
-| `GET /api/v1/issuer/documents` | Si no podés recibir webhooks (firewall, red cerrada). Consultá el `status` del `id` que guardaste. |
+- **Esperá el webhook antes de entregar.** Un verificador rechaza cualquier documento
+  que no esté `anchored`, así que entregar un `signed` es entregar algo que va a
+  fallar la verificación. Si no podés recibir webhooks, consultá
+  [`GET /api/v1/issuer/documents`](#listar-los-documentos-del-workspace).
+- **Ningún documento falla por tiempo.** Uno que espera en una cola larga sigue en
+  `signed` hasta que su job corre; nada lo marca `failed` por tardar. El throughput
+  del anclaje tiene un techo —del orden de 5 documentos por bloque y por nodo—, así
+  que un lote grande puede tardar varios minutos en resolverse.
+- **Un `failed` hay que volver a emitirlo.** No hay forma de reintentar el anclaje de
+  un documento ya firmado.
 
-En el ambiente de test el anclaje suele tardar unos segundos; el techo depende de la
-congestión de la cadena, así que no dimensiones nada contra lo que medís en test.
-Antes esta llamada esperaba el recibo de la transacción y podía durar ~90 segundos:
-si tu cliente tiene un `--max-time 120` heredado de esa época, ya no hace falta.
+> 💡 **Mostrá el estado, no un spinner.** Como la emisión responde rápido, el patrón
+> correcto es guardar el `id`, mostrar el documento como "en proceso", y pasarlo a
+> "listo" cuando llegue el webhook.
+
+> 📜 **Si venías de la versión anterior:** antes esta llamada esperaba el recibo de la
+> transacción y podía durar ~90 segundos. Si tu cliente arrastra un
+> `--max-time 120`, o un read timeout largo en un proxy, ya no hacen falta.
 
 ## La respuesta, campo por campo
 
@@ -114,7 +125,7 @@ si tu cliente tiene un `--max-time 120` heredado de esa época, ya no hace falta
     "schema_id": "document_example",
     "credential_type": "Document",
     "name": "Document Example",
-    "version": "v1",
+    "version": 1,
     "claims": [ /* … */ ]
   }
 }
@@ -127,14 +138,14 @@ dentro del `credential`) o si es una afirmación del servicio. Ver
 | Campo | Tipo | Qué es | Firmado |
 |---|---|---|---|
 | `id` | `uuid` | El identificador del documento. Se usa en las URLs (`/api/v1/documents/<id>`) y coincide con el claim `jti` de adentro del `credential`, así que una credencial no puede servirse bajo otro id. | Sí (como `jti`) |
-| `status` | `string` | El ciclo de vida. Un documento recién emitido vuelve `signed`; `anchored` —firmado y con la firma registrada on-chain— es el estado final exitoso. | No |
+| `status` | `string` | El ciclo de vida. **En la respuesta de emisión es siempre `signed`**; `anchored` —el estado final exitoso— llega después, por webhook. | No |
 | `visibility` | `string` | `public` o `private`. Controla el acceso vía la API — ver [guía 4](04-visibilidad-y-entrega.md). | No |
 | `credential` | `string` | ★ **El documento en sí.** Un SD-JWT VC en base64url, autocontenido y verificable por cualquiera que lo tenga. Es el único campo que hay que conservar. | Es la firma |
 | `claims` | `object` | Los mismos claims ya decodificados, por conveniencia. No es prueba de nada: es lo que el servicio *dice* que dice el documento. | Sí, adentro del `credential` |
-| `digest` | `string` (hex) | El SHA-256 del *signing input* (los bytes que se firmaron). La huella del documento: la verificación lo recalcula y compara. Si alguien altera un byte, deja de coincidir. | No (se recalcula) |
-| `tx_hash` | `string` (`0x…`) \| `null` | El hash de la transacción on-chain donde quedó anclada la firma. **`null` en la respuesta de la emisión**: la transacción todavía no salió. | No |
+| `digest` | `string` (hex) | El SHA-256 del *signing input* (los bytes que se firmaron). La huella del documento, **y la clave bajo la cual la firma queda anclada**: la verificación lo recalcula y compara. Si alguien altera un byte, deja de coincidir. | No (se recalcula) |
+| `tx_hash` | `string` (`0x…`) \| `null` | El hash de la transacción on-chain donde quedó anclada la firma. **`null` en la respuesta de emisión**, y hasta que el anclaje confirme. | No |
 | `signed_at` | `string` (ISO 8601) | Cuándo el emisor firmó. | Sí (como `iat`) |
-| `anchored_at` | `string` (ISO 8601) | Cuándo la firma quedó registrada en la cadena. En las pruebas, segundos después de firmar. | No |
+| `anchored_at` | `string` (ISO 8601) \| `null` | Cuándo la firma quedó registrada en la cadena. **`null` hasta que el anclaje confirme.** | No |
 | `revoked_at` | `string` \| `null` | `null` = vigente. Con fecha, el documento está revocado. | No |
 | `issuer` | `object` | Quién emitió — ver abajo. | Parcial |
 | `schema` | `object` | El molde usado — ver abajo. | Parcial |
@@ -154,7 +165,7 @@ dentro del `credential`) o si es una afirmación del servicio. Ver
 | `schema.id` | `string` (uuid) | UUID interno del esquema en el servicio. | No |
 | `schema.schema_id` | `string` | El identificador legible, el que se manda al emitir. | No |
 | `schema.name` | `string` | Nombre humano del molde. | No |
-| `schema.version` | `string` | Versión del molde. | No |
+| `schema.version` | `integer` | La versión del molde con la que se firmó. Arranca en 1. | No |
 | `schema.credential_type` | `string` | El tipo de credencial. Viaja como `vct` dentro del JWT firmado, y es contra este valor que se comprueba on-chain si el emisor está autorizado a emitirlo. | Sí (como `vct`) |
 | `schema.claims[]` | `array<object>` | La definición de cada campo. | No |
 
@@ -180,7 +191,7 @@ En la práctica conviene guardar además:
 | Campo | Por qué |
 |---|---|
 | `id` | Para armar el enlace público y para cambiar la visibilidad después. |
-| `tx_hash` | Para linkear al explorer. **No viene en la respuesta de la emisión** (`null`): llega en el webhook `document.status-changed`, o se consulta después con `GET /api/v1/issuer/documents`. |
+| `tx_hash` | Para linkear al explorer sin volver a consultar la API. **No está en la respuesta de emisión**: llega en el webhook `document.status-changed`. |
 | `digest` | Se puede recalcular del `credential`, pero tenerlo a mano evita el cómputo. |
 
 Todo eso también se puede recuperar más tarde con
@@ -193,17 +204,14 @@ el `credential` completo de cada documento.
 
 | `status` | Qué significa | ¿Entregable? |
 |---|---|---|
-| `signed` | Firmado, pero el anclaje todavía no confirmó. | No todavía |
+| `signed` | Firmado, pero el anclaje todavía no confirmó. **Es el estado con el que responde la emisión.** | No todavía |
 | `anchored` | Firmado y con la firma registrada on-chain. **El estado final exitoso.** | ✅ Sí |
-| `failed` | El documento se firmó, pero su transacción de anclaje **no confirmó**. | ❌ No |
-| `revoked` | El documento fue invalidado. `revoked_at` trae la fecha. | ❌ No |
+| `failed` | El documento se firmó, pero su transacción de anclaje **no confirmó** después de 5 intentos. | ❌ No |
+| `revoked` | El documento fue invalidado. `revoked_at` trae la fecha. **Ningún endpoint de la API lo deja en este estado todavía.** | ❌ No |
 
 > ⚠️ **Solo `anchored` es un estado entregable.** Un `failed` significa que la firma
 > existe pero no quedó registrada en la cadena, y un verificador que corra el check
 > de anclaje lo va a rechazar (`NOT_ANCHORED`). No lo reenvíes: reemitilo.
-
-Cada paso de `signed` a `anchored` o a `failed` se anuncia con un webhook
-[`document.status-changed`](../credentials/05-webhooks.md#documentstatus-changed).
 
 ## Listar los documentos del workspace
 
@@ -250,9 +258,8 @@ La respuesta trae `revoked_at` y `status: "revoked"`, así que un documento **se
 invalidar**: es el mecanismo real para dar de baja un documento emitido, y es
 distinto de volverlo `private` (eso cierra el enlace, no las copias).
 
-> ⚠️ **La API de documentos no expone un endpoint de revocación.** Los cuatro
-> endpoints disponibles son los de la [referencia](07-referencia-api.md); ninguno
-> revoca. La baja se gestiona desde el dashboard. Si necesitás revocar por API,
+> ⚠️ **La API no expone un endpoint de revocación.** Los endpoints disponibles son
+> los de la [referencia](07-referencia-api.md); ninguno revoca. La baja se gestiona desde el dashboard. Si necesitás revocar por API,
 > confirmalo con el equipo de Sovra antes de diseñar el flujo.
 
 ## Errores
@@ -260,10 +267,15 @@ distinto de volverlo `private` (eso cierra el enlace, no las copias).
 | Respuesta | Causa | Qué revisar |
 |---|---|---|
 | `401 invalid_api_key` | Key desconocida, malformada o revocada, o el esquema no era literalmente `Bearer`. | Que el header diga `Bearer` con **B** mayúscula. |
+| `404 schema_not_found` | No hay esquema con ese `schema_id` en este workspace. | El slug, y que el esquema sea de este workspace. |
 | `409 workspace_not_provisioned` | El workspace todavía no tiene DID ni claves. | Aprovisionar el workspace desde el dashboard y esperar el DID. |
+| `409 schema_registration_pending` | El tipo de credencial del esquema **se sigue registrando on-chain**. | Esperar unos segundos y reintentar; el estado se ve en `GET /api/v1/issuer/schemas`. |
+| `409 schema_registration_failed` | El tipo no pudo registrarse: con ese esquema no se puede emitir nada. | Crear el esquema de nuevo, o pedir ayuda al equipo de Sovra. |
 | `422 wrong_schema_kind` | El esquema es de kind `credential` (con holder), no `document`. | Usar un esquema de documentos. |
 | `422 missing_claims` | Falta un claim requerido. **La respuesta lista cuáles.** | Los `required` de `schema.claims[]`. |
 | `422 invalid_visibility` | `visibility` no es `public` ni `private`. | El campo del body. |
+| `422 invalid_valid_until` | `valid_until` es `null`, está malformado o quedó en el pasado. | El campo del body, o omitilo. |
+| `422 validation_error` | El documento no pudo guardarse. `details` nombra el campo. | La respuesta. |
 | `503 chain_not_configured` | No hay registro de firmas configurado: el servicio **se niega a firmar**. | Es intencional — prefiere fallar antes que emitir algo no anclable. Contactá al equipo de Sovra. |
 
 El sobre de error es siempre el mismo:

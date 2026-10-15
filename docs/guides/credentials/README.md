@@ -22,12 +22,12 @@ una **API key de workspace** (`Authorization: Bearer sovra_sk_...`).
 | # | Guía | Para qué sirve |
 |---|---|---|
 | 1 | [Introducción](01-introduccion.md) | Qué es una credencial verificable, los tres roles, y cómo se ve el flujo completo. |
-| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, workspace, DID, esquemas, API key, webhook. Primera llamada. |
+| 2 | [Primeros pasos](02-primeros-pasos.md) | Entornos, workspace, DID, esquemas (dashboard o API), API key, webhook. Primera llamada. |
 | 3 | [Emisión de credenciales](03-emision-de-credenciales.md) | Crear la oferta, mostrar el QR, recibir el `credential.issued`. |
 | 4 | [Verificación de credenciales](04-verificacion-de-credenciales.md) | Crear la sesión OID4VP, escribir el DCQL, leer el resultado. |
-| 5 | [Webhooks](05-webhooks.md) | Todos los eventos, sus payloads y cómo validar la firma HMAC. |
+| 5 | [Webhooks](05-webhooks.md) | Los nueve eventos, sus payloads, las suscripciones por endpoint, la firma HMAC y los reintentos. |
 | 6 | [Ciclo de vida y revocación](06-ciclo-de-vida-y-revocacion.md) | Estados de una credencial, revocar, suspender, reactivar. |
-| 7 | [Referencia de la API](07-referencia-api.md) | Todos los endpoints, parámetros y respuestas. |
+| 7 | [Referencia de la API](07-referencia-api.md) | Todos los endpoints —esquemas, diseño, emisión, verificación—, parámetros y respuestas. |
 | 8 | [Errores y troubleshooting](08-errores-y-troubleshooting.md) | Cada código de error, qué lo causa y cómo se arregla. |
 | 9 | [Verificación sin Sovra](09-verificacion-sin-sovra.md) | Verificar contra la cadena, sin depender de la API de Sovra. |
 | 10 | [Verificar por WhatsApp](10-whatsapp.md) | Llevar la verificación al chat: deep link, QR, correlación y cotejo de identidad. |

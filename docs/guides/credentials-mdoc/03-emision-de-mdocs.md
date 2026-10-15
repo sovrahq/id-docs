@@ -321,6 +321,13 @@ esquema.
 Idénticos a los de una credencial SD-JWT: mismos estados, mismas transiciones y
 mismos endpoints.
 
+> ⚠️ **La llamada responde `202`, no `200`.** El cambio se escribe en la lista de
+> estado on-chain en segundo plano: el destino consta en `pending_status`, y el estado
+> se mueve recién cuando la transacción confirma, momento en el que se emite el webhook
+> correspondiente. Si no confirma tras cinco intentos, se emite
+> `credential.status-change-failed` y el estado **queda como estaba**. Véase
+> [Ciclo de vida y revocación](../credentials/06-ciclo-de-vida-y-revocacion.md#cambiar-el-estado).
+
 ```bash
 # Revocar — permanente, sin reversión posible.
 curl -X PUT "$BASE_URL/api/v1/issuer/credentials/$CREDENTIAL_ID/status/revoked" \

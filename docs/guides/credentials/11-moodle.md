@@ -80,7 +80,7 @@ suelen estar detrás de firewalls de aplicación, a veces **con restricción por
 y el aviso puede no llegar nunca.
 
 El endpoint se crea en **Settings → Workspaces → *(tu workspace)* → Webhooks**, y la
-suscripción a eventos es **explícita, sin comodín** ([guía 5](05-webhooks.md#configuración)):
+suscripción a eventos es **explícita, sin comodín** ([guía 5](05-webhooks.md#endpoints-y-suscripciones)):
 hay que marcar `credential.issued`, `credential.revoked`, `credential.suspended` y
 `credential.unsuspended`. Un endpoint sin esos eventos no recibe nada — y acá eso no
 se nota, porque la reconciliación tapa el agujero cinco minutos más tarde.

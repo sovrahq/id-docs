@@ -71,11 +71,15 @@ Si configuraste el webhook antes de que termine, recibís el evento
 
 ## Paso 3 — Crear un esquema
 
-Un **esquema** define qué campos lleva una credencial. Se crean **desde el
-dashboard** (menú **Schemas**), no por API: la API servidor-a-servidor emite y
-verifica, pero el modelo de datos se define en la consola.
+Un **esquema** define qué campos lleva una credencial. Hay **dos caminos**, y los dos
+llegan al mismo lugar:
 
-El asistente pide:
+| | |
+|---|---|
+| **Dashboard** (menú **Schemas**) | El asistente, con vista previa de la tarjeta. Es el camino recomendado para el primer esquema. |
+| **API** ([`POST /api/v1/issuer/schemas`](07-referencia-api.md#post-apiv1issuerschemas)) | Para provisionar esquemas desde tu propio código o desde un script de despliegue. El diseño de la tarjeta se asigna con [`PUT …/design`](07-referencia-api.md#put-apiv1issuerschemasschema_iddesign). |
+
+El asistente del dashboard pide:
 
 | Campo | Qué es | Notas |
 |---|---|---|
@@ -85,9 +89,32 @@ El asistente pide:
 | **Kind** | `credential` o `document` | Para emitir a una wallet: **`credential`**. Para documentos firmados, ver [`../documents/`](../documents/). |
 | **Claims** | Los campos | Cada uno con `key`, `label`, `type` (`string`, `number`, `date`, `boolean`) y `required`. |
 
+Por API, los mismos campos van en el body —y ahí **`schema_id` lo elegís vos**, no se
+deriva del nombre:
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "credential_type": "DrivingLicence",
+    "name": "Licencia de Conducir",
+    "validity_period": "10y",
+    "claims": [
+      {"key": "full_name", "type": "string", "required": true, "disclosable": true, "label": "Nombre"}
+    ]
+  }'
+```
+
+> 🔴 **Un esquema recién creado todavía no sirve para emitir.** Nace en
+> `registration_status: "pending"` mientras su tipo de credencial se registra
+> on-chain, y crear una oferta antes de que pase a `registered` devuelve
+> `409 schema_registration_pending`. **No hay webhook de registro:** consultá
+> `GET /api/v1/issuer/schemas` hasta ver `registered`.
+
 Tres cosas que conviene saber antes de cargar el primer esquema:
 
-**1. El `schema_id` se deriva del nombre.** Se toma el *name*, se pasa a minúsculas,
+**1. Desde el dashboard, el `schema_id` se deriva del nombre.** Se toma el *name*, se pasa a minúsculas,
 todo lo que no sea `a-z0-9` se convierte en `_`, y se corta a 24 caracteres.
 "Licencia de Conducir" → `licencia_de_conducir`. **Ese es el valor que vas a mandar
 en `schema_id` al crear una oferta** — lo podés confirmar en el listado de esquemas.
@@ -100,7 +127,8 @@ todos los verificadores a pedir `fist_name` para siempre.
 
 **3. Todos los claims son divulgables.** El dashboard marca `disclosable: true` en
 cada campo, así que la divulgación selectiva funciona sin configurar nada: el
-ciudadano elige campo por campo qué comparte.
+ciudadano elige campo por campo qué comparte. **Por API el default no es ese**: si no
+mandás `disclosable: true`, el claim no es divulgable y el holder no puede retenerlo.
 
 > 💡 **Mantené los esquemas en ~12 claims.** El JWT del emisor lleva un digest `_sd`
 > por **cada** claim divulgable, revele el holder uno o todos — unos 44 caracteres
@@ -114,7 +142,14 @@ Editar un esquema **no lo modifica**: crea una **versión nueva**. Las credencia
 ya emitidas quedan ancladas a la versión con la que se emitieron. Al crear una
 oferta, Sovra usa siempre la versión más reciente de ese `schema_id`.
 
-Un esquema con credenciales emitidas no se puede borrar (`409 schema_in_use`).
+Por API, la revisión es
+[`PUT /api/v1/issuer/schemas/{schema_id}`](07-referencia-api.md#put-apiv1issuerschemasschema_id),
+y pide un `base_version`: la versión desde la que empezaste a editar. Si mientras
+tanto alguien creó otra versión desde el dashboard, la llamada devuelve
+`409 schema_revision_conflict` en vez de pisarla.
+
+Un esquema con ofertas o credenciales emitidas no se puede borrar
+(`409 schema_in_use`), y el borrado alcanza **todas** sus versiones de una vez.
 
 ## Paso 4 — Crear una API key
 
@@ -149,11 +184,18 @@ Un par de propiedades a tener en cuenta:
 Los dos flujos — emisión y verificación — **terminan en un webhook**. Sin webhook
 configurado te vas a quedar sin saber el resultado, salvo que hagas polling.
 
-En **Settings → Workspace**:
+En **Settings → Webhooks** (hasta **10 endpoints** por workspace, cada uno con su
+propia configuración):
 
-1. Cargá la **Webhook URL** de tu servidor (`https://tu-servidor.com/webhooks/sovra`).
-2. Generá el **webhook secret**. También se muestra **una sola vez**; se usa para
-   validar la firma HMAC de cada entrega.
+1. Cargá la **URL** de tu servidor (`https://tu-servidor.com/webhooks/sovra`).
+2. **Elegí los eventos que ese endpoint recibe.** La suscripción es una lista
+   explícita y **no hay comodín**: un evento que no suscribís no se entrega nunca.
+   Para el flujo básico hacen falta `credential.issued`, `presentation.verified` y
+   `presentation.failed`; si vas a revocar por API, agregá `credential.revoked`,
+   `credential.suspended`, `credential.unsuspended` y
+   **`credential.status-change-failed`**.
+3. Guardá el **secreto** `whsec_…`. Se muestra **una sola vez**, y es la clave del
+   HMAC con el que se firma cada entrega — **prefijo incluido**.
 
 Los detalles del payload, la firma y los reintentos están en
 [5. Webhooks](05-webhooks.md).
@@ -188,6 +230,7 @@ Antes de pasar a emitir:
 - [ ] Tenés acceso al dashboard del entorno.
 - [ ] El workspace muestra un DID `did:sovra:0x…`.
 - [ ] Hay al menos un esquema de kind `credential`, y anotaste su `schema_id`.
+- [ ] Ese esquema figura como `registered` en `GET /api/v1/issuer/schemas`.
 - [ ] Tenés una API key `sovra_sk_…` guardada de forma segura.
 - [ ] La webhook URL apunta a un endpoint tuyo accesible por HTTPS.
 - [ ] Guardaste el webhook secret.

@@ -78,6 +78,32 @@ claim se nombra con dos segmentos, `[namespace, identificador]`.
 | 8 | [Verificación sin Sovra](credentials-mdoc/08-verificacion-sin-sovra.md) | `verifyMdoc()` contra la cadena y contra anclas de confianza propias. |
 | 9 | [Habilitar mDL ISO](credentials-mdoc/09-habilitar-mdl-iso.md) | **Solo para el docType oficial de ISO.** El trámite del certificado ante la autoridad emisora. |
 
+## 🧩 [`credentials-mdoc-custom/`](credentials-mdoc-custom/) — mDoc con namespace propio
+
+`org.iso.18013.5.1` es un conjunto **cerrado**: un `key` ajeno a su catálogo es
+rechazado al crear el esquema. Cuando el documento debe transportar datos que ISO no
+define —CURP, colonia, tipo sanguíneo, alergias, condición de donante— la vía que la
+propia norma prevé es **añadir un namespace**.
+
+Supone leída [`credentials-mdoc/`](credentials-mdoc/): aquí solo se describe lo que
+cambia. El caso que se desarrolla es una licencia de conducir mexicana.
+
+| | Namespace de ISO | Namespace propio |
+|---|---|---|
+| Elementos fuera del catálogo | ❌ | ✅ |
+| Document signer | Obligatorio | No se requiere |
+| `doctype_value` identifica al emisor | ❌ | ✅ |
+| Lectores mDL de terceros | La interpretan | No la interpretan como licencia |
+| Ambos namespaces a la vez | — | ❌ No emitible hoy |
+
+| # | Guía | Para qué sirve |
+|---|---|---|
+| 1 | [Por qué un namespace propio](credentials-mdoc-custom/01-introduccion.md) | El conjunto cerrado de ISO, las dos rutas comparadas, qué identificadores conviene conservar. |
+| 2 | [Crear el esquema](credentials-mdoc-custom/02-crear-un-esquema.md) | El cuerpo completo, `required` frente a `always shared`, los 23 atributos y su clave. |
+| 3 | [Emisión](credentials-mdoc-custom/03-emision.md) | La oferta con los 24 claims, `valid_until` frente a `expiry_date`, la codificación de cada tipo. |
+| 4 | [Imágenes: foto y firma](credentials-mdoc-custom/04-imagenes.md) | Base64 estándar al emitir, base64url al verificar, y qué muestra hoy la cartera. |
+| 5 | [Verificación](credentials-mdoc-custom/05-verificacion.md) | El DCQL con namespace propio, las tres cadenas que deben coincidir, seis escenarios reales y los fallos más frecuentes. |
+
 ## 📑 [`documents/`](documents/) — Documentos firmados
 
 Una sola llamada valida y firma, y el **anclaje on-chain** se completa después, en
@@ -114,6 +140,7 @@ lo verifica contra la cadena, no preguntándole al servicio que lo emitió.
 
 - [Colección de Postman — Credenciales](../resources/sovra-credenciales.postman_collection.json)
 - [Colección de Postman — mDoc](../resources/sovra-mdoc.postman_collection.json)
+- [Colección de Postman — mDoc con namespace propio](../resources/sovra-mdoc-custom.postman_collection.json)
 - [Colección de Postman — Documentos firmados](../resources/sovra-documentos-firmados.postman_collection.json)
 
 > La documentación de la plataforma anterior (`x-api-key`, `did:quarkid`, DIDComm,

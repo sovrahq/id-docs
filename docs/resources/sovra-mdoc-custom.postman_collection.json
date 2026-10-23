@@ -1,0 +1,517 @@
+{
+  "info": {
+    "name": "Sovra ID — mDoc con namespace propio",
+    "description": "Emisión y verificación de un mDoc bajo un **namespace propio**, para documentos que deben transportar datos que `org.iso.18013.5.1` no define: CURP, colonia, tipo sanguíneo, alergias, condición de donante.\n\nNo existen endpoints específicos: son los mismos que para SD-JWT, y el formato lo determina el esquema.\n\nDos cadenas distintas gobiernan todo, y confundirlas es el error más frecuente:\n- `{{docType}}` → va en `meta.doctype_value` al verificar.\n- `{{namespace}}` → va en `claims[].path[0]`.\n\nAmbas se leen de `GET /api/v1/issuer/schemas`; no deben deducirse.\n\nLa totalidad de las solicitudes requiere:\n\n```\nAuthorization: Bearer {{apiKey}}\n```\n\nEntornos:\n- Test: `https://test-api-sovra.flagonsa.com`\n- Producción: `https://api.sovra.io`\n\nDocumentación: https://github.com/sovrahq/id-docs/blob/main/docs/guides/credentials-mdoc-custom.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://test-api-sovra.flagonsa.com",
+      "description": "Test: https://test-api-sovra.flagonsa.com · Producción: https://api.sovra.io"
+    },
+    {
+      "key": "apiKey",
+      "value": "sovra_sk_reemplazame",
+      "description": "API key del workspace (Settings → API keys)."
+    },
+    {
+      "key": "schemaId",
+      "value": "driving_licence_v2",
+      "description": "El slug del esquema, no su UUID. Para mso_mdoc: minúsculas, dígitos, - o _. Pasa a formar parte del docType."
+    },
+    {
+      "key": "docType",
+      "value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1",
+      "description": "Generado por la plataforma. Se lee de GET /schemas. Va en meta.doctype_value."
+    },
+    {
+      "key": "namespace",
+      "value": "mx.gob.nl.icv.1",
+      "description": "El namespace propio del esquema. Va en claims[].path[0]. Inmutable."
+    },
+    {
+      "key": "credentialId",
+      "value": "",
+      "description": "Se completa sola al crear una oferta."
+    },
+    {
+      "key": "verificationId",
+      "value": "",
+      "description": "Se completa sola al crear una sesión."
+    }
+  ],
+  "item": [
+    {
+      "name": "Esquema",
+      "item": [
+        {
+          "name": "Crear esquema mDoc con namespace propio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/schemas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "schemas"
+              ]
+            },
+            "description": "Crea el esquema. **`format`, `doc_type` y `namespace` son inmutables de por vida**: quedan firmados dentro de cada credencial emitida.\n\n`namespace` propio ⇒ no corre la validación del catálogo ISO, de modo que los claims propios (`curp`, `neighborhood`, `organ_donor`, `blood_type`, `allergies`, `emergency_phone`, `second_family_name`, `street`, `exterior_number`, `interior_number`) son admitidos.\n\n`disclosable: false` es lo que el dashboard rotula **always shared**: el claim viaja en toda presentación y el ciudadano no puede retenerlo.\n\n🔴 `validity_period: null` **no** significa «sin vencimiento» en mDoc: ISO hace obligatorio `validUntil` y la emisión recaería en un año por defecto. De ahí `\"4y\"`.\n\nRespuesta `201`. El esquema queda `pending` hasta que su credential type se inscriba on-chain; nada se emite antes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema_id\": \"driving_licence_v2\",\n  \"credential_type\": \"DrivingLicence\",\n  \"name\": \"Driving Licence v2\",\n  \"format\": \"mso_mdoc\",\n  \"namespace\": \"mx.gob.nl.icv.1\",\n  \"validity_period\": \"4y\",\n  \"claims\": [\n    {\n      \"key\": \"given_name\",\n      \"label\": \"Nombre\",\n      \"type\": \"string\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"family_name\",\n      \"label\": \"Apellido paterno\",\n      \"type\": \"string\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"second_family_name\",\n      \"label\": \"Apellido materno\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"birth_date\",\n      \"label\": \"Fecha de nacimiento\",\n      \"type\": \"date\",\n      \"required\": true,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"document_number\",\n      \"label\": \"Folio de licencia\",\n      \"type\": \"string\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"issue_date\",\n      \"label\": \"Fecha de expedición\",\n      \"type\": \"date\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"expiry_date\",\n      \"label\": \"Fecha de vencimiento\",\n      \"type\": \"date\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"driving_privileges\",\n      \"label\": \"Tipo y restricciones\",\n      \"type\": \"driving_privileges\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"portrait\",\n      \"label\": \"Foto\",\n      \"type\": \"bytes\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"issuing_authority\",\n      \"label\": \"Autorizado por\",\n      \"type\": \"string\",\n      \"required\": true,\n      \"disclosable\": false\n    },\n    {\n      \"key\": \"signature_usual_mark\",\n      \"label\": \"Firma\",\n      \"type\": \"bytes\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"street\",\n      \"label\": \"Calle\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"exterior_number\",\n      \"label\": \"Número exterior\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"interior_number\",\n      \"label\": \"Número interior\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"neighborhood\",\n      \"label\": \"Colonia\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"resident_city\",\n      \"label\": \"Municipio\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"resident_postal_code\",\n      \"label\": \"Código postal\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"issuing_country\",\n      \"label\": \"País emisor\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"age_over_18\",\n      \"label\": \"Mayor de 18\",\n      \"type\": \"boolean\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"curp\",\n      \"label\": \"CURP\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"organ_donor\",\n      \"label\": \"Donador\",\n      \"type\": \"boolean\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"blood_type\",\n      \"label\": \"Tipo sanguíneo\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"allergies\",\n      \"label\": \"Alergias\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    },\n    {\n      \"key\": \"emergency_phone\",\n      \"label\": \"Teléfono de emergencia\",\n      \"type\": \"string\",\n      \"required\": false,\n      \"disclosable\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Consultar esquemas (leer docType y namespace)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/schemas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "schemas"
+              ]
+            },
+            "description": "Devuelve todas las versiones. De aquí se leen las dos cadenas que gobiernan el resto: `doc_type` y `namespace`. **No deben deducirse**: la regla «namespace = docType» rige únicamente cuando el esquema no declara namespace propio.\n\nTambién confirma `registration_status: \"registered\"`, sin el cual la emisión responde `409 schema_registration_pending`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emisión",
+      "item": [
+        {
+          "name": "Crear oferta (24 claims)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credential-offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credential-offer"
+              ]
+            },
+            "description": "Mismo endpoint que para SD-JWT: el formato lo determina el esquema.\n\n`claims` va **plano e indexado por `key`**: el namespace procede del esquema y la API no lo solicita.\n\n⚠️ `valid_until` y `expiry_date` deben coincidir. El primero es el `validUntil` del MSO; el segundo, un claim legible.\n\nCodificación:\n- `date` → `\"YYYY-MM-DD\"`, diez caracteres exactos.\n- `bytes` (`portrait`, `signature_usual_mark`) → **base64 estándar con padding**, sin prefijo `data:`, sin saltos de línea, nunca alfabeto URL-safe. PNG o JPEG, 480 px, 400 KB.\n- `exterior_number` / `interior_number` → **string**, para admitir `\"S/N\"` o `\"123-A\"`.\n- `driving_privileges` → array no vacío; `sign` y `value` son texto.\n\nUn claim que el esquema no declara se descarta en silencio.\n\nRespuesta `201` con `offer_uri`, que es el QR que escanea el ciudadano.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema_id\": \"{{schemaId}}\",\n  \"valid_until\": \"2030-10-22T23:59:59Z\",\n  \"claims\": {\n    \"given_name\": \"Sofía\",\n    \"family_name\": \"Demo\",\n    \"second_family_name\": \"Lambda\",\n    \"birth_date\": \"1990-01-01\",\n    \"document_number\": \"NL-2026-0001\",\n    \"issue_date\": \"2026-10-22\",\n    \"expiry_date\": \"2030-10-22\",\n    \"driving_privileges\": [\n      {\n        \"vehicle_category_code\": \"B\",\n        \"issue_date\": \"2026-10-22\",\n        \"expiry_date\": \"2030-10-22\",\n        \"codes\": [\n          {\n            \"code\": \"01\",\n            \"sign\": \"<=\",\n            \"value\": \"70\"\n          }\n        ]\n      }\n    ],\n    \"portrait\": \"/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n    \"signature_usual_mark\": \"iVBORw0KGgoAAAANSUhEUgAAA...\",\n    \"issuing_authority\": \"Secretaría de Movilidad y Planeación Urbana\",\n    \"street\": \"Av. Constitución\",\n    \"exterior_number\": \"1234\",\n    \"interior_number\": \"5B\",\n    \"neighborhood\": \"Centro\",\n    \"resident_city\": \"Monterrey\",\n    \"resident_postal_code\": \"64000\",\n    \"issuing_country\": \"MX\",\n    \"age_over_18\": true,\n    \"curp\": \"DELS900101MNLXXX01\",\n    \"organ_donor\": true,\n    \"blood_type\": \"O+\",\n    \"allergies\": \"Penicilina\",\n    \"emergency_phone\": \"8181234567\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el credential_id para las solicitudes siguientes.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('credentialId', body.credential_id);",
+                  "  console.log('offer_uri:', body.offer_uri);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una credencial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issuer/credentials/{{credentialId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "issuer",
+                "credentials",
+                "{{credentialId}}"
+              ]
+            },
+            "description": "Estado y metadatos de la credencial. La credencial firmada **no se almacena**: se entrega una sola vez, en el webhook `credential.issued`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verificación",
+      "item": [
+        {
+          "name": "Control de tránsito (licencia completa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "La ruta de un claim mDoc es `[namespace, identificador]`, **exactamente dos cadenas**.\n\n`meta.doctype_value` lleva el **docType**; `path[0]`, el **namespace**. Son cadenas distintas: confundirlas produce `doctype_mismatch` o `missing_required_claim:<ns>.<elemento>`.\n\nSe renderiza como QR `authorization_request_uri_ref`, no la otra. La sesión vive 10 minutos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"licencia\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"given_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"family_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"second_family_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"document_number\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"expiry_date\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"driving_privileges\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"portrait\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificación de edad (sin fecha de nacimiento)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "La razón de ser del formato: acreditar la mayoría de edad sin revelar la fecha de nacimiento. `birth_date` es `required` pero **no** always shared, justamente para esto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"edad\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"age_over_18\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Urgencias médicas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "Los cuatro claims propios que ISO no define. Lo que una licencia de plástico jamás pudo entregar de forma selectiva.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"urgencias\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"blood_type\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"allergies\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"organ_donor\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"emergency_phone\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Comprobante de domicilio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "El domicilio completo, sin fotografía, folio ni fecha de nacimiento.\n\nEsto es lo que habilita el desglose: con el domicilio en una sola cadena (`resident_address`), solicitar el código postal entregaba también la calle y el interior.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"domicilio\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"street\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"exterior_number\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"interior_number\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"neighborhood\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"resident_city\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"resident_postal_code\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Zona de cobertura (calle y CP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "Dos campos, nada más. Imposible antes del desglose.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"cobertura\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"street\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"resident_postal_code\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trámite que requiere CURP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications"
+              ]
+            },
+            "description": "`family_name` y `second_family_name` son always shared, de modo que el materno viaja aunque no se solicite. Lo que el desglose cambia es que llegan como **dos claves separadas**, en lugar de una cadena que nadie puede partir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dcql_query\": {\n    \"credentials\": [\n      {\n        \"id\": \"tramite\",\n        \"format\": \"mso_mdoc\",\n        \"meta\": {\n          \"doctype_value\": \"{{docType}}\"\n        },\n        \"claims\": [\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"curp\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"given_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"family_name\"\n            ]\n          },\n          {\n            \"path\": [\n              \"{{namespace}}\",\n              \"second_family_name\"\n            ]\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el session_id y deja a la vista la URI que se renderiza como QR.",
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('verificationId', body.session_id);",
+                  "  console.log('QR:', body.authorization_request_uri_ref);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar una sesión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/verifier/verifications/{{verificationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "verifier",
+                "verifications",
+                "{{verificationId}}"
+              ]
+            },
+            "description": "`status`: `pending`, `completed`, `failed` o `expired`.\n\nEn `completed`, `presentation_data.credentials[].claims` viene **indexado por `\"<namespace>.<elemento>\"`**, nunca por el elemento desnudo. Ahí falla en silencio una integración que presuponga la forma de SD-JWT.\n\n⚠️ Los `bytes` retornan en base64**url** **sin padding**, no en el base64 estándar que se envió. Para renderizar: `.replace(/-/g,'+').replace(/_/g,'/')` y reponer el padding."
+          }
+        }
+      ]
+    }
+  ]
+}

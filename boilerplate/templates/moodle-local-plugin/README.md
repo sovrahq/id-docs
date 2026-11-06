@@ -130,9 +130,10 @@ Y además:
   del núcleo, que respeta esa lista.
 - **Zona horaria del sitio:** la fecha de finalización que viaja en la
   credencial se calcula en la zona horaria del sitio.
-- **Campos personalizados del curso** (Administración del sitio → Cursos →
-  Campos personalizados de curso): `sovra_horas` y, si querés, `sovra_nivel`, de
-  tipo texto. Ver la tabla de abajo.
+- **Campo de perfil del tipo de documento** (Administración del sitio → Usuarios
+  → Campos de perfil de usuario): un campo de texto, no editable por el
+  estudiante, con valores como `CC`, `CE`, `TI` o `PA`. Elegilo en la
+  configuración del plugin, en **«Campo del tipo de documento»**.
 
 Después, en **Administración del sitio → Informes → Credenciales de curso (Sovra
 ID)**, tocá **«Probar conexión»**: distingue llave inválida, esquema inexistente,
@@ -150,13 +151,12 @@ key que el esquema no declara se descarta en silencio al firmar.
 |---|---|---|
 | `holderName` | Nombre y apellido del estudiante | ✅ |
 | `documento` | El campo del perfil elegido en la configuración | ✅ |
-| `programa` | La categoría del curso | ✅ |
+| `tipoDocumento` | El campo propio del perfil elegido en la configuración | ✅ |
 | `curso` | El nombre completo del curso | ✅ |
-| `horas` | Campo personalizado del curso `sovra_horas` | ✅ |
 | `entidadFormadora` | El nombre del sitio | ✅ |
 | `fechaFinalizacion` | La fecha de completitud, `AAAA-MM-DD` | ✅ |
 | `codigoVerificacion` | Código propio de cada credencial (`XXXX-XXXX-XXXX`), generado al completar | ✅ |
-| `nivel` | Campo personalizado del curso `sovra_nivel` (sólo si tiene valor) | — |
+| `programa` | La categoría del curso (sólo si tiene valor) | — |
 
 Si falta un dato obligatorio —por ejemplo, un estudiante sin documento— el plugin
 **no llama a la API**: el estudiante ve *«falta un dato, ya avisamos»* y el
@@ -273,9 +273,10 @@ available ──(el estudiante la pide)──▶ offered ──(la canjea)──
 ## Antes de producción
 
 - [ ] **Acordar los claims** con la institución y ajustar `classes/claims.php` al
-      esquema definitivo. Confirmar si `horas` es texto o número en el esquema.
-- [ ] **Elegir el campo del documento** en la configuración y verificar en el
-      reporte que ningún derecho quede con `missingclaims: documento`.
+      esquema definitivo.
+- [ ] **Elegir los campos del documento y del tipo de documento** en la
+      configuración y verificar en el reporte que ningún derecho quede con
+      `missingclaims: documento` ni `missingclaims: tipoDocumento`.
 - [ ] **Organización propia en producción.** El nombre que el ciudadano lee como
       emisor es el de la **organización** de Sovra, no el del workspace.
 - [ ] **Bloquear nombre, apellido y documento** para que el estudiante no los

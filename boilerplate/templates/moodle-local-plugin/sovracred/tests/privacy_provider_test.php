@@ -32,7 +32,7 @@ final class privacy_provider_test extends \core_privacy\tests\provider_testcase 
         $this->setAdminUser();
         $this->redirectMessages();
         $this->student = $this->create_student();
-        $this->complete_course($this->student, $this->create_course_with_fields());
+        $this->complete_course($this->student, $this->create_completable_course());
     }
 
     public function test_exportacion(): void {
@@ -50,7 +50,7 @@ final class privacy_provider_test extends \core_privacy\tests\provider_testcase 
         global $DB;
         // Un segundo estudiante de control: sus datos no se tocan.
         $other = $this->getDataGenerator()->create_user();
-        $this->complete_course($other, $this->create_course_with_fields());
+        $this->complete_course($other, $this->create_completable_course());
 
         $context = \context_user::instance($this->student->id);
         privacy\provider::delete_data_for_user(new approved_contextlist($this->student, 'local_sovracred', [$context->id]));

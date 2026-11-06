@@ -11,7 +11,7 @@ global $CFG;
 require_once($CFG->dirroot . '/completion/completion_completion.php');
 
 /**
- * Datos de prueba compartidos: configuración, curso con campos propios, estudiante y completitud.
+ * Datos de prueba compartidos: configuración, curso, estudiante y completitud.
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra
@@ -31,44 +31,37 @@ trait fixtures_trait {
         set_config('schemaid', 'bogota-formacion', 'local_sovracred');
         set_config('coursescope', config::SCOPE_ALL, 'local_sovracred');
         set_config('documentfield', 'profile_field_documento', 'local_sovracred');
+        set_config('documenttypefield', 'profile_field_tipodocumento', 'local_sovracred');
     }
 
     /**
-     * Curso con completitud habilitada, en una categoría (programa) y con horas y nivel.
+     * Curso con completitud habilitada, en una categoría (programa).
      *
-     * @param array $fields Valores de los campos propios: ['sovra_horas' => '40', 'sovra_nivel' => 'Básico'].
+     * @param string $program Nombre de la categoría.
      * @return \stdClass
      */
-    protected function create_course_with_fields(array $fields = ['sovra_horas' => '40', 'sovra_nivel' => 'Básico']): \stdClass {
-        global $DB;
+    protected function create_completable_course(string $program = 'Talento Digital'): \stdClass {
         $gen = $this->getDataGenerator();
-        $cfgen = $gen->get_plugin_generator('core_customfield');
-        if (!$DB->record_exists('customfield_field', ['shortname' => 'sovra_horas'])) {
-            $category = $cfgen->create_category(['component' => 'core_course', 'area' => 'course', 'itemid' => 0]);
-            $cfgen->create_field(['categoryid' => $category->get('id'), 'type' => 'text', 'shortname' => 'sovra_horas']);
-            $cfgen->create_field(['categoryid' => $category->get('id'), 'type' => 'text', 'shortname' => 'sovra_nivel']);
-        }
-        $coursecat = $gen->create_category(['name' => 'Talento Digital']);
-        $data = ['enablecompletion' => 1, 'fullname' => 'Programación en Python', 'category' => $coursecat->id];
-        foreach ($fields as $shortname => $value) {
-            $data['customfield_' . $shortname] = $value;
-        }
-        return $gen->create_course($data);
+        $coursecat = $gen->create_category(['name' => $program]);
+        return $gen->create_course(['enablecompletion' => 1, 'fullname' => 'Programación en Python', 'category' => $coursecat->id]);
     }
 
     /**
-     * Estudiante con documento en un campo propio del perfil.
+     * Estudiante con número y tipo de documento en campos propios del perfil.
      *
      * @param string $documento
+     * @param string $tipodocumento
      * @return \stdClass
      */
-    protected function create_student(string $documento = '1020304050'): \stdClass {
+    protected function create_student(string $documento = '1020304050', string $tipodocumento = 'CC'): \stdClass {
         $gen = $this->getDataGenerator();
         global $DB;
         if (!$DB->record_exists('user_info_field', ['shortname' => 'documento'])) {
             $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'documento', 'name' => 'Documento']);
+            $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'tipodocumento', 'name' => 'Tipo de documento']);
         }
-        return $gen->create_user(['firstname' => 'Ada', 'lastname' => 'Lovelace', 'profile_field_documento' => $documento]);
+        return $gen->create_user(['firstname' => 'Ada', 'lastname' => 'Lovelace',
+            'profile_field_documento' => $documento, 'profile_field_tipodocumento' => $tipodocumento]);
     }
 
     /**

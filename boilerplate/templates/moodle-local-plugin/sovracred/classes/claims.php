@@ -25,40 +25,31 @@ class claims {
     const REQUIRED = [
         'holderName',
         'documento',
-        'programa',
+        'tipoDocumento',
         'curso',
-        'horas',
         'entidadFormadora',
         'fechaFinalizacion',
         'codigoVerificacion',
     ];
 
-    /** @var string Campo personalizado del curso con la carga horaria (Administración → Cursos → Campos personalizados). */
-    const COURSE_FIELD_HOURS = 'sovra_horas';
-
-    /** @var string Campo personalizado del curso con el nivel. Opcional. */
-    const COURSE_FIELD_LEVEL = 'sovra_nivel';
-
     /**
      * Arma los claims de la credencial de un derecho.
      *
      * @param \stdClass $issuance Registro de local_sovracred_issuance.
-     * @return array key → valor. `nivel` sólo aparece si tiene valor.
+     * @return array key → valor. `programa` sólo aparece si tiene valor.
      */
     public static function build(\stdClass $issuance): array {
         global $SITE;
 
         $user = \core_user::get_user($issuance->userid, '*', MUST_EXIST);
         $course = get_course($issuance->courseid);
-        $coursefields = self::course_fields($course->id);
         $category = \core_course_category::get($course->category, IGNORE_MISSING, true);
 
         $claims = [
             'holderName' => trim($user->firstname . ' ' . $user->lastname),
-            'documento' => self::document($user),
-            'programa' => $category ? self::plain($category->name) : '',
+            'documento' => self::user_field($user, config::document_field()),
+            'tipoDocumento' => self::user_field($user, config::document_type_field()),
             'curso' => self::plain($course->fullname),
-            'horas' => $coursefields[self::COURSE_FIELD_HOURS] ?? '',
             'entidadFormadora' => self::plain($SITE->fullname),
             'fechaFinalizacion' => $issuance->timecompleted
                 ? userdate($issuance->timecompleted, '%Y-%m-%d', \core_date::get_server_timezone(), false)
@@ -66,9 +57,9 @@ class claims {
             'codigoVerificacion' => $issuance->verificationcode,
         ];
 
-        $level = $coursefields[self::COURSE_FIELD_LEVEL] ?? '';
-        if ($level !== '') {
-            $claims['nivel'] = $level;
+        $program = $category ? self::plain($category->name) : '';
+        if ($program !== '') {
+            $claims['programa'] = $program;
         }
         return $claims;
     }
@@ -86,15 +77,18 @@ class claims {
     }
 
     /**
-     * El número de documento, del campo que eligió el administrador.
+     * Un dato del perfil, del campo que eligió el administrador.
      *
      * @param \stdClass $user
+     * @param string $field Un campo de la tabla user o 'profile_field_<shortname>'. Vacío: sin configurar.
      * @return string
      */
-    private static function document(\stdClass $user): string {
+    private static function user_field(\stdClass $user, string $field): string {
         global $CFG;
 
-        $field = config::document_field();
+        if ($field === '') {
+            return '';
+        }
         if (strpos($field, 'profile_field_') === 0) {
             require_once($CFG->dirroot . '/user/profile/lib.php');
             $profile = profile_user_record($user->id, false);
@@ -102,21 +96,6 @@ class claims {
             return trim((string) ($profile->$shortname ?? ''));
         }
         return trim((string) ($user->$field ?? ''));
-    }
-
-    /**
-     * Valores de los campos personalizados del curso, por shortname.
-     *
-     * @param int $courseid
-     * @return array
-     */
-    private static function course_fields(int $courseid): array {
-        $values = [];
-        foreach (\core_course\customfield\course_handler::create()->get_instance_data($courseid, true) as $data) {
-            $value = $data->get_value();
-            $values[$data->get_field()->get('shortname')] = is_scalar($value) ? trim((string) $value) : '';
-        }
-        return $values;
     }
 
     /**

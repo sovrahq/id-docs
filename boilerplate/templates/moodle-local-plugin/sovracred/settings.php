@@ -59,12 +59,17 @@ if ($hassiteconfig) {
             '', PARAM_SEQUENCE));
 
         // Origen del número de documento: el campo estándar «Número de ID» o un campo propio del perfil.
-        $documentfields = ['idnumber' => get_string('idnumber')];
+        $profilefields = [];
         foreach ($DB->get_records('user_info_field', null, 'sortorder', 'id, shortname, name') as $field) {
-            $documentfields['profile_field_' . $field->shortname] = format_string($field->name) . " ({$field->shortname})";
+            $profilefields['profile_field_' . $field->shortname] = format_string($field->name) . " ({$field->shortname})";
         }
         $settings->add(new admin_setting_configselect('local_sovracred/documentfield',
             get_string('documentfield', 'local_sovracred'), get_string('documentfield_desc', 'local_sovracred'),
-            'idnumber', $documentfields));
+            'idnumber', ['idnumber' => get_string('idnumber')] + $profilefields));
+
+        // El tipo de documento (CC, CE, TI, PA…) no tiene campo estándar: sale de un campo propio del perfil.
+        $settings->add(new admin_setting_configselect('local_sovracred/documenttypefield',
+            get_string('documenttypefield', 'local_sovracred'), get_string('documenttypefield_desc', 'local_sovracred'),
+            '', ['' => get_string('choosedots')] + $profilefields));
     }
 }

@@ -75,15 +75,19 @@ La página «Mis credenciales» SHALL mostrar cada oferta vigente como un códig
 - **THEN** el plugin no agrega scripts, estilos ni imágenes de fuera del propio Moodle (lo que cargue el tema o los filtros del sitio es configuración del sitio)
 
 ### Requirement: Los claims de la credencial
-Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `programa`, `curso`, `horas`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `nivel` sólo cuando tiene valor. El campo del perfil del que sale `documento` SHALL ser configurable, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
+Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `tipoDocumento`, `curso`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `programa` sólo cuando tiene valor. Los campos del perfil de los que salen `documento` y `tipoDocumento` SHALL ser configurables, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
 
 #### Scenario: Claims completos
 - **WHEN** se arma la credencial de un estudiante con todos los datos
 - **THEN** las claves coinciden carácter por carácter con las del esquema y la fecha es la de completitud del curso en formato `AAAA-MM-DD`
 
-#### Scenario: Nivel vacío
-- **WHEN** el curso no tiene nivel
-- **THEN** la clave `nivel` no se envía
+#### Scenario: Programa vacío
+- **WHEN** la categoría del curso no tiene nombre
+- **THEN** la clave `programa` no se envía
+
+#### Scenario: Tipo de documento sin configurar
+- **WHEN** el administrador no eligió el campo del tipo de documento
+- **THEN** falta `tipoDocumento` y el plugin no llama a la API
 
 #### Scenario: Documento desde un campo de perfil propio
 - **WHEN** el administrador eligió un campo personalizado del perfil como origen del documento

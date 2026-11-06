@@ -34,7 +34,7 @@ final class reconcile_test extends \advanced_testcase {
         $this->redirectMessages();
         ['mock' => $this->mock] = $this->get_mocked_http_client();
 
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student();
         $this->complete_course($student, $course);
         $record = $DB->get_record(issuance::TABLE, ['userid' => $student->id], '*', MUST_EXIST);
@@ -116,7 +116,7 @@ final class reconcile_test extends \advanced_testcase {
         global $DB;
         // Una segunda oferta abierta, y lotes de a una: dos corridas tienen que consultar las dos.
         $student = $this->create_student('555');
-        $this->complete_course($student, $this->create_course_with_fields());
+        $this->complete_course($student, $this->create_completable_course());
         $second = $DB->get_record(issuance::TABLE, ['userid' => $student->id], '*', MUST_EXIST);
         issuance::update($second, ['status' => issuance::OFFERED, 'credentialid' => '22222222-2222-2222-2222-222222222222',
             'offeruri' => 'openid-credential-offer://?y', 'offerexpires' => time() + DAYSECS]);

@@ -42,7 +42,7 @@ final class issuance_test extends \advanced_testcase {
      */
     private function available_issuance(string $documento = '1020304050'): \stdClass {
         global $DB;
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student($documento);
         $this->complete_course($student, $course);
         return $DB->get_record(issuance::TABLE, ['userid' => $student->id], '*', MUST_EXIST);

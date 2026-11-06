@@ -26,7 +26,7 @@ Ver `proposal.md` — Why. Restricciones que dan forma a la solución:
 
 **Una sola oferta canjeable por derecho.** Antes de crear otra se consulta a Sovra el estado de la anterior: si se canjeó (aviso perdido) se marca emitida; si sigue pendiente se reutiliza, **aunque le falten minutos**; sólo si Sovra la informa vencida se crea otra. Alternativa descartada: reemplazarla con un margen de 10 minutos — la anterior seguiría canjeable unos minutos con su `credential_id` ya pisado, y si el estudiante la escaneaba, ni el webhook ni la reconciliación podrían asociarla al derecho. Un lock por derecho (`\core\lock`) impide que dos pestañas o un doble clic creen dos ofertas.
 
-**Claims en `classes/claims.php`.** Qué datos lleva la credencial es una decisión de producto y privacidad: pasa por revisión, no se edita en caliente. Mapeo de prueba para `bogota-formacion`: `holderName` ← nombre completo; `documento` ← campo configurable (`idnumber` o un campo propio del perfil); `programa` ← categoría del curso; `curso` ← nombre del curso; `horas` y `nivel` ← campos personalizados del curso (`sovra_horas`, `sovra_nivel`); `entidadFormadora` ← nombre del sitio; `fechaFinalizacion` ← fecha de completitud; `codigoVerificacion` ← código aleatorio generado al registrar el derecho. Los nombres definitivos se acuerdan con Atenea.
+**Claims en `classes/claims.php`.** Qué datos lleva la credencial es una decisión de producto y privacidad: pasa por revisión, no se edita en caliente. Mapeo de prueba para `bogota-formacion`: `holderName` ← nombre completo; `documento` ← campo configurable (`idnumber` o un campo propio del perfil); `tipoDocumento` ← campo propio del perfil, configurable; `programa` ← categoría del curso (opcional); `curso` ← nombre del curso; `entidadFormadora` ← nombre del sitio; `fechaFinalizacion` ← fecha de completitud; `codigoVerificacion` ← código aleatorio generado al registrar el derecho. Los nombres definitivos se acuerdan con Atenea.
 
 **HTTP con `\core\http_client` obtenido del contenedor `\core\di`.** Respeta hosts y puertos bloqueados y permite inyectar un cliente simulado en las pruebas. Existe desde 4.4, así que cubre 4.5 y 5.x.
 
@@ -57,4 +57,4 @@ Instalación nueva: copiar `local/sovracred`, completar la actualización desde 
 ## Open Questions
 
 - Nombre del campo de perfil donde Atenea guarda el número de documento (se configura, no cambia el código).
-- Nombres definitivos de los claims y si `horas` viaja como número o texto (se acuerdan con Atenea; cambia sólo `claims.php`).
+- Nombres definitivos de los claims (se acuerdan con Atenea; cambia sólo `claims.php`).

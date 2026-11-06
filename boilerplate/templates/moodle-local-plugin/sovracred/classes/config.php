@@ -71,6 +71,15 @@ class config {
     }
 
     /**
+     * Campo del perfil del que sale el tipo de documento: 'profile_field_<shortname>', o vacío si no se eligió.
+     *
+     * @return string
+     */
+    public static function document_type_field(): string {
+        return (string) get_config('local_sovracred', 'documenttypefield');
+    }
+
+    /**
      * ¿La API está configurada lo suficiente como para crear ofertas?
      *
      * @return bool

@@ -38,7 +38,7 @@ final class webhook_test extends \advanced_testcase {
         $this->setAdminUser();
         $this->redirectMessages();
 
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student();
         $this->complete_course($student, $course);
         $record = $DB->get_record(issuance::TABLE, ['userid' => $student->id], '*', MUST_EXIST);

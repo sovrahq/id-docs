@@ -52,10 +52,9 @@ class provider implements
         $collection->add_external_location_link('sovra', [
             'holderName' => 'privacy:metadata:sovra:holdername',
             'documento' => 'privacy:metadata:sovra:documento',
+            'tipoDocumento' => 'privacy:metadata:sovra:tipodocumento',
             'programa' => 'privacy:metadata:sovra:programa',
             'curso' => 'privacy:metadata:sovra:curso',
-            'horas' => 'privacy:metadata:sovra:horas',
-            'nivel' => 'privacy:metadata:sovra:nivel',
             'entidadFormadora' => 'privacy:metadata:sovra:entidad',
             'fechaFinalizacion' => 'privacy:metadata:sovra:fecha',
             'codigoVerificacion' => 'privacy:metadata:sovra:codigo',

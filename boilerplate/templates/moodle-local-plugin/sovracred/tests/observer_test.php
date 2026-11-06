@@ -28,7 +28,7 @@ final class observer_test extends \advanced_testcase {
 
     public function test_curso_habilitado_completado(): void {
         global $DB;
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student();
         $sink = $this->redirectMessages();
 
@@ -47,8 +47,8 @@ final class observer_test extends \advanced_testcase {
 
     public function test_curso_no_habilitado(): void {
         global $DB;
-        $enabled = $this->create_course_with_fields();
-        $other = $this->create_course_with_fields();
+        $enabled = $this->create_completable_course();
+        $other = $this->create_completable_course();
         set_config('coursescope', config::SCOPE_LIST, 'local_sovracred');
         set_config('courseids', (string) $enabled->id, 'local_sovracred');
         $student = $this->create_student();
@@ -66,7 +66,7 @@ final class observer_test extends \advanced_testcase {
 
     public function test_completitud_repetida(): void {
         global $DB;
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student();
         $sink = $this->redirectMessages();
 
@@ -80,7 +80,7 @@ final class observer_test extends \advanced_testcase {
 
     public function test_el_estudiante_es_el_relacionado_no_el_actor(): void {
         global $DB, $USER;
-        $course = $this->create_course_with_fields();
+        $course = $this->create_completable_course();
         $student = $this->create_student();
         $this->redirectMessages();
 

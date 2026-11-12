@@ -16,8 +16,10 @@ sin dependencias fuera del núcleo.
 3. [Decisión 1 — la oferta se crea cuando el estudiante la pide](#decisión-1--la-oferta-se-crea-cuando-el-estudiante-la-pide)
 4. [Decisión 2 — el webhook es opcional](#decisión-2--el-webhook-es-opcional)
 5. [Decisión 3 — qué responder al webhook](#decisión-3--qué-responder-al-webhook)
-6. [Del evento de Moodle al estudiante correcto](#del-evento-de-moodle-al-estudiante-correcto)
-7. [Checklist de producción](#checklist-de-producción)
+6. [Decisión 4 — los claims se mapean desde el esquema](#decisión-4--los-claims-se-mapean-desde-el-esquema)
+7. [Diagnosticar desde Moodle](#diagnosticar-desde-moodle)
+8. [Del evento de Moodle al estudiante correcto](#del-evento-de-moodle-al-estudiante-correcto)
+9. [Checklist de producción](#checklist-de-producción)
 
 ---
 
@@ -115,10 +117,62 @@ Un **4xx hace que Sovra descarte el evento sin reintentar**
 | Entrega repetida (mismo `id`) | 200 | Idempotencia: ya se procesó (marcar y aplicar van en una transacción) |
 | Credencial que el plugin no creó | 200 | Otro sistema del mismo workspace |
 | Evento más viejo que el estado actual | 200, sin aplicar | Los eventos llegan desordenados. Se compara sólo contra horas de Sovra, nunca contra el reloj de Moodle |
+| `workspace_id` distinto del configurado | 200, sin aplicar | La API key y el webhook salieron de workspaces distintos: reintentarlo no lo arregla |
 
 La firma se calcula sobre el **cuerpo crudo** (`php://input`), nunca sobre el JSON
 decodificado y vuelto a codificar, y se compara con `hash_equals`. El endpoint no
 usa la sesión de Moodle (`NO_MOODLE_COOKIES`): lo autentica la firma.
+
+## Decisión 4 — los claims se mapean desde el esquema
+
+Cada institución tiene su esquema, y los esquemas cambian: la versión 2 de
+`bogota_formacion` sacó `horas` y sumó `tipoDocumento`. Si el mapeo estuviera en
+código, cada cambio pediría un desarrollador y una versión nueva del plugin.
+
+Por eso el plugin lee el esquema de Sovra (`GET /api/v1/issuer/schemas`,
+[guía 8](08-referencia-api.md#get-apiv1issuerschemas)) y el administrador elige,
+en la página **Mapeo de claims**, de qué dato de Moodle sale cada claim:
+
+| Origen | Ejemplos |
+|---|---|
+| Usuario | Nombre completo, correo, número de ID, institución |
+| Campo propio del perfil | Documento, tipo de documento |
+| Curso | Nombre, nombre corto, categoría, número de ID |
+| Campo personalizado del curso | Horas, nivel |
+| Otros | Nombre del sitio, fecha de finalización, código de verificación, texto fijo |
+
+El mapeo se guarda con el tipo de cada claim y si es obligatorio. Con eso el plugin:
+
+- **formatea cada valor según su tipo**: `date` como `AAAA-MM-DD` en la zona
+  horaria del sitio, `datetime` en ISO 8601 UTC, `integer` y `number` como
+  números, `boolean` como booleano;
+- **no llama a la API si falta un obligatorio**: el estudiante ve «falta un dato»
+  y el reporte muestra cuál, en vez de un `missing_claims` genérico;
+- **no consulta el esquema en cada emisión**: lo lee sólo al editar el mapeo.
+
+Elegir qué datos personales viajan firmados es una decisión de privacidad: la
+página es sólo para administradores del sitio, y advierte que los campos elegidos
+no tienen que ser editables por el estudiante.
+
+## Diagnosticar desde Moodle
+
+La consola de Sovra no tiene historial de entregas del webhook
+([guía 6](06-webhooks.md#endpoints-y-suscripciones)). El plugin lleva el suyo:
+
+- **Registro de Sovra ID:** cada llamada a la API (método, ruta, código HTTP,
+  resultado, duración) y cada aviso del webhook (evento, id de la entrega,
+  workspace y qué se hizo con él). Se guarda 30 días, sin claims ni cuerpos. Los
+  avisos sin firma válida se anotan como mucho uno por minuto, porque la URL es
+  pública.
+- **Reporte:** la configuración vigente, con la API key y el secreto
+  enmascarados, el último aviso recibido y el `workspace_id` que traen los avisos.
+- **Probar conexión:** consulta `GET /schemas` sin crear ninguna oferta. Si el slug
+  no existe, lista los que sí existen en el workspace de la key; también compara los
+  claims del esquema con el mapeo.
+
+El error más común en la puesta en marcha fue el slug: `bogota-formacion` en vez de
+`bogota_formacion`. Con la lista de esquemas a la vista se resuelve sin escribirle a
+nadie.
 
 ## Del evento de Moodle al estudiante correcto
 
@@ -131,9 +185,9 @@ Por la misma razón, la notificación se arma **en el idioma del estudiante**
 
 ## Checklist de producción
 
-- [ ] Los claims de `classes/claims.php` coinciden carácter por carácter con el esquema.
-- [ ] El campo del perfil con el documento está elegido, y el reporte no muestra
-      `missingclaims`.
+- [ ] El **mapeo de claims** está guardado para el esquema definitivo, y
+      «Probar conexión» no avisa diferencias entre los dos.
+- [ ] El reporte no muestra `missingclaims`: a ningún estudiante le falta un dato.
 - [ ] Nombre, apellido y documento **no son editables** por el estudiante: la
       institución firma esos valores.
 - [ ] El host de la API está permitido en **Seguridad HTTP** del sitio
@@ -145,6 +199,8 @@ Por la misma razón, la notificación se arma **en el idioma del estudiante**
 - [ ] La **organización** de Sovra lleva el nombre que el estudiante tiene que leer
       como emisor.
 - [ ] «Probar conexión» en el reporte da *conexión correcta*.
+- [ ] El **Registro de Sovra ID** muestra avisos `credential.issued` *Aplicados*: el
+      webhook llega. Si no hay ninguno, revisar el firewall de entrada.
 - [ ] Probado con una **cartera real, en la misma red** (test o producción) que el
       workspace.
 

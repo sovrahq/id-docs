@@ -21,6 +21,7 @@ $string['check_api'] = 'API URL, API key and schema configured.';
 $string['check_lastrejected'] = 'Last webhook rejected for an invalid signature: {$a}. Check that the webhook secret matches the Sovra console.';
 $string['check_lastwebhook'] = 'Last notice from Sovra: {$a->time}, <code>{$a->event}</code> ({$a->result}).';
 $string['check_nowebhook'] = 'No notice from Sovra has arrived yet. Check that the endpoint in the console points to the URL above and is subscribed to the credential events; meanwhile, the scheduled task confirms issuances.';
+$string['check_nowebhooksecret'] = 'No webhook secret: issuances are confirmed by the scheduled task, every 5 minutes.';
 $string['check_webhook'] = 'Webhook secret set (optional: the scheduled task confirms issuances without it).';
 $string['check_workspacehint'] = 'Notices come from workspace <code>{$a}</code>. Copy it into "Workspace ID" in the settings to ignore notices from other workspaces.';
 $string['completedon'] = 'Completed on {$a}';

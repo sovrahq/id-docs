@@ -21,6 +21,7 @@ $string['check_api'] = 'URL de la API, API key y esquema configurados.';
 $string['check_lastrejected'] = 'Último aviso rechazado por firma inválida: {$a}. Revisá que el secreto del webhook coincida con el de la consola de Sovra.';
 $string['check_lastwebhook'] = 'Último aviso de Sovra: {$a->time}, <code>{$a->event}</code> ({$a->result}).';
 $string['check_nowebhook'] = 'Todavía no llegó ningún aviso de Sovra. Revisá que el endpoint de la consola apunte a la URL de arriba y esté suscrito a los eventos de credencial; mientras tanto, la tarea programada confirma las emisiones.';
+$string['check_nowebhooksecret'] = 'Sin secreto del webhook: las emisiones se confirman con la tarea programada, cada 5 minutos.';
 $string['check_webhook'] = 'Secreto del webhook configurado (opcional: la tarea programada confirma las emisiones sin él).';
 $string['check_workspacehint'] = 'Los avisos llegan del workspace <code>{$a}</code>. Copialo en «Workspace ID» de la configuración para ignorar los de otros workspaces.';
 $string['completedon'] = 'Completado el {$a}';

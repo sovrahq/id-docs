@@ -83,13 +83,12 @@ echo html_writer::tag('p', html_writer::link(new moodle_url('/admin/settings.php
     html_writer::link(new moodle_url('/local/sovracred/logs.php'), get_string('logs', 'local_sovracred')));
 
 // Estado de la configuración.
-$checks = [];
-$checks[] = [config::api_url() !== '' && config::api_key() !== '' && config::schema_id() !== '', get_string('check_api', 'local_sovracred')];
-$checks[] = [config::webhook_secret() !== '', get_string('check_webhook', 'local_sovracred')];
-$items = '';
-foreach ($checks as [$ok, $text]) {
-    $items .= html_writer::tag('li', ($ok ? '✅ ' : '⚠️ ') . $text);
-}
+$apiok = config::api_url() !== '' && config::api_key() !== '' && config::schema_id() !== '';
+$webhookok = config::webhook_secret() !== '';
+$items = html_writer::tag('li', $apiok ? '✅ ' . get_string('check_api', 'local_sovracred')
+    : '⚠️ ' . get_string('test_notconfigured', 'local_sovracred'));
+$items .= html_writer::tag('li', $webhookok ? '✅ ' . get_string('check_webhook', 'local_sovracred')
+    : 'ℹ️ ' . get_string('check_nowebhooksecret', 'local_sovracred'));
 $lastwebhook = log::last_webhook();
 if ($lastwebhook) {
     $items .= html_writer::tag('li', 'ℹ️ ' . get_string('check_lastwebhook', 'local_sovracred', (object) [

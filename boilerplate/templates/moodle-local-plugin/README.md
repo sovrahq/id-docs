@@ -223,6 +223,14 @@ Mientras no se guarde un mapeo, se usa el de fábrica, el del esquema de prueba
 
 ## Probarlo en un Moodle local
 
+Lo más rápido, con Docker: `scripts/probar-en-docker.sh` descarga Moodle 4.5 y
+[moodle-docker](https://github.com/moodlehq/moodle-docker), instala el plugin, corre
+sus pruebas PHPUnit y deja el sitio en `http://localhost:8000` (admin / test). Cada
+vez que lo corrés copia el plugin tal como está en el repo. `scripts/probar-en-docker.sh down`
+lo apaga.
+
+A mano:
+
 Hace falta PHP 8.1–8.3 (Moodle 4.5) u 8.2–8.4 (Moodle 5.x) y PostgreSQL. Con
 **[moodle-docker](https://github.com/moodlehq/moodle-docker)** es lo más
 reproducible; sin Docker, en macOS:

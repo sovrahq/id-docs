@@ -13,7 +13,7 @@ namespace local_sovracred;
  *
  * Las keys tienen que coincidir carácter por carácter con las del esquema en Sovra: una key que el
  * esquema no declara se descarta en silencio al firmar. Este mapeo es el del esquema de prueba
- * `bogota-formacion`; adaptalo al esquema de tu institución.
+ * `bogota_formacion`; adaptalo al esquema de tu institución.
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra
@@ -30,6 +30,11 @@ class claims {
         'entidadFormadora',
         'fechaFinalizacion',
         'codigoVerificacion',
+    ];
+
+    /** @var string[] Claims que se envían sólo si tienen valor. */
+    const OPTIONAL = [
+        'programa',
     ];
 
     /**

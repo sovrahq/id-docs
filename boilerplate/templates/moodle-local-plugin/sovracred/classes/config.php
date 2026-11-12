@@ -61,6 +61,29 @@ class config {
     }
 
     /**
+     * El workspace_id de Sovra (UUID). Opcional: si está, se ignoran los avisos de otros workspaces.
+     *
+     * @return string
+     */
+    public static function workspace_id(): string {
+        return trim((string) get_config('local_sovracred', 'workspaceid'));
+    }
+
+    /**
+     * Un secreto enmascarado para mostrar en pantalla: el prefijo y los últimos cuatro caracteres.
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function masked(string $value): string {
+        if ($value === '') {
+            return '';
+        }
+        $prefix = preg_match('~^(sovra_sk_|whsec_)~', $value, $m) ? $m[1] : '';
+        return $prefix . '…' . \core_text::substr($value, -4);
+    }
+
+    /**
      * Campo del perfil del que sale el número de documento: 'idnumber' o 'profile_field_<shortname>'.
      *
      * @return string

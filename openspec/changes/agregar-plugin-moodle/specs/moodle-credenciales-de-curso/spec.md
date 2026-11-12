@@ -75,7 +75,7 @@ La página «Mis credenciales» SHALL mostrar cada oferta vigente como un códig
 - **THEN** el plugin no agrega scripts, estilos ni imágenes de fuera del propio Moodle (lo que cargue el tema o los filtros del sitio es configuración del sitio)
 
 ### Requirement: Los claims de la credencial
-Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota-formacion` SHALL enviarse `holderName`, `documento`, `tipoDocumento`, `curso`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `programa` sólo cuando tiene valor. Los campos del perfil de los que salen `documento` y `tipoDocumento` SHALL ser configurables, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
+Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota_formacion` SHALL enviarse `holderName`, `documento`, `tipoDocumento`, `curso`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `programa` sólo cuando tiene valor. Los campos del perfil de los que salen `documento` y `tipoDocumento` SHALL ser configurables, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
 
 #### Scenario: Claims completos
 - **WHEN** se arma la credencial de un estudiante con todos los datos
@@ -190,7 +190,7 @@ Toda llamada a la API SHALL autenticarse con `Authorization: Bearer sovra_sk_…
 - **THEN** la llamada no sale y el error registrado lo indica
 
 ### Requirement: Reporte para el administrador
-El plugin SHALL ofrecer a quien tenga la capacidad de verlo un reporte con los derechos por estado, el último error de cada uno, la hora del último webhook rechazado, una prueba de conexión que no crea ofertas, y acciones para consultar el estado de una oferta y para reenviar el aviso al estudiante.
+El plugin SHALL ofrecer a quien tenga la capacidad de verlo un reporte con la configuración vigente (con la API key y el secreto del webhook enmascarados), los derechos por estado, el último error de cada uno, el último aviso del webhook recibido, la hora del último webhook rechazado, una prueba de conexión que no crea ofertas, y acciones para consultar el estado de una oferta y para reenviar el aviso al estudiante.
 
 #### Scenario: Acceso restringido
 - **WHEN** un usuario sin la capacidad abre el reporte
@@ -198,12 +198,26 @@ El plugin SHALL ofrecer a quien tenga la capacidad de verlo un reporte con los d
 
 #### Scenario: Prueba de conexión
 - **WHEN** el administrador prueba la conexión
-- **THEN** el plugin llama a la API con el esquema configurado y sin claims, y el resultado distingue «llave inválida», «esquema inexistente» y «conexión correcta»
-- **AND** si el esquema tiene campos obligatorios no se crea ninguna oferta; si no los tiene, el resultado avisa que se creó una oferta de prueba que vence sola
+- **THEN** el plugin consulta los esquemas del workspace, sin crear ninguna oferta, y el resultado distingue «llave inválida», «esquema inexistente» —con la lista de los esquemas de credencial que sí existen—, «esquema registrándose» y «conexión correcta»
+
+#### Scenario: Claims que no coinciden con el esquema
+- **WHEN** el esquema exige un claim que el plugin no envía, o el plugin envía uno que el esquema no declara
+- **THEN** la prueba de conexión lo informa, nombrando esos claims
 
 #### Scenario: Reintento
 - **WHEN** el administrador pide consultar el estado de una oferta o reenviar el aviso
 - **THEN** se ejecuta esa acción para ese derecho y el reporte muestra el resultado
+
+### Requirement: Registro de la API y del webhook
+El plugin SHALL registrar cada llamada a la API (método, ruta, código HTTP, resultado y duración) y cada aviso del webhook (evento, id de la entrega, workspace, código respondido y qué se hizo con él), y SHALL mostrarlo a quien pueda ver el reporte, filtrable por dirección y por errores. El registro MUST NOT guardar claims ni cuerpos de avisos, SHALL borrarse a los 30 días, y los avisos sin firma válida SHALL registrarse como mucho uno por minuto.
+
+#### Scenario: Aviso aplicado
+- **WHEN** llega un aviso con firma válida
+- **THEN** el registro muestra el evento, el id de la entrega, el workspace y si se aplicó, se repitió o se ignoró
+
+#### Scenario: Aviso de otro workspace
+- **WHEN** hay un workspace configurado y llega un aviso firmado de otro workspace
+- **THEN** se responde 2xx, el derecho no cambia y el registro lo marca como de otro workspace
 
 ### Requirement: Privacidad
 El plugin SHALL declarar a la API de privacidad de Moodle qué datos personales guarda y cuáles envía a Sovra, y SHALL permitir exportarlos y borrarlos por usuario.

@@ -18,6 +18,10 @@ $ADMIN->add('reports', new admin_externalpage('local_sovracred_report',
     get_string('report', 'local_sovracred'),
     new moodle_url('/local/sovracred/index.php'),
     'local/sovracred:viewreport'));
+$ADMIN->add('reports', new admin_externalpage('local_sovracred_logs',
+    get_string('logs', 'local_sovracred'),
+    new moodle_url('/local/sovracred/logs.php'),
+    'local/sovracred:viewreport'));
 
 if ($hassiteconfig) {
     $settings = new admin_settingpage('local_sovracred', get_string('pluginname', 'local_sovracred'));
@@ -38,12 +42,15 @@ if ($hassiteconfig) {
         // Cifrados en la base con la clave del sitio; nunca se vuelven a mostrar.
         $settings->add(new admin_setting_encryptedpassword('local_sovracred/apikey',
             get_string('apikey', 'local_sovracred'), get_string('apikey_desc', 'local_sovracred')));
+        $settings->add(new admin_setting_configtext('local_sovracred/workspaceid',
+            get_string('workspaceid', 'local_sovracred'), get_string('workspaceid_desc', 'local_sovracred'),
+            '', '/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$/'));
         $settings->add(new admin_setting_encryptedpassword('local_sovracred/webhooksecret',
             get_string('webhooksecret', 'local_sovracred'), get_string('webhooksecret_desc', 'local_sovracred')));
 
         $settings->add(new admin_setting_configtext('local_sovracred/schemaid',
             get_string('schemaid', 'local_sovracred'), get_string('schemaid_desc', 'local_sovracred'),
-            'bogota-formacion', PARAM_ALPHANUMEXT));
+            'bogota_formacion', PARAM_ALPHANUMEXT));
 
         $settings->add(new admin_setting_heading('local_sovracred/issuing',
             get_string('settings_issuing', 'local_sovracred'), ''));

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/sovracred/db" VERSION="20261008" COMMENT="XMLDB file for local_sovracred"
+<XMLDB PATH="local/sovracred/db" VERSION="20261112" COMMENT="XMLDB file for local_sovracred"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -48,6 +48,29 @@
       <INDEXES>
         <INDEX NAME="eventid" UNIQUE="true" FIELDS="eventid"/>
         <INDEX NAME="timereceived" UNIQUE="false" FIELDS="timereceived"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_sovracred_log" COMMENT="Registro de llamadas a la API de Sovra y de avisos del webhook. Sin claims ni cuerpos: sólo qué pasó">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="kind" TYPE="char" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="api (Moodle → Sovra) o webhook (Sovra → Moodle)"/>
+        <FIELD NAME="action" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="Método y ruta de la API, o el tipo de evento"/>
+        <FIELD NAME="httpstatus" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="api: lo que respondió Sovra (0 sin respuesta); webhook: lo que respondió Moodle"/>
+        <FIELD NAME="result" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="api: ok o el código de error; webhook: applied, duplicate, badsignature…"/>
+        <FIELD NAME="credentialid" TYPE="char" LENGTH="36" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="eventid" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="id de la entrega del webhook"/>
+        <FIELD NAME="workspaceid" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="workspace_id del aviso"/>
+        <FIELD NAME="duration" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Milisegundos que tardó la API"/>
+        <FIELD NAME="detail" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="kindtime" UNIQUE="false" FIELDS="kind, timecreated"/>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+        <INDEX NAME="credentialid" UNIQUE="false" FIELDS="credentialid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

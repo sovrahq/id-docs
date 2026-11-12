@@ -14,7 +14,9 @@
 use local_sovracred\api_client;
 use local_sovracred\api_exception;
 use local_sovracred\config;
+use local_sovracred\connection_test;
 use local_sovracred\issuance;
+use local_sovracred\log;
 
 require(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
@@ -34,24 +36,10 @@ if ($action !== '') {
     $type = \core\output\notification::NOTIFY_SUCCESS;
 
     if ($action === 'test') {
-        // Una oferta sin claims: con un esquema que tiene campos obligatorios, la API responde
-        // missing_claims sin crear nada, y eso prueba a la vez la llave, el esquema y la red.
-        try {
-            api_client::from_config()->create_offer(config::schema_id(), []);
-            $message = get_string('test_created', 'local_sovracred');
-            $type = \core\output\notification::NOTIFY_WARNING;
-        } catch (api_exception $e) {
-            if ($e->errorcode === 'missing_claims') {
-                $message = get_string('test_ok', 'local_sovracred');
-            } else if (get_string_manager()->string_exists('test_' . $e->errorcode, 'local_sovracred')) {
-                $message = get_string('test_' . $e->errorcode, 'local_sovracred');
-                $type = \core\output\notification::NOTIFY_ERROR;
-            } else {
-                $message = get_string('test_other', 'local_sovracred', s($e->summary()));
-                $type = \core\output\notification::NOTIFY_ERROR;
-            }
+        foreach (connection_test::run() as [$testtype, $message]) {
+            \core\notification::add($message, $testtype);
         }
-        redirect($baseurl, $message, null, $type);
+        redirect($baseurl);
     }
 
     $record = $DB->get_record(issuance::TABLE, ['id' => $id], '*', MUST_EXIST);
@@ -75,13 +63,44 @@ if ($action !== '') {
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('report', 'local_sovracred'));
 
+// La configuración tal como la ve el plugin, con los secretos enmascarados: lo primero que hay que mirar.
+$notset = html_writer::tag('em', get_string('notset', 'local_sovracred'));
+$code = fn(string $value) => $value !== '' ? html_writer::tag('code', s($value)) : $notset;
+$summary = new html_table();
+$summary->attributes['class'] = 'generaltable w-auto';
+$summary->data = [
+    [get_string('apiurl', 'local_sovracred'), $code(config::api_url())],
+    [get_string('apikey', 'local_sovracred'), $code(config::masked(config::api_key()))],
+    [get_string('workspaceid', 'local_sovracred'), $code(config::workspace_id())],
+    [get_string('schemaid', 'local_sovracred'), $code(config::schema_id())],
+    [get_string('webhooksecret', 'local_sovracred'), $code(config::masked(config::webhook_secret()))],
+    [get_string('webhookurl', 'local_sovracred'), $code(config::webhook_url()->out(false))],
+];
+echo html_writer::table($summary);
+echo html_writer::tag('p', html_writer::link(new moodle_url('/admin/settings.php', ['section' => 'local_sovracred']),
+    get_string('editsettings', 'local_sovracred')) . ' · ' .
+    html_writer::link(new moodle_url('/local/sovracred/logs.php'), get_string('logs', 'local_sovracred')));
+
 // Estado de la configuración.
 $checks = [];
 $checks[] = [config::api_url() !== '' && config::api_key() !== '' && config::schema_id() !== '', get_string('check_api', 'local_sovracred')];
-$checks[] = [config::webhook_secret() !== '', get_string('check_webhook', 'local_sovracred', config::webhook_url()->out(false))];
+$checks[] = [config::webhook_secret() !== '', get_string('check_webhook', 'local_sovracred')];
 $items = '';
 foreach ($checks as [$ok, $text]) {
     $items .= html_writer::tag('li', ($ok ? '✅ ' : '⚠️ ') . $text);
+}
+$lastwebhook = log::last_webhook();
+if ($lastwebhook) {
+    $items .= html_writer::tag('li', 'ℹ️ ' . get_string('check_lastwebhook', 'local_sovracred', (object) [
+        'time' => userdate($lastwebhook->timecreated),
+        'event' => s($lastwebhook->action),
+        'result' => get_string('result_' . $lastwebhook->result, 'local_sovracred'),
+    ]));
+} else if (config::webhook_secret() !== '') {
+    $items .= html_writer::tag('li', 'ℹ️ ' . get_string('check_nowebhook', 'local_sovracred'));
+}
+if ($lastwebhook && $lastwebhook->workspaceid && config::workspace_id() === '') {
+    $items .= html_writer::tag('li', 'ℹ️ ' . get_string('check_workspacehint', 'local_sovracred', s($lastwebhook->workspaceid)));
 }
 $lastrejected = (int) get_config('local_sovracred', 'lastrejected');
 if ($lastrejected) {

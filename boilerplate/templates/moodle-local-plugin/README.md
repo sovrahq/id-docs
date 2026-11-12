@@ -112,8 +112,9 @@ la reconciliación; si Moodle ya calcula completitudes, ya lo tenés) y la
 |---|---|
 | URL de la API | Pruebas: `https://test-api-sovra.flagonsa.com` · Producción: `https://api.sovra.io` |
 | API key | La `sovra_sk_…`. Se guarda **cifrada** y no se vuelve a mostrar. |
+| Workspace ID | *(opcional)* El UUID del workspace. Si está, los avisos de otro workspace se ignoran y quedan marcados en el registro. Si no lo tenés, el reporte muestra el que traen los avisos. |
 | Secreto del webhook | El de la consola. Cifrado. Vacío = se confirma sólo por la tarea programada. |
-| Esquema | El slug del esquema, por ejemplo `bogota-formacion`. |
+| Esquema | El slug del esquema, por ejemplo `bogota_formacion`. |
 | Cursos que emiten | Todos, o una lista de IDs de curso. |
 | Campo del número de documento | El campo estándar «Número de ID» o cualquier campo propio del perfil. |
 
@@ -136,14 +137,52 @@ Y además:
   configuración del plugin, en **«Campo del tipo de documento»**.
 
 Después, en **Administración del sitio → Informes → Credenciales de curso (Sovra
-ID)**, tocá **«Probar conexión»**: distingue llave inválida, esquema inexistente,
-host bloqueado y conexión correcta, **sin crear ninguna oferta**.
+ID)**, revisá el resumen de la configuración (las claves aparecen enmascaradas) y
+tocá **«Probar conexión»**. Consulta `GET /api/v1/issuer/schemas`, **sin crear
+ninguna oferta**, y te dice:
+
+- si la API key es válida, o si el host está bloqueado o no hay red;
+- si el esquema existe y, si no, **cuáles sí existen** en el workspace de la key
+  (el error más común es el slug: `bogota-formacion` en vez de `bogota_formacion`);
+- si el esquema terminó de registrarse on-chain;
+- si **sus claims coinciden con los del plugin**: lo que el esquema exige y el
+  plugin no manda (la API rechazaría todas las ofertas) y lo que el plugin manda y
+  el esquema no declara (se descartaría al firmar).
+
+### 3. El registro
+
+**Administración del sitio → Informes → Registro de Sovra ID** muestra, de los
+últimos 30 días, cada llamada de Moodle a la API (método, ruta, código HTTP,
+resultado, cuánto tardó) y cada aviso que llegó al webhook (evento, id de la
+entrega, workspace y qué se hizo con él: aplicado, repetido, de otro workspace,
+firma inválida…). Se filtra por dirección y por errores, y cada fila muestra el
+estudiante y el curso cuando la credencial es de un derecho de este Moodle.
+
+No guarda claims ni cuerpos de los avisos. Los avisos sin firma válida se anotan
+como mucho uno por minuto, porque el endpoint es público.
+
+La consola de Sovra no tiene historial de entregas: para saber si los avisos
+llegan, mirá acá. El reporte también muestra el último aviso recibido.
+
+### Configurar por consola
+
+Los ajustes también se pueden fijar con el CLI de Moodle, útil en despliegues
+automatizados. Las claves fijadas así quedan en claro en la base: para que queden
+cifradas, cargalas desde la pantalla de configuración.
+
+```bash
+php admin/cli/cfg.php --component=local_sovracred --name=apiurl --set=https://test-api-sovra.flagonsa.com
+php admin/cli/cfg.php --component=local_sovracred --name=apikey --set=sovra_sk_...
+php admin/cli/cfg.php --component=local_sovracred --name=workspaceid --set=<uuid>
+php admin/cli/cfg.php --component=local_sovracred --name=schemaid --set=bogota_formacion
+php admin/cli/cfg.php --component=local_sovracred --name=webhooksecret --set=whsec_...
+```
 
 ![Reporte del administrador](capturas/reporte-administrador.png)
 
 ## Los datos de la credencial
 
-El mapeo de este boilerplate corresponde al esquema de prueba `bogota-formacion`.
+El mapeo de este boilerplate corresponde al esquema de prueba `bogota_formacion`.
 Las keys tienen que coincidir **carácter por carácter** con las del esquema: una
 key que el esquema no declara se descarta en silencio al firmar.
 
@@ -244,13 +283,16 @@ sovracred/
 ├── settings.php               Ajustes + entrada del reporte
 ├── lib.php                    «Mis credenciales» en el perfil del usuario
 ├── credenciales.php           La página del estudiante: botón, QR, enlace directo
-├── index.php                  Reporte del administrador: estados, prueba de conexión, reintentos
+├── index.php                  Reporte del administrador: configuración, estados, prueba de conexión, reintentos
+├── logs.php                   Registro: llamadas a la API y avisos del webhook
 ├── webhook.php                Endpoint del webhook (sin sesión; lo autentica la firma)
 ├── classes/
 │   ├── claims.php             Qué datos lleva la credencial — revisar antes de producción
 │   ├── issuance.php           El derecho y su oferta: registrar, avisar, pedir, consultar
 │   ├── api_client.php         POST /credential-offer y GET /credentials/{id}, con \core\http_client
-│   ├── webhook.php            Firma, idempotencia por id, eventos desordenados
+│   ├── webhook.php            Firma, idempotencia por id, eventos desordenados, workspace
+│   ├── log.php                Registro de la API y del webhook (30 días, sin claims)
+│   ├── connection_test.php    «Probar conexión»: key, esquema y claims, sin crear ofertas
 │   ├── hmac.php               X-Sovra-Signature: sha256=HMAC del cuerpo crudo
 │   ├── observer.php           \core\event\course_completed → derecho + notificación
 │   ├── config.php             Lectura de ajustes; secretos descifrados

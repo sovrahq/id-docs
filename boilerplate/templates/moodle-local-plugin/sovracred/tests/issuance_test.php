@@ -69,7 +69,7 @@ final class issuance_test extends \advanced_testcase {
         $this->assertSame('Bearer sovra_sk_prueba', $request->getHeaderLine('Authorization'));
         $this->assertFalse($request->hasHeader('x-api-key'));
         $body = json_decode((string) $request->getBody(), true);
-        $this->assertSame('bogota-formacion', $body['schema_id']);
+        $this->assertSame('bogota_formacion', $body['schema_id']);
         $this->assertSame('1020304050', $body['claims']['documento']);
 
         $saved = $DB->get_record(issuance::TABLE, ['id' => $issuance->id]);
@@ -218,12 +218,12 @@ final class issuance_test extends \advanced_testcase {
         // La API responde 500 a "claims": [] — la prueba de conexión manda un objeto vacío.
         $this->mock->append($this->json_response(422, ['error' => 'missing_claims', 'details' => ['holderName']]));
         try {
-            api_client::from_config()->create_offer('bogota-formacion', []);
+            api_client::from_config()->create_offer('bogota_formacion', []);
             $this->fail('Tenía que fallar con missing_claims');
         } catch (api_exception $e) {
             $this->assertSame('missing_claims', $e->errorcode);
         }
-        $this->assertSame('{"schema_id":"bogota-formacion","claims":{}}', (string) $this->history[0]['request']->getBody());
+        $this->assertSame('{"schema_id":"bogota_formacion","claims":{}}', (string) $this->history[0]['request']->getBody());
     }
 
     /**

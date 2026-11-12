@@ -53,6 +53,7 @@ class reconcile extends \core\task\scheduled_task {
 
         $DB->delete_records_select('local_sovracred_webhook', 'timereceived < :cutoff',
             ['cutoff' => time() - self::WEBHOOK_RETENTION]);
+        \local_sovracred\log::prune();
 
         try {
             $api = api_client::from_config();

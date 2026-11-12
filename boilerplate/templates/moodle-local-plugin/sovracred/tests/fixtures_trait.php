@@ -28,7 +28,7 @@ trait fixtures_trait {
         set_config('apiurl', 'https://api.example.test', 'local_sovracred');
         set_config('apikey', 'sovra_sk_prueba', 'local_sovracred');
         set_config('webhooksecret', 'secreto-de-prueba', 'local_sovracred');
-        set_config('schemaid', 'bogota-formacion', 'local_sovracred');
+        set_config('schemaid', 'bogota_formacion', 'local_sovracred');
         set_config('coursescope', config::SCOPE_ALL, 'local_sovracred');
         set_config('documentfield', 'profile_field_documento', 'local_sovracred');
         set_config('documenttypefield', 'profile_field_tipodocumento', 'local_sovracred');

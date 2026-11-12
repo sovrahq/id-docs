@@ -18,10 +18,17 @@ $ADMIN->add('reports', new admin_externalpage('local_sovracred_report',
     get_string('report', 'local_sovracred'),
     new moodle_url('/local/sovracred/index.php'),
     'local/sovracred:viewreport'));
+$ADMIN->add('reports', new admin_externalpage('local_sovracred_logs',
+    get_string('logs', 'local_sovracred'),
+    new moodle_url('/local/sovracred/logs.php'),
+    'local/sovracred:viewreport'));
 
 if ($hassiteconfig) {
     $settings = new admin_settingpage('local_sovracred', get_string('pluginname', 'local_sovracred'));
     $ADMIN->add('localplugins', $settings);
+    $ADMIN->add('localplugins', new admin_externalpage('local_sovracred_claimmap',
+        get_string('map_title', 'local_sovracred'),
+        new moodle_url('/local/sovracred/mapeo.php')));
 
     if ($ADMIN->fulltree) {
         $settings->add(new admin_setting_heading('local_sovracred/connection',
@@ -38,12 +45,15 @@ if ($hassiteconfig) {
         // Cifrados en la base con la clave del sitio; nunca se vuelven a mostrar.
         $settings->add(new admin_setting_encryptedpassword('local_sovracred/apikey',
             get_string('apikey', 'local_sovracred'), get_string('apikey_desc', 'local_sovracred')));
+        $settings->add(new admin_setting_configtext('local_sovracred/workspaceid',
+            get_string('workspaceid', 'local_sovracred'), get_string('workspaceid_desc', 'local_sovracred'),
+            '', '/^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$/'));
         $settings->add(new admin_setting_encryptedpassword('local_sovracred/webhooksecret',
             get_string('webhooksecret', 'local_sovracred'), get_string('webhooksecret_desc', 'local_sovracred')));
 
         $settings->add(new admin_setting_configtext('local_sovracred/schemaid',
             get_string('schemaid', 'local_sovracred'), get_string('schemaid_desc', 'local_sovracred'),
-            'bogota-formacion', PARAM_ALPHANUMEXT));
+            'bogota_formacion', PARAM_ALPHANUMEXT));
 
         $settings->add(new admin_setting_heading('local_sovracred/issuing',
             get_string('settings_issuing', 'local_sovracred'), ''));
@@ -58,18 +68,10 @@ if ($hassiteconfig) {
             get_string('courseids', 'local_sovracred'), get_string('courseids_desc', 'local_sovracred'),
             '', PARAM_SEQUENCE));
 
-        // Origen del número de documento: el campo estándar «Número de ID» o un campo propio del perfil.
-        $profilefields = [];
-        foreach ($DB->get_records('user_info_field', null, 'sortorder', 'id, shortname, name') as $field) {
-            $profilefields['profile_field_' . $field->shortname] = format_string($field->name) . " ({$field->shortname})";
-        }
-        $settings->add(new admin_setting_configselect('local_sovracred/documentfield',
-            get_string('documentfield', 'local_sovracred'), get_string('documentfield_desc', 'local_sovracred'),
-            'idnumber', ['idnumber' => get_string('idnumber')] + $profilefields));
-
-        // El tipo de documento (CC, CE, TI, PA…) no tiene campo estándar: sale de un campo propio del perfil.
-        $settings->add(new admin_setting_configselect('local_sovracred/documenttypefield',
-            get_string('documenttypefield', 'local_sovracred'), get_string('documenttypefield_desc', 'local_sovracred'),
-            '', ['' => get_string('choosedots')] + $profilefields));
+        // Qué datos lleva la credencial y de dónde salen: en su propia página, porque se arma con el esquema.
+        $settings->add(new admin_setting_heading('local_sovracred/claims',
+            get_string('map', 'local_sovracred'),
+            get_string('settings_map_desc', 'local_sovracred',
+                (new moodle_url('/local/sovracred/mapeo.php'))->out(false))));
     }
 }

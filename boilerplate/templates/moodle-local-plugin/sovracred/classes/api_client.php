@@ -25,6 +25,9 @@ class api_client {
     /** @var string sovra_sk_... */
     private string $apikey;
 
+    /** @var int Estado HTTP de la última respuesta, para el registro. */
+    private int $laststatus = 0;
+
     /**
      * Constructor.
      *
@@ -73,7 +76,52 @@ class api_client {
      * @return array id, status, holder_did, issued_at, expires_at, schema
      */
     public function get_credential(string $credentialid): array {
-        return $this->request('GET', '/api/v1/issuer/credentials/' . rawurlencode($credentialid));
+        return $this->request('GET', '/api/v1/issuer/credentials/' . rawurlencode($credentialid), null, $credentialid);
+    }
+
+    /**
+     * Los esquemas del workspace de la API key, una entrada por versión.
+     *
+     * @return array[] Cada uno con schema_id, version, kind, claims, registration_status, registration_error…
+     */
+    public function list_schemas(): array {
+        $data = $this->request('GET', '/api/v1/issuer/schemas');
+        if (!isset($data['schemas']) || !is_array($data['schemas'])) {
+            throw new api_exception('invalidresponse');
+        }
+        return $data['schemas'];
+    }
+
+    /**
+     * Hace la llamada y la deja en el registro, salga bien o mal.
+     *
+     * @param string $method
+     * @param string $path
+     * @param array|null $body
+     * @param string|null $credentialid Para el registro, si la llamada es sobre una credencial.
+     * @return array
+     */
+    private function request(string $method, string $path, ?array $body = null, ?string $credentialid = null): array {
+        $start = microtime(true);
+        try {
+            $data = $this->send($method, $path, $body);
+        } catch (api_exception $e) {
+            log::api($method, $path, $e->httpstatus, $e->errorcode, self::elapsed($start), $credentialid, $e->summary());
+            throw $e;
+        }
+        $credentialid = $credentialid ?? (is_string($data['credential_id'] ?? null) ? $data['credential_id'] : null);
+        log::api($method, $path, $this->laststatus, 'ok', self::elapsed($start), $credentialid);
+        return $data;
+    }
+
+    /**
+     * Milisegundos desde $start.
+     *
+     * @param float $start
+     * @return int
+     */
+    private static function elapsed(float $start): int {
+        return (int) round((microtime(true) - $start) * 1000);
     }
 
     /**
@@ -84,7 +132,7 @@ class api_client {
      * @param array|null $body
      * @return array
      */
-    private function request(string $method, string $path, ?array $body = null): array {
+    private function send(string $method, string $path, ?array $body): array {
         $url = $this->baseurl . $path;
 
         // Mismo chequeo que hace el cliente HTTP del núcleo, hecho antes para dar un error claro.
@@ -113,7 +161,7 @@ class api_client {
             throw new api_exception('network', 0, $e->getMessage());
         }
 
-        $status = $response->getStatusCode();
+        $status = $this->laststatus = $response->getStatusCode();
         $data = json_decode((string) $response->getBody(), true);
 
         if ($status >= 400) {

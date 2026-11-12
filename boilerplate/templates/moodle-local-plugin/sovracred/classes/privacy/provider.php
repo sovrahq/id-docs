@@ -48,16 +48,14 @@ class provider implements
             'lasterror' => 'privacy:metadata:issuance:lasterror',
         ], 'privacy:metadata:issuance');
 
-        // Lo que viaja a Sovra al crear la oferta: los claims de classes/claims.php.
+        $collection->add_database_table('local_sovracred_log', [
+            'credentialid' => 'privacy:metadata:log:credentialid',
+            'timecreated' => 'privacy:metadata:log:timecreated',
+        ], 'privacy:metadata:log');
+
+        // Lo que viaja a Sovra al crear la oferta: los claims que eligió el administrador en el mapeo.
         $collection->add_external_location_link('sovra', [
-            'holderName' => 'privacy:metadata:sovra:holdername',
-            'documento' => 'privacy:metadata:sovra:documento',
-            'tipoDocumento' => 'privacy:metadata:sovra:tipodocumento',
-            'programa' => 'privacy:metadata:sovra:programa',
-            'curso' => 'privacy:metadata:sovra:curso',
-            'entidadFormadora' => 'privacy:metadata:sovra:entidad',
-            'fechaFinalizacion' => 'privacy:metadata:sovra:fecha',
-            'codigoVerificacion' => 'privacy:metadata:sovra:codigo',
+            'claims' => 'privacy:metadata:sovra:claims',
         ], 'privacy:metadata:sovra');
 
         return $collection;
@@ -133,10 +131,8 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
-        global $DB;
-
         if ($context instanceof \context_user) {
-            $DB->delete_records('local_sovracred_issuance', ['userid' => $context->instanceid]);
+            self::delete_user($context->instanceid);
         }
     }
 
@@ -147,12 +143,10 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_user(approved_contextlist $contextlist): void {
-        global $DB;
-
         $userid = $contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
             if ($context instanceof \context_user && $context->instanceid == $userid) {
-                $DB->delete_records('local_sovracred_issuance', ['userid' => $userid]);
+                self::delete_user($userid);
             }
         }
     }
@@ -164,11 +158,27 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_users(approved_userlist $userlist): void {
-        global $DB;
-
         $context = $userlist->get_context();
         if ($context instanceof \context_user && in_array($context->instanceid, $userlist->get_userids())) {
-            $DB->delete_records('local_sovracred_issuance', ['userid' => $context->instanceid]);
+            self::delete_user($context->instanceid);
         }
+    }
+
+    /**
+     * Borra los derechos de un usuario y las entradas del registro de sus credenciales vigentes.
+     *
+     * @param int $userid
+     * @return void
+     */
+    private static function delete_user(int $userid): void {
+        global $DB;
+
+        $credentialids = $DB->get_fieldset_select('local_sovracred_issuance', 'credentialid',
+            'userid = :userid AND credentialid IS NOT NULL', ['userid' => $userid]);
+        if ($credentialids) {
+            [$insql, $params] = $DB->get_in_or_equal($credentialids);
+            $DB->delete_records_select('local_sovracred_log', "credentialid $insql", $params);
+        }
+        $DB->delete_records('local_sovracred_issuance', ['userid' => $userid]);
     }
 }

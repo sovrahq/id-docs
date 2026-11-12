@@ -15,6 +15,9 @@ namespace local_sovracred;
  * El webhook es opcional: si no llega (el firewall del sitio lo bloquea), la tarea de reconciliación
  * confirma igual las emisiones.
  *
+ * Cada aviso queda en el registro (log) con lo que se hizo con él. Los que no traen una firma válida,
+ * como mucho uno por minuto: el endpoint es público y no tiene que poder llenar la base.
+ *
  * Referencia: docs/guides/credentials/06-webhooks.md
  *
  * @package    local_sovracred
@@ -43,6 +46,10 @@ class webhook {
         global $DB;
 
         if ($secret === '') {
+            if ((int) get_config('local_sovracred', 'lastunconfigured') < time() - MINSECS) {
+                set_config('lastunconfigured', time(), 'local_sovracred');
+                log::webhook('', 503, 'notconfigured');
+            }
             return 503;
         }
         if (!hmac::is_valid($rawbody, $signature, $secret)) {
@@ -50,6 +57,7 @@ class webhook {
             // Como mucho una escritura por minuto: el endpoint es público y esto no tiene que ser disparable a voluntad.
             if ((int) get_config('local_sovracred', 'lastrejected') < time() - MINSECS) {
                 set_config('lastrejected', time(), 'local_sovracred');
+                log::webhook('', 401, 'badsignature');
             }
             return 401;
         }
@@ -57,12 +65,22 @@ class webhook {
         $payload = json_decode($rawbody, true);
         if (!is_array($payload) || empty($payload['id']) || empty($payload['event']) || !is_string($payload['id'])) {
             // Firmado por Sovra pero ilegible: reintentarlo no lo arregla.
+            log::webhook('', 200, 'unreadable', is_array($payload) ? $payload : []);
             return 200;
         }
         $eventid = \core_text::substr($payload['id'], 0, 64);
         $event = \core_text::substr((string) $payload['event'], 0, 64);
 
         if ($DB->record_exists('local_sovracred_webhook', ['eventid' => $eventid])) {
+            log::webhook($event, 200, 'duplicate', $payload);
+            return 200;
+        }
+
+        // La API key y el secreto del webhook salen de la consola por separado: si son de workspaces distintos,
+        // los avisos llegan firmados pero hablan de credenciales que este Moodle no emitió.
+        $workspaceid = config::workspace_id();
+        if ($workspaceid !== '' && strcasecmp($workspaceid, (string) ($payload['workspace_id'] ?? '')) !== 0) {
+            log::webhook($event, 200, 'otherworkspace', $payload);
             return 200;
         }
 
@@ -76,8 +94,9 @@ class webhook {
                 'event' => $event,
                 'timereceived' => time(),
             ]);
-            self::apply($event, $payload);
+            $result = self::apply($event, $payload);
             $transaction->allow_commit();
+            log::webhook($event, 200, $result, $payload);
             return 200;
         } catch (\Throwable $e) {
             if ($transaction && !$transaction->is_disposed()) {
@@ -90,11 +109,13 @@ class webhook {
             }
             // ¿Era la misma entrega procesándose en paralelo? Entonces el índice único ya la tomó y está aplicada.
             if ($DB->record_exists('local_sovracred_webhook', ['eventid' => $eventid])) {
+                log::webhook($event, 200, 'duplicate', $payload);
                 return 200;
             }
             // Cualquier otro fallo: 500 para que Sovra reintente. Un 4xx lo descartaría para siempre,
             // y una excepción sin atrapar acá la convierte Moodle en un 404.
             debugging('local_sovracred: no se pudo aplicar la entrega ' . $eventid . ': ' . get_class($e), DEBUG_NORMAL);
+            log::webhook($event, 500, 'failed', $payload, get_class($e));
             return 500;
         }
     }
@@ -104,19 +125,19 @@ class webhook {
      *
      * @param string $event
      * @param array $payload
-     * @return void
+     * @return string Para el registro: applied, stale, unknowncredential o unhandledevent.
      */
-    private static function apply(string $event, array $payload): void {
+    private static function apply(string $event, array $payload): string {
         global $DB;
 
         if (!isset(self::TRANSITIONS[$event]) || empty($payload['data']['credential_id'])) {
-            return;
+            return 'unhandledevent';
         }
         $data = $payload['data'];
         $issuance = $DB->get_record(issuance::TABLE, ['credentialid' => (string) $data['credential_id']]);
         if (!$issuance) {
             // Una credencial que emitió otro sistema con el mismo workspace.
-            return;
+            return 'unknowncredential';
         }
 
         // Los eventos se entregan en paralelo y con reintentos: un revoked puede llegar antes que un issued demorado.
@@ -132,7 +153,7 @@ class webhook {
             if ($missing) {
                 issuance::update($issuance, $missing);
             }
-            return;
+            return 'stale';
         }
 
         $changes = ['status' => self::TRANSITIONS[$event], 'statustime' => $eventtime, 'lasterror' => null];
@@ -155,5 +176,6 @@ class webhook {
             // Este plugin no lo necesita y no lo conserva; si tu institución sí, guardalo acá.
         }
         issuance::update($issuance, $changes);
+        return 'applied';
     }
 }

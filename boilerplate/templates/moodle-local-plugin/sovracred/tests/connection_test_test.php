@@ -53,12 +53,16 @@ final class connection_test_test extends \advanced_testcase {
     }
 
     /**
-     * Los claims del esquema de prueba v2, que coinciden con los del plugin.
+     * Los claims del esquema de prueba v2, que coinciden con el mapeo de fábrica.
      *
      * @return array
      */
     private function v2_claims(): array {
-        return array_fill_keys(claims::REQUIRED, true) + ['programa' => false];
+        $claims = [];
+        foreach (claims::default_map() as $claim) {
+            $claims[$claim['key']] = $claim['required'];
+        }
+        return $claims;
     }
 
     /**
@@ -104,15 +108,35 @@ final class connection_test_test extends \advanced_testcase {
         $claims = $this->v2_claims();
         unset($claims['tipoDocumento']);
         $claims['horas'] = true;
-        $claims['programa'] = true;
         $this->mock->append($this->json_response(200, ['schemas' => [$this->schema('bogota_formacion', 3, $claims)]]));
 
         $results = connection_test::run();
 
-        $this->assertSame([connection_test::ERROR, connection_test::WARNING, connection_test::WARNING], $this->types($results));
+        $this->assertSame([connection_test::ERROR, connection_test::WARNING], $this->types($results));
         $this->assertStringContainsString('<code>horas</code>', $results[0][1]);
-        $this->assertStringContainsString('<code>programa</code>', $results[1][1]);
-        $this->assertStringContainsString('<code>tipoDocumento</code>', $results[2][1]);
+        $this->assertStringContainsString('<code>tipoDocumento</code>', $results[1][1]);
+    }
+
+    public function test_mapeo_guardado_para_otro_esquema(): void {
+        claims::save_map('otro_esquema', claims::default_map());
+        $this->mock->append($this->json_response(200, ['schemas' => [$this->schema('bogota_formacion', 2, $this->v2_claims())]]));
+
+        $results = connection_test::run();
+
+        $this->assertSame([connection_test::OK, connection_test::WARNING], $this->types($results));
+        $this->assertStringContainsString('<code>otro_esquema</code>', $results[1][1]);
+    }
+
+    public function test_mapeo_que_no_llena_un_obligatorio(): void {
+        $map = claims::default_map();
+        $map[1]['source'] = '';
+        claims::save_map('bogota_formacion', $map);
+        $this->mock->append($this->json_response(200, ['schemas' => [$this->schema('bogota_formacion', 2, $this->v2_claims())]]));
+
+        [[$type, $message]] = connection_test::run();
+
+        $this->assertSame(connection_test::ERROR, $type);
+        $this->assertStringContainsString('<code>documento</code>', $message);
     }
 
     public function test_esquema_registrandose(): void {

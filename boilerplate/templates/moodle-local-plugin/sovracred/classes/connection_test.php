@@ -9,8 +9,8 @@ namespace local_sovracred;
  * El botón «Probar conexión»: API key, esquema y claims, sin crear ninguna oferta.
  *
  * Lee GET /api/v1/issuer/schemas, que prueba la llave y la red, y de paso permite decir qué esquemas sí
- * existen en el workspace (el error más común es el slug) y si los claims del esquema coinciden con los
- * que arma classes/claims.php (el segundo más común: el esquema cambió y el plugin no).
+ * existen en el workspace (el error más común es el slug) y si los claims del esquema coinciden con el
+ * mapeo de claims (el segundo más común: el esquema cambió y el mapeo no).
  *
  * @package    local_sovracred
  * @copyright  2026 Sovra
@@ -77,7 +77,7 @@ class connection_test {
     }
 
     /**
-     * Compara los claims del esquema con los que arma el plugin.
+     * Compara los claims del esquema con el mapeo.
      *
      * @param array $schema
      * @return array[]
@@ -93,21 +93,26 @@ class connection_test {
                 }
             }
         }
-        $pluginkeys = array_merge(claims::REQUIRED, claims::OPTIONAL);
+        $map = claims::map();
+        $mapped = [];
+        foreach ($map['claims'] as $claim) {
+            if ($claim['source'] !== '') {
+                $mapped[] = $claim['key'];
+            }
+        }
 
         $results = [];
-        // Lo que el esquema exige y el plugin no manda: la API rechaza todas las ofertas con missing_claims.
-        $missing = array_values(array_diff($schemarequired, $pluginkeys));
+        // El mapeo se guardó para otro esquema (o nunca se guardó y el esquema no es el de fábrica).
+        if ($map['schema'] !== '' && $map['schema'] !== $schema['schema_id']) {
+            $results[] = [self::WARNING, get_string('test_map_otherschema', 'local_sovracred', s($map['schema']))];
+        }
+        // Lo que el esquema exige y el mapeo no llena: la API rechaza todas las ofertas con missing_claims.
+        $missing = array_values(array_diff($schemarequired, $mapped));
         if ($missing) {
             $results[] = [self::ERROR, get_string('test_claims_missing', 'local_sovracred', self::code_list($missing))];
         }
-        // Lo que el esquema exige y el plugin manda sólo a veces: falla para algunos estudiantes.
-        $sometimes = array_values(array_intersect($schemarequired, claims::OPTIONAL));
-        if ($sometimes) {
-            $results[] = [self::WARNING, get_string('test_claims_optional', 'local_sovracred', self::code_list($sometimes))];
-        }
-        // Lo que el plugin manda y el esquema no declara: se descarta en silencio al firmar.
-        $unknown = array_values(array_diff($pluginkeys, $schemakeys));
+        // Lo que el mapeo manda y el esquema no declara: se descarta en silencio al firmar.
+        $unknown = array_values(array_diff($mapped, $schemakeys));
         if ($unknown) {
             $results[] = [self::WARNING, get_string('test_claims_unknown', 'local_sovracred', self::code_list($unknown))];
         }

@@ -53,16 +53,9 @@ class provider implements
             'timecreated' => 'privacy:metadata:log:timecreated',
         ], 'privacy:metadata:log');
 
-        // Lo que viaja a Sovra al crear la oferta: los claims de classes/claims.php.
+        // Lo que viaja a Sovra al crear la oferta: los claims que eligió el administrador en el mapeo.
         $collection->add_external_location_link('sovra', [
-            'holderName' => 'privacy:metadata:sovra:holdername',
-            'documento' => 'privacy:metadata:sovra:documento',
-            'tipoDocumento' => 'privacy:metadata:sovra:tipodocumento',
-            'programa' => 'privacy:metadata:sovra:programa',
-            'curso' => 'privacy:metadata:sovra:curso',
-            'entidadFormadora' => 'privacy:metadata:sovra:entidad',
-            'fechaFinalizacion' => 'privacy:metadata:sovra:fecha',
-            'codigoVerificacion' => 'privacy:metadata:sovra:codigo',
+            'claims' => 'privacy:metadata:sovra:claims',
         ], 'privacy:metadata:sovra');
 
         return $collection;

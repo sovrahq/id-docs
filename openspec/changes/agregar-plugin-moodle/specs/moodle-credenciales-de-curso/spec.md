@@ -75,23 +75,19 @@ La página «Mis credenciales» SHALL mostrar cada oferta vigente como un códig
 - **THEN** el plugin no agrega scripts, estilos ni imágenes de fuera del propio Moodle (lo que cargue el tema o los filtros del sitio es configuración del sitio)
 
 ### Requirement: Los claims de la credencial
-Los datos que viajan en la credencial SHALL definirse en código, para que cualquier cambio pase por revisión. Para el esquema de prueba `bogota_formacion` SHALL enviarse `holderName`, `documento`, `tipoDocumento`, `curso`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `programa` sólo cuando tiene valor. Los campos del perfil de los que salen `documento` y `tipoDocumento` SHALL ser configurables, y la configuración SHALL advertir que ese campo, el nombre y el apellido no tienen que ser editables por el estudiante, porque la institución firma esos valores. La fecha SHALL viajar como texto ISO 8601 (`AAAA-MM-DD`).
+El esquema que se emite y el origen de cada claim SHALL configurarse en una página de administración, sin tocar código, que lea de Sovra los claims del esquema elegido —su key, su tipo y si es obligatorio— y deje elegir para cada uno un origen: un dato del usuario, un campo propio del perfil, un dato o campo personalizado del curso, el nombre del sitio, la fecha de finalización, el código de verificación o un texto fijo. Sólo quien administra el sitio SHALL poder cambiarlo, y la página SHALL advertir que los campos elegidos no tienen que ser editables por el estudiante, porque la institución firma esos valores. Cada valor SHALL viajar con el formato de su tipo (`date` como `AAAA-MM-DD`, `integer` y `number` como números, `boolean` como booleano). Mientras no se guarde un mapeo SHALL usarse el del esquema de prueba `bogota_formacion` v2.
 
-#### Scenario: Claims completos
-- **WHEN** se arma la credencial de un estudiante con todos los datos
-- **THEN** las claves coinciden carácter por carácter con las del esquema y la fecha es la de completitud del curso en formato `AAAA-MM-DD`
+#### Scenario: Claims del mapeo de fábrica
+- **WHEN** se arma la credencial de un estudiante con todos los datos y no se guardó ningún mapeo
+- **THEN** se envían `holderName`, `documento`, `tipoDocumento`, `curso`, `entidadFormadora`, `fechaFinalizacion` y `codigoVerificacion`, más `programa` sólo cuando tiene valor, y la fecha es la de finalización en formato `AAAA-MM-DD`
 
-#### Scenario: Programa vacío
-- **WHEN** la categoría del curso no tiene nombre
-- **THEN** la clave `programa` no se envía
+#### Scenario: Mapeo guardado
+- **WHEN** el administrador guardó un mapeo con orígenes de perfil, del curso y texto fijo
+- **THEN** cada claim toma el valor de su origen con el formato de su tipo, y un claim sin origen no se envía
 
-#### Scenario: Tipo de documento sin configurar
-- **WHEN** el administrador no eligió el campo del tipo de documento
-- **THEN** falta `tipoDocumento` y el plugin no llama a la API
-
-#### Scenario: Documento desde un campo de perfil propio
-- **WHEN** el administrador eligió un campo personalizado del perfil como origen del documento
-- **THEN** `documento` toma el valor de ese campo para el estudiante
+#### Scenario: Claim obligatorio sin valor
+- **WHEN** un claim obligatorio no tiene origen, o el estudiante no tiene ese dato
+- **THEN** el plugin no llama a la API y el reporte muestra qué claim falta
 
 ### Requirement: Recepción de avisos de Sovra (webhook)
 El plugin SHALL exponer un endpoint que no use la sesión de Moodle y que valide cada entrega con `X-Sovra-Signature: sha256=<HMAC-SHA256 hex del cuerpo crudo>` en comparación de tiempo constante. SHALL responder 2xx a toda entrega con firma válida —incluidas las repetidas, las desconocidas y las malformadas— porque un 4xx hace que Sovra descarte el evento sin reintentar. SHALL ser idempotente por el `id` de la entrega.

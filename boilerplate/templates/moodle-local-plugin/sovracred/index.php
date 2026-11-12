@@ -79,6 +79,7 @@ $summary->data = [
 echo html_writer::table($summary);
 echo html_writer::tag('p', html_writer::link(new moodle_url('/admin/settings.php', ['section' => 'local_sovracred']),
     get_string('editsettings', 'local_sovracred')) . ' · ' .
+    html_writer::link(new moodle_url('/local/sovracred/mapeo.php'), get_string('map', 'local_sovracred')) . ' · ' .
     html_writer::link(new moodle_url('/local/sovracred/logs.php'), get_string('logs', 'local_sovracred')));
 
 // Estado de la configuración.

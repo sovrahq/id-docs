@@ -68,10 +68,10 @@ al abrirse. Las credenciales ya emitidas se vuelven a consultar una vez por día
 para reflejar revocaciones y suspensiones. Con el webhook todo es instantáneo; sin
 él, una emisión se confirma en hasta 5 minutos y una revocación, en hasta un día.
 
-**3. Los datos de la credencial están en código.** Qué datos personales viajan en
-una credencial es una decisión de producto y de privacidad: está en
-[`sovracred/classes/claims.php`](sovracred/classes/claims.php) para que pase por
-revisión, no en una pantalla de configuración que se edita en caliente.
+**3. Los datos de la credencial se mapean desde el esquema.** El plugin lee los
+claims del esquema en Sovra y el administrador elige de qué dato de Moodle sale
+cada uno. Qué datos personales viajan en una credencial es una decisión de
+privacidad: la toma quien administra el sitio, no el estudiante ni el docente.
 
 ## Instalación
 
@@ -116,7 +116,6 @@ la reconciliación; si Moodle ya calcula completitudes, ya lo tenés) y la
 | Secreto del webhook | El de la consola. Cifrado. Vacío = se confirma sólo por la tarea programada. |
 | Esquema | El slug del esquema, por ejemplo `bogota_formacion`. |
 | Cursos que emiten | Todos, o una lista de IDs de curso. |
-| Campo del número de documento | El campo estándar «Número de ID» o cualquier campo propio del perfil. |
 
 > ⚠️ **La institución firma lo que el estudiante tiene en su perfil.** Si el
 > estudiante puede editar su nombre, su apellido o el campo del documento, puede
@@ -131,10 +130,10 @@ Y además:
   del núcleo, que respeta esa lista.
 - **Zona horaria del sitio:** la fecha de finalización que viaja en la
   credencial se calcula en la zona horaria del sitio.
-- **Campo de perfil del tipo de documento** (Administración del sitio → Usuarios
-  → Campos de perfil de usuario): un campo de texto, no editable por el
-  estudiante, con valores como `CC`, `CE`, `TI` o `PA`. Elegilo en la
-  configuración del plugin, en **«Campo del tipo de documento»**.
+- **El mapeo de claims** (ver [Los datos de la credencial](#los-datos-de-la-credencial)):
+  si el esquema pide un dato que Moodle no trae, como el tipo de documento, creá
+  antes un campo de perfil (Administración del sitio → Usuarios → Campos de
+  perfil de usuario), no editable por el estudiante.
 
 Después, en **Administración del sitio → Informes → Credenciales de curso (Sovra
 ID)**, revisá el resumen de la configuración (las claves aparecen enmascaradas) y
@@ -182,27 +181,45 @@ php admin/cli/cfg.php --component=local_sovracred --name=webhooksecret --set=whs
 
 ## Los datos de la credencial
 
-El mapeo de este boilerplate corresponde al esquema de prueba `bogota_formacion`.
-Las keys tienen que coincidir **carácter por carácter** con las del esquema: una
-key que el esquema no declara se descarta en silencio al firmar.
+Qué esquema se emite y de qué dato de Moodle sale cada claim se elige en
+**Administración del sitio → Extensiones → Plugins locales → Mapeo de claims de
+Sovra ID** (`mapeo.php`), sin tocar código.
+
+La página lee de Sovra los esquemas de credencial del workspace. Al elegir uno,
+muestra sus claims con su tipo y si son obligatorios, y para cada uno elegís el
+origen:
+
+| Origen | Ejemplos |
+|---|---|
+| Datos del usuario | Nombre completo, nombre, apellido, correo, número de ID, institución, ciudad, país |
+| Campos propios del perfil | Cualquiera de *Campos de perfil de usuario* (documento, tipo de documento…) |
+| Datos del curso | Nombre completo o corto, número de ID, categoría |
+| Campos personalizados del curso | Cualquiera de *Campos personalizados de curso* (horas, nivel…) |
+| Otros | Nombre del sitio, fecha de finalización, código de verificación, un texto fijo |
+
+Cada valor viaja con el formato de su tipo: `date` como `AAAA-MM-DD` (en la zona
+horaria del sitio), `datetime` en ISO 8601 UTC, `integer` y `number` como
+números, `boolean` como verdadero o falso. Un claim sin origen, o sin valor para
+un estudiante, no se envía. Si es obligatorio, el plugin **no llama a la API**:
+el estudiante ve *«falta un dato, ya avisamos»* y el reporte muestra cuál.
+
+**Probar conexión** compara el esquema con el mapeo guardado: avisa si el esquema
+exige un claim que el mapeo no llena, si el mapeo manda uno que el esquema no
+declara, o si el mapeo se guardó para otro esquema.
+
+Mientras no se guarde un mapeo, se usa el de fábrica, el del esquema de prueba
+`bogota_formacion` (v2):
 
 | Claim | De dónde sale en Moodle | Obligatorio |
 |---|---|---|
 | `holderName` | Nombre y apellido del estudiante | ✅ |
-| `documento` | El campo del perfil elegido en la configuración | ✅ |
-| `tipoDocumento` | El campo propio del perfil elegido en la configuración | ✅ |
+| `documento` | Número de ID (o el campo que se eligió en la versión 0.2) | ✅ |
+| `tipoDocumento` | El campo de perfil que se eligió en la versión 0.2 | ✅ |
+| `programa` | La categoría del curso | — |
 | `curso` | El nombre completo del curso | ✅ |
 | `entidadFormadora` | El nombre del sitio | ✅ |
-| `fechaFinalizacion` | La fecha de completitud, `AAAA-MM-DD` | ✅ |
+| `fechaFinalizacion` | La fecha de finalización, `AAAA-MM-DD` | ✅ |
 | `codigoVerificacion` | Código propio de cada credencial (`XXXX-XXXX-XXXX`), generado al completar | ✅ |
-| `programa` | La categoría del curso (sólo si tiene valor) | — |
-
-Si falta un dato obligatorio —por ejemplo, un estudiante sin documento— el plugin
-**no llama a la API**: el estudiante ve *«falta un dato, ya avisamos»* y el
-administrador ve el campo faltante en el reporte.
-
-Para tu esquema, editá `REQUIRED` y `build()` en
-[`classes/claims.php`](sovracred/classes/claims.php).
 
 ## Probarlo en un Moodle local
 
@@ -285,9 +302,10 @@ sovracred/
 ├── credenciales.php           La página del estudiante: botón, QR, enlace directo
 ├── index.php                  Reporte del administrador: configuración, estados, prueba de conexión, reintentos
 ├── logs.php                   Registro: llamadas a la API y avisos del webhook
+├── mapeo.php                  Mapeo de claims: esquema y origen de cada claim
 ├── webhook.php                Endpoint del webhook (sin sesión; lo autentica la firma)
 ├── classes/
-│   ├── claims.php             Qué datos lleva la credencial — revisar antes de producción
+│   ├── claims.php             El mapeo de claims: orígenes, formato por tipo, mapeo de fábrica
 │   ├── issuance.php           El derecho y su oferta: registrar, avisar, pedir, consultar
 │   ├── api_client.php         POST /credential-offer y GET /credentials/{id}, con \core\http_client
 │   ├── webhook.php            Firma, idempotencia por id, eventos desordenados, workspace
@@ -314,11 +332,11 @@ available ──(el estudiante la pide)──▶ offered ──(la canjea)──
 
 ## Antes de producción
 
-- [ ] **Acordar los claims** con la institución y ajustar `classes/claims.php` al
-      esquema definitivo.
-- [ ] **Elegir los campos del documento y del tipo de documento** en la
-      configuración y verificar en el reporte que ningún derecho quede con
-      `missingclaims: documento` ni `missingclaims: tipoDocumento`.
+- [ ] **Acordar los claims** con la institución, guardar el **mapeo de claims**
+      para el esquema definitivo y confirmar con **Probar conexión** que
+      coinciden.
+- [ ] **Verificar en el reporte** que ningún derecho quede con
+      `missingclaims: …`: es un dato que le falta al estudiante.
 - [ ] **Organización propia en producción.** El nombre que el ciudadano lee como
       emisor es el de la **organización** de Sovra, no el del workspace.
 - [ ] **Bloquear nombre, apellido y documento** para que el estudiante no los

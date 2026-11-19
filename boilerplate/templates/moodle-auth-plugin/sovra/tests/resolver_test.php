@@ -10,7 +10,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/fixtures_trait.php');
 
 /**
- * Spec: «Sólo emisores permitidos», «Identificación por número de documento», «Cuentas que no pueden entrar».
+ * Spec: «Sólo emisores permitidos», «Identificación por número de documento», «Comparación por tipo de documento», «Cuentas que no pueden entrar».
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra

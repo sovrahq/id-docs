@@ -8,7 +8,7 @@
 - [x] 2.1 `resolver`: emisor permitido, `vct`, normalización, búsqueda por campo, tipo, cuentas que no pueden entrar; verificar los escenarios de «Sólo emisores permitidos», «Identificación por número de documento» y «Cuentas que no pueden entrar» con PHPUnit
 - [x] 2.2 `login_session`: crear, consultar con freno, aplicar veredicto una sola vez, consumir, vencer; verificar «Sesión de ingreso atada al navegador» con PHPUnit
 - [x] 2.3 `login.php` (QR + enlace + cuenta regresiva), `status.php`, `finish.php`, `notfound`; botón en `loginpage_idp_list`
-- [x] 2.4 `webhook.php` + procesador; verificar «Recepción del resultado» con PHPUnit y con avisos firmados por `curl`
+- [x] 2.4 `webhook.php` + procesador; verificar «Recepción del resultado por webhook» y «por consulta» con PHPUnit y con avisos firmados por `curl`
 
 ## 3. Administración y privacidad
 

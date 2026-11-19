@@ -10,7 +10,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/fixtures_trait.php');
 
 /**
- * Spec: «Recepción del resultado» (webhook) y la prueba de conexión.
+ * Spec: «Recepción del resultado por webhook» y la prueba de conexión.
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra

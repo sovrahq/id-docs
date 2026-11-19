@@ -13,7 +13,15 @@ El plugin SHALL agregar «Ingresar con la SuperApp» a la pantalla de ingreso de
 - **AND** abrir la página de ingreso del plugin directamente muestra que el ingreso con la SuperApp no está disponible, sin llamar a la API
 
 ### Requirement: Solicitud de la credencial
-Al abrir la página de ingreso, el plugin SHALL crear una verificación en `POST /api/v1/verifier/verifications` con una consulta DCQL de una sola credencial `vc+sd-jwt` que pida `iss`, `vct`, el claim del tipo de documento (sólo si la comparación por tipo está activa) y el claim del número de documento, con los nombres de claim configurables. Si hay tipos de credencial configurados, SHALL enviarlos en `meta.vct_values` para que la billetera ofrezca la credencial correcta. MUST NOT pedir otros datos personales (nombre, correo, fecha de nacimiento). La página SHALL mostrar el QR y el enlace `openid4vp://` (paso por referencia) y consultar el resultado desde el navegador, porque la billetera no vuelve al sitio.
+Al abrir la página de ingreso, el plugin SHALL crear una verificación en `POST /api/v1/verifier/verifications` con una consulta DCQL de una sola credencial `vc+sd-jwt` que pida `iss`, `vct`, el claim del tipo de documento (sólo si la comparación por tipo está activa) y el claim del número de documento, con los nombres de claim configurables. Si hay tipos de credencial configurados, SHALL enviarlos en `meta.vct_values`. MUST NOT pedir otros datos personales (nombre, correo, fecha de nacimiento).
+
+#### Scenario: Datos pedidos
+- **WHEN** el plugin crea la verificación con tipos de credencial configurados y sin comparación por tipo
+- **THEN** la consulta pide sólo `iss`, `vct` y el claim del número de documento
+- **AND** envía los tipos configurados en `meta.vct_values` para que la billetera ofrezca la credencial correcta
+
+### Requirement: Página de ingreso con QR
+La página de ingreso SHALL mostrar el QR y el enlace `openid4vp://` de la verificación (paso por referencia) y SHALL consultar el resultado desde el navegador, porque la billetera no vuelve al sitio.
 
 #### Scenario: Página de ingreso
 - **WHEN** una persona sin sesión abre la página de ingreso del plugin
@@ -45,28 +53,31 @@ Cada verificación SHALL quedar atada a la sesión del navegador que la pidió m
 - **THEN** la página muestra que el código venció y ofrece generar uno nuevo
 - **AND** un resultado que llegue después del vencimiento no permite entrar
 
-### Requirement: Recepción del resultado
-El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `presentation.failed` firmado con HMAC (`X-Sovra-Signature` sobre el cuerpo crudo) y SHALL también consultarlo con `GET /api/v1/verifier/verifications/{id}` mientras la página espera, para no depender del webhook. Un aviso con firma inválida MUST NOT cambiar nada. Un aviso de una verificación que el plugin no creó, o de otro workspace si el Workspace ID está configurado, SHALL ignorarse. Un mismo resultado recibido dos veces SHALL aplicarse una sola vez.
+### Requirement: Recepción del resultado por webhook
+El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `presentation.failed` firmado con HMAC (`X-Sovra-Signature` sobre el cuerpo crudo). Un aviso con firma inválida MUST NOT cambiar nada. Un aviso de una verificación que el plugin no creó, o de otro workspace si el Workspace ID está configurado, SHALL ignorarse. Un mismo resultado recibido dos veces SHALL aplicarse una sola vez.
 
 #### Scenario: Llega el webhook
 - **WHEN** llega un `presentation.verified` firmado de una verificación pendiente del plugin
 - **THEN** el plugin resuelve la cuenta con los claims del aviso y la página que espera lleva a la persona a terminar el ingreso
 
-#### Scenario: Sin webhook
-- **WHEN** el webhook no llega (no configurado o bloqueado) y la verificación se completa en Sovra
-- **THEN** la consulta periódica de la página obtiene el mismo resultado por `GET` y el ingreso sigue igual
-
 #### Scenario: Firma inválida
 - **WHEN** llega un aviso con una firma que no corresponde al cuerpo
 - **THEN** el plugin responde 401, no cambia ninguna sesión de ingreso y lo registra
 
-#### Scenario: Presentación rechazada
-- **WHEN** llega `presentation.failed` (o el `GET` informa `failed`)
-- **THEN** la página muestra que la credencial no pudo validarse y ofrece reintentar, y nadie entra
-
 #### Scenario: Aviso repetido
 - **WHEN** el mismo aviso llega dos veces
 - **THEN** el segundo no cambia el resultado ya aplicado
+
+### Requirement: Recepción del resultado por consulta
+Mientras la página espera, el plugin SHALL consultar el resultado con `GET /api/v1/verifier/verifications/{id}`, para no depender del webhook, y SHALL aplicarlo igual que si hubiera llegado por webhook.
+
+#### Scenario: Sin webhook
+- **WHEN** el webhook no llega (no configurado o bloqueado) y la verificación se completa en Sovra
+- **THEN** la consulta periódica de la página obtiene el mismo resultado por `GET` y el ingreso sigue igual
+
+#### Scenario: Presentación rechazada
+- **WHEN** llega `presentation.failed` (o el `GET` informa `failed`)
+- **THEN** la página muestra que la credencial no pudo validarse y ofrece reintentar, y nadie entra
 
 ### Requirement: Sólo emisores permitidos
 El plugin SHALL aceptar sólo credenciales cuyo emisor (el DID del `iss`, que en Sovra es la ruta de la URL del emisor) esté en la lista de emisores permitidos. Con la lista vacía, o si el resultado no trae `iss`, MUST rechazar el ingreso (falla cerrada). Si hay tipos de credencial configurados, el `vct` presentado SHALL estar entre ellos.
@@ -84,7 +95,7 @@ El plugin SHALL aceptar sólo credenciales cuyo emisor (el DID del `iss`, que en
 - **THEN** nadie entra
 
 ### Requirement: Identificación por número de documento
-El plugin SHALL identificar la cuenta comparando el número de documento presentado con el campo configurado (`idnumber` o un campo de perfil), ambos normalizados: sin puntos, espacios ni guiones, y sin distinguir mayúsculas. Si la comparación por tipo está activa, SHALL comparar además el tipo de documento presentado, traducido por la tabla de equivalencias configurada, con el campo de tipo configurado. SHALL considerar sólo cuentas no borradas de este sitio. Con exactamente una coincidencia SHALL iniciar la sesión de esa cuenta con `complete_user_login`; con más de una MUST NOT iniciar sesión.
+El plugin SHALL identificar la cuenta comparando el número de documento presentado con el campo configurado (`idnumber` o un campo de perfil), ambos normalizados: sin puntos, espacios ni guiones, y sin distinguir mayúsculas. SHALL considerar sólo cuentas no borradas de este sitio. Con exactamente una coincidencia SHALL iniciar la sesión de esa cuenta con `complete_user_login`; con más de una MUST NOT iniciar sesión.
 
 #### Scenario: Una coincidencia
 - **WHEN** el documento presentado es `1.020.304-5` y una sola cuenta tiene `10203045` en el campo configurado
@@ -106,6 +117,9 @@ El plugin SHALL identificar la cuenta comparando el número de documento present
 #### Scenario: Duplicados
 - **WHEN** dos cuentas tienen el mismo documento
 - **THEN** nadie entra y la página indica que hay un problema con la cuenta y que contacte a soporte
+
+### Requirement: Comparación por tipo de documento
+Si la comparación por tipo está activa, el plugin SHALL comparar además el tipo de documento presentado, traducido por la tabla de equivalencias configurada, con el campo de tipo configurado; sólo cuentan las cuentas que coinciden en número y tipo.
 
 #### Scenario: Tipo de documento distinto
 - **WHEN** la comparación por tipo está activa y la única cuenta con ese número tiene otro tipo de documento

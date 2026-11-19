@@ -192,6 +192,60 @@ final class resolver_test extends \advanced_testcase {
         $this->assertSame([resolver::OK, (int) $admin->id], resolver::resolve($this->claims('10203045')));
     }
 
+    /**
+     * Configuración de Atenea: campos propios, siglas y la tabla de equivalencias por defecto.
+     *
+     * @return void
+     */
+    private function configure_atenea(): void {
+        $gen = $this->getDataGenerator();
+        $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'numero_documento', 'name' => 'Número de documento']);
+        $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'tipo_documento', 'name' => 'Tipo de documento']);
+        set_config('documentfield', 'profile_field_numero_documento', 'auth_sovra');
+        set_config('documenttypefield', 'profile_field_tipo_documento', 'auth_sovra');
+        set_config('matchdoctype', 1, 'auth_sovra');
+        set_config('doctypemap', "Cédula de ciudadanía = CC\nCédula de extranjería = CE\nPasaporte = PA\nPPT = PPT\nPEP = PEP\n"
+            . "Salvoconducto = SC", 'auth_sovra');
+    }
+
+    /**
+     * Una cuenta como las de Atenea.
+     *
+     * @param string $numero
+     * @param string $sigla
+     * @return \stdClass
+     */
+    private function create_atenea_person(string $numero, string $sigla): \stdClass {
+        return $this->getDataGenerator()->create_user(['auth' => 'manual',
+            'profile_field_numero_documento' => $numero, 'profile_field_tipo_documento' => $sigla]);
+    }
+
+    public function test_atenea_siglas(): void {
+        $this->configure_atenea();
+        $cc = $this->create_atenea_person('30191292', 'CC');
+        $sc = $this->create_atenea_person('40001234', 'SC');
+        $ce = $this->create_atenea_person('50001234', 'CE');
+        $this->assertSame([resolver::OK, (int) $cc->id], resolver::resolve($this->claims('30.191.292')));
+        $this->assertSame([resolver::OK, (int) $sc->id],
+            resolver::resolve($this->claims('40001234', ['tipo_doc' => 'Salvoconducto'])));
+        $this->assertSame([resolver::OK, (int) $ce->id],
+            resolver::resolve($this->claims('50001234', ['tipo_doc' => 'Cédula de extranjería'])));
+    }
+
+    public function test_atenea_documento_de_origen_no_entra_a_una_cedula_ajena(): void {
+        $this->configure_atenea();
+        $this->create_atenea_person('30191292', 'CC');
+        $this->assertSame([resolver::NOT_FOUND, null],
+            resolver::resolve($this->claims('30191292', ['tipo_doc' => 'DNI del país de origen'])));
+    }
+
+    public function test_atenea_pep_tutor_no_se_equipara_a_pep(): void {
+        $this->configure_atenea();
+        $this->create_atenea_person('60001234', 'PEP');
+        $this->assertSame([resolver::NOT_FOUND, null],
+            resolver::resolve($this->claims('60001234', ['tipo_doc' => 'PEP Tutor'])));
+    }
+
     public function test_normalizaciones(): void {
         $this->assertSame('10203045', resolver::normalize_document(" 1.020.304-5\t"));
         $this->assertSame('cedula de ciudadania', resolver::normalize_text('  Cédula   de CIUDADANÍA '));

@@ -44,16 +44,39 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 | Tipos de credencial aceptados | `IdentidadMigrante` | El `vct` de la Credencial de Identidad |
 | Claim del número de documento | `num_doc` | |
 | Claim del tipo de documento | `tipo_doc` | Sólo si se compara el tipo |
-| Campo con el número de documento | `idnumber` o el campo de perfil donde Atenea lo guarda | **Dato pendiente de Atenea** |
-| Comparar también el tipo de documento | Desactivado hasta saber si Atenea lo guarda | **Dato pendiente de Atenea** |
-| Campo con el tipo de documento | El campo de perfil con el tipo | Sólo si se compara |
-| Equivalencias de tipos | `Cédula de ciudadanía = CC`, `Pasaporte = PA`, … | La credencial trae el nombre largo |
+| Campo con el número de documento | `profile_field_numero_documento` | Atenea: sólo números, obligatorio y único |
+| Comparar también el tipo de documento | **Sí** | Ver «Tipos de documento» abajo: evita que un número de otro tipo entre a una cuenta ajena |
+| Campo con el tipo de documento | `profile_field_tipo_documento` | Siglas: RC, PPT, CC, TI, CE, PTP, PEP, PIP, NES, PA, NIT, SC |
+| Equivalencias de tipos | El valor por defecto (abajo) | La credencial trae el nombre largo; Atenea guarda la sigla |
 | Métodos de autenticación aceptados | `manual`, `email`, `sovra` | Los de las cuentas existentes |
 | Permitir administradores del sitio | No | Recomendado |
-| Página de registro | La URL del registro de Atenea | **Dato pendiente de Atenea.** Vacío = el registro de Moodle, si está habilitado |
+| Página de registro | `https://academia.agenciaatenea.gov.co/registrarse/` | |
 
 El número se compara **sin puntos, espacios ni guiones y sin distinguir mayúsculas**, tanto el de la credencial
 como el de Moodle: `1.020.304-5` y `10203045` coinciden. Los ceros a la izquierda **sí** cuentan.
+
+### Tipos de documento (Atenea)
+
+La Credencial de Identidad trae el tipo con su nombre largo (`tipo_doc`); Atenea guarda la sigla. Equivalencias por defecto:
+
+```
+Cédula de ciudadanía = CC
+Cédula de extranjería = CE
+Pasaporte = PA
+PPT = PPT
+PEP = PEP
+Salvoconducto = SC
+```
+
+**Comparar el tipo importa aunque en Atenea el número sea único:** el número es único dentro de Atenea, pero la credencial puede traer un número de otro tipo de documento que coincida con el de una cuenta ajena (por ejemplo, un documento extranjero con los mismos dígitos que una cédula). Comparando el tipo, eso da «No encontramos tu cuenta» en lugar de abrir la cuenta equivocada.
+
+Dos tipos de la credencial **no tienen sigla en Atenea** y quedan sin equivalencia a propósito, así que esas personas ven «No encontramos tu cuenta»:
+
+- **PEP Tutor**: el permiso es otro documento que el PEP; equipararlo a `PEP` sólo si Atenea confirma que lo registra así.
+- **DNI del país de origen**: es un documento extranjero sin equivalente en la lista de Atenea.
+
+Los tipos de Atenea sin contraparte en la credencial (RC, TI, PTP, PIP, NES, NIT) no necesitan línea.
+El número se compara tal como llega: un pasaporte con letras no coincide con un campo que en Atenea sólo admite números.
 
 Para un despliegue automatizado, los valores se pueden fijar en `config.php`:
 
@@ -62,6 +85,10 @@ $CFG->forced_plugin_settings['auth_sovra'] = [
     'apiurl' => 'https://api.sovra.io',
     'apikey' => getenv('SOVRA_API_KEY'),
     'allowedissuers' => 'did:sovra:0x…',
+    'documentfield' => 'profile_field_numero_documento',
+    'matchdoctype' => 1,
+    'documenttypefield' => 'profile_field_tipo_documento',
+    'signupurl' => 'https://academia.agenciaatenea.gov.co/registrarse/',
 ];
 ```
 

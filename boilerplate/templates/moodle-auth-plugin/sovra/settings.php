@@ -72,7 +72,7 @@ if ($ADMIN->fulltree) {
         ['' => get_string('none')] + $profilefields));
     $settings->add(new admin_setting_configtextarea('auth_sovra/doctypemap',
         get_string('doctypemap', 'auth_sovra'), get_string('doctypemap_desc', 'auth_sovra'),
-        "Cédula de ciudadanía = CC\nCédula de extranjería = CE\nPasaporte = PA\nPPT = PPT\nPEP = PEP", PARAM_RAW_TRIMMED));
+        "Cédula de ciudadanía = CC\nCédula de extranjería = CE\nPasaporte = PA\nPPT = PPT\nPEP = PEP\nSalvoconducto = SC", PARAM_RAW_TRIMMED));
 
     // Quién puede entrar.
     $settings->add(new admin_setting_heading('auth_sovra/accounts',

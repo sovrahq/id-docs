@@ -76,7 +76,10 @@ Dos tipos de la credencial **no tienen sigla en Atenea** y quedan sin equivalenc
 - **DNI del país de origen**: es un documento extranjero sin equivalente en la lista de Atenea.
 
 Los tipos de Atenea sin contraparte en la credencial (RC, TI, PTP, PIP, NES, NIT) no necesitan línea.
-El número se compara tal como llega: un pasaporte con letras no coincide con un campo que en Atenea sólo admite números.
+### Limitaciones conocidas
+
+- **Pasaportes con letras.** El número se compara tal como llega (sólo se quitan puntos, espacios y guiones). Atenea guarda el documento sólo con números, así que una persona cuyo pasaporte tiene letras no va a encontrar su cuenta. Pendiente de definir con Atenea.
+- **PEP Tutor y DNI del país de origen** no entran (ver arriba), por decisión.
 
 Para un despliegue automatizado, los valores se pueden fijar en `config.php`:
 

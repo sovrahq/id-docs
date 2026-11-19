@@ -5,7 +5,7 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 
 - Moodle 4.5 LTS y 5.1. PHP, sin dependencias fuera del núcleo.
 - Verificación OID4VP con [Sovra ID](../../../docs/guides/credentials/05-verificacion-de-credenciales.md): Sovra valida la firma del emisor, la posesión, la vigencia y la revocación.
-- **No crea cuentas.** Si no hay una cuenta con ese documento, muestra «No encontramos tu cuenta» y el enlace al registro.
+- **No crea cuentas.** Si no hay una cuenta con ese documento, muestra «No tienes cuenta en Atenea» y el enlace al registro.
 - Las personas pueden seguir entrando también con su contraseña.
 
 ## Cómo funciona
@@ -18,7 +18,7 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 | Resultado | Qué ve la persona |
 |---|---|
 | Una cuenta, habilitada | Entra a Moodle, a la página que intentaba abrir |
-| Ninguna cuenta | «No encontramos tu cuenta» + enlace al registro |
+| Ninguna cuenta | «No tienes cuenta en Atenea» + enlace al registro |
 | Dos o más cuentas | Aviso de que contacte a soporte; nadie entra |
 | Cuenta suspendida, con método no aceptado o administradora del sitio | Aviso; nadie entra |
 | Credencial de otro emisor o de otro tipo | «Esa credencial no está aceptada»; nadie entra |
@@ -51,6 +51,7 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 | Métodos de autenticación aceptados | `manual`, `email`, `sovra` | Los de las cuentas existentes |
 | Permitir administradores del sitio | No | Recomendado |
 | Página de registro | `https://academia.agenciaatenea.gov.co/registrarse/` | |
+| Nombre de la plataforma | `Atenea` | Para el aviso «No tienes cuenta en Atenea». Vacío: el nombre corto del sitio |
 
 El número se compara **sin puntos, espacios ni guiones y sin distinguir mayúsculas**, tanto el de la credencial
 como el de Moodle: `1.020.304-5` y `10203045` coinciden. Los ceros a la izquierda **sí** cuentan.
@@ -68,9 +69,9 @@ PEP = PEP
 Salvoconducto = SC
 ```
 
-**Comparar el tipo importa aunque en Atenea el número sea único:** el número es único dentro de Atenea, pero la credencial puede traer un número de otro tipo de documento que coincida con el de una cuenta ajena (por ejemplo, un documento extranjero con los mismos dígitos que una cédula). Comparando el tipo, eso da «No encontramos tu cuenta» en lugar de abrir la cuenta equivocada.
+**Comparar el tipo importa aunque en Atenea el número sea único:** el número es único dentro de Atenea, pero la credencial puede traer un número de otro tipo de documento que coincida con el de una cuenta ajena (por ejemplo, un documento extranjero con los mismos dígitos que una cédula). Comparando el tipo, eso da «No tienes cuenta en Atenea» en lugar de abrir la cuenta equivocada.
 
-Dos tipos de la credencial **no tienen sigla en Atenea** y quedan sin equivalencia a propósito, así que esas personas ven «No encontramos tu cuenta»:
+Dos tipos de la credencial **no tienen sigla en Atenea** y quedan sin equivalencia a propósito, así que esas personas ven «No tienes cuenta en Atenea»:
 
 - **PEP Tutor**: el permiso es otro documento que el PEP; equipararlo a `PEP` sólo si Atenea confirma que lo registra así.
 - **DNI del país de origen**: es un documento extranjero sin equivalente en la lista de Atenea.
@@ -92,6 +93,7 @@ $CFG->forced_plugin_settings['auth_sovra'] = [
     'matchdoctype' => 1,
     'documenttypefield' => 'profile_field_tipo_documento',
     'signupurl' => 'https://academia.agenciaatenea.gov.co/registrarse/',
+    'platformname' => 'Atenea',
 ];
 ```
 

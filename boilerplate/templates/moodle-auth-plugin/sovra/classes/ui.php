@@ -30,7 +30,7 @@ class ui {
 
         if ($result === resolver::NOT_FOUND) {
             $signup = config::signup_url();
-            $html = $OUTPUT->heading(get_string('result_notfound', 'auth_sovra'), 3);
+            $html = $OUTPUT->heading(get_string('result_notfound', 'auth_sovra', s(config::platform_name())), 3);
             $html .= \html_writer::tag('p', get_string($signup ? 'result_notfound_signup' : 'result_notfound_nosignup', 'auth_sovra'));
             $links = $signup ? \html_writer::link($signup, get_string('signup', 'auth_sovra'),
                 ['class' => 'btn btn-primary me-2 mr-2']) : '';

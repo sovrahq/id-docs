@@ -6,7 +6,7 @@ La Academia Atenea (Bogotá) quiere que una persona entre a su Moodle con la **C
 
 - Nuevo boilerplate `boilerplate/templates/moodle-auth-plugin/sovra/`: un **plugin de autenticación de Moodle** (`auth_sovra`, PHP) compatible con Moodle 4.5 LTS y 5.1, que agrega «Ingresar con la SuperApp» a la pantalla de ingreso.
 - El plugin abre una verificación OID4VP en la API de Sovra que pide sólo el tipo y el número de documento (más `iss` y `vct`, que no son datos personales y permiten controlar el emisor y el tipo), muestra QR + enlace `openid4vp://`, y espera el resultado por webhook `presentation.verified` o consultando la verificación.
-- Con el resultado, busca **la** cuenta por el campo de documento configurado (`idnumber` o un campo de perfil) y la deja entrar. **Sin cuenta, no la crea**: muestra «No encontramos tu cuenta» y lleva al registro (URL configurable).
+- Con el resultado, busca **la** cuenta por el campo de documento configurado (`idnumber` o un campo de perfil) y la deja entrar. **Sin cuenta, no la crea**: muestra «No tienes cuenta en <plataforma>» y lleva al registro (URL configurable).
 - Controles: lista de **emisores permitidos** (falla cerrada), exactamente una cuenta coincidente, documento normalizado, tipo de documento opcional con tabla de equivalencias, sesión atada al navegador, de un solo uso y con vencimiento, y registro sin datos personales en claro.
 - Guía de instalación en español para Atenea (`README.md` del plugin) y entrada en `boilerplate/README.md`.
 

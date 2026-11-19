@@ -90,4 +90,6 @@ if ($ADMIN->fulltree) {
         get_string('allowadmins', 'auth_sovra'), get_string('allowadmins_desc', 'auth_sovra'), 0));
     $settings->add(new admin_setting_configtext('auth_sovra/signupurl',
         get_string('signupurl', 'auth_sovra'), get_string('signupurl_desc', 'auth_sovra'), '', PARAM_URL));
+    $settings->add(new admin_setting_configtext('auth_sovra/platformname',
+        get_string('platformname', 'auth_sovra'), get_string('platformname_desc', 'auth_sovra'), '', PARAM_TEXT));
 }

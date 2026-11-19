@@ -190,6 +190,22 @@ class config {
     }
 
     /**
+     * Nombre de la plataforma en los avisos («No tienes cuenta en Atenea»).
+     * Vacío: el nombre corto del sitio.
+     *
+     * @return string Texto plano, sin escapar.
+     */
+    public static function platform_name(): string {
+        global $SITE;
+        $name = trim((string) get_config(self::PLUGIN, 'platformname'));
+        if ($name === '') {
+            $name = trim(format_string($SITE->shortname ?: $SITE->fullname, true, ['context' => \context_system::instance(),
+                'escape' => false]));
+        }
+        return $name;
+    }
+
+    /**
      * ¿Está todo lo necesario para ofrecer el ingreso? URL, API key y al menos un emisor permitido.
      *
      * @return bool

@@ -14,7 +14,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'auth_sovra';
-$plugin->version   = 2026111900;
+$plugin->version   = 2026111901;
 $plugin->requires  = 2024100700;      // Moodle 4.5 LTS.
 $plugin->supported = [405, 501];      // 4.5 LTS a 5.1.
 $plugin->maturity  = MATURITY_BETA;

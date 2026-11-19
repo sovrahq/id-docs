@@ -6,7 +6,7 @@
 /**
  * Ingreso con la SuperApp: QR + enlace openid4vp://, y espera del resultado.
  *
- * Con ?result=<código> muestra el resultado de un intento (por ejemplo «No encontramos tu cuenta»).
+ * Con ?result=<código> muestra el resultado de un intento (por ejemplo «No tienes cuenta en <plataforma>»).
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra

@@ -96,7 +96,12 @@ El plugin SHALL identificar la cuenta comparando el número de documento present
 
 #### Scenario: Ninguna coincidencia
 - **WHEN** ninguna cuenta tiene ese documento
-- **THEN** el plugin no crea ninguna cuenta y muestra «No encontramos tu cuenta» con un enlace a la página de registro configurada (o al registro de Moodle si está habilitado y no se configuró otra)
+- **THEN** el plugin no crea ninguna cuenta y muestra «No tienes cuenta en <plataforma>» con un enlace a la página de registro configurada (o al registro de Moodle si está habilitado y no se configuró otra)
+
+#### Scenario: El aviso nombra a la plataforma
+- **WHEN** ninguna cuenta tiene ese documento y el nombre de la plataforma configurado es «Atenea»
+- **THEN** el aviso dice «No tienes cuenta en Atenea» y el botón lleva a la página de registro configurada
+- **AND** si el nombre de la plataforma está vacío, el aviso usa el nombre corto del sitio
 
 #### Scenario: Duplicados
 - **WHEN** dos cuentas tienen el mismo documento
@@ -104,7 +109,7 @@ El plugin SHALL identificar la cuenta comparando el número de documento present
 
 #### Scenario: Tipo de documento distinto
 - **WHEN** la comparación por tipo está activa y la única cuenta con ese número tiene otro tipo de documento
-- **THEN** se trata como «No encontramos tu cuenta»
+- **THEN** se trata como «No tienes cuenta en <plataforma>»
 
 #### Scenario: El tipo desempata
 - **WHEN** la comparación por tipo está activa y dos cuentas tienen el mismo número con tipos distintos

@@ -10,7 +10,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/fixtures_trait.php');
 
 /**
- * Spec: «Solicitud de la credencial», «Página de ingreso con QR», «Recepción del resultado por consulta», «Sesión de ingreso atada al navegador», «Recepción del resultado» (GET)
+ * Spec: «Solicitud de la credencial», «Página de ingreso con QR», «Recepción del resultado por consulta», «Sesión de ingreso atada al navegador»
  * y «Registro sin datos personales».
  *
  * @package    auth_sovra

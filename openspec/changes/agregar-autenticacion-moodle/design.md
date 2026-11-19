@@ -1,0 +1,25 @@
+## Context
+
+Atenea corre Moodle 4.5 LTS y evalúa 5.x. Ya usa nuestro `local_sovracred` para emitir. La Credencial de Identidad de Bogotá la emite el workspace de la Alcaldía (esquema `bogota-identidad-migrante`, `vct` = `IdentidadMigrante`, claims `tipo_doc` y `num_doc`, con `tipo_doc` en texto: «Cédula de ciudadanía», «PPT», «Pasaporte», …). Atenea verifica con **su propio** workspace (API key de verificador). Faltan datos de Atenea (campo del documento, formato, tipo, duplicados, URL de registro): todo eso es configuración.
+
+## Goals / Non-Goals
+
+**Goals:** entrar sin contraseña presentando la credencial; identificar por documento; fallar cerrado ante emisores ajenos, duplicados y sesiones ajenas; funcionar sin webhook.
+
+**Non-Goals:** crear cuentas (decisión de Lucas, 19/11), vincular una credencial a una cuenta ya abierta, verificar el `vp_token` por cuenta propia (lo hace Sovra).
+
+## Decisions
+
+1. **El emisor se controla pidiendo `iss` en el DCQL.** El resultado de la verificación no trae el DID del emisor, pero el verificador de Sovra arma los claims del resultado sobre el payload ya verificado del SD-JWT, así que pedir `iss` devuelve la URL del emisor, cuya ruta es el DID del workspace con cuya llave Sovra verificó la firma. El plugin compara ese DID con la lista. Se pide también `vct` para comprobar el tipo en el servidor: `meta.vct_values` lo evalúa la billetera, no Sovra. Alternativa descartada: comparar contra lo emitido (lo que hace el ERP) — Atenea no emite esta credencial. Lo ideal es que la plataforma devuelva el DID del emisor como campo propio del resultado; cuando lo haga, el plugin debe pasar a usarlo.
+2. **Plugin `auth_sovra`, no OAuth 2 ni `local_`.** `loginpage_idp_list` es el punto de extensión del núcleo para botones de ingreso, y un plugin de autenticación puede usar `complete_user_login` sin tocar contraseñas.
+3. **La sesión de ingreso es una fila con un token aleatorio que sólo conoce `$SESSION`.** La tabla guarda token, `verification_id`, estado, resultado, `userid` resuelto y vencimiento — **nunca** documento, tipo ni DID del holder. El webhook y la consulta por `GET` escriben el mismo veredicto con la misma función (`resolver`), con una actualización condicionada a `status = pending` para que el segundo aviso no pise al primero. El ingreso lo completa `finish.php` desde el navegador dueño del token; Moodle serializa las peticiones de una misma sesión (lock de sesión), así que borrar la fila antes de `complete_user_login` alcanza para el un-solo-uso.
+4. **Búsqueda normalizada en SQL.** `REPLACE(REPLACE(REPLACE(UPPER(campo),'.',''),' ',''),'-','')` existe en PostgreSQL, MySQL/MariaDB, SQL Server y Oracle. Se traen todas las coincidencias (incluidas suspendidas) y el desempate por tipo y los chequeos de cuenta se hacen en PHP, para poder distinguir «suspendida» de «no existe».
+5. **Tipo de documento por tabla de equivalencias.** Línea por línea `valor en la credencial = valor en Moodle` (comparación sin mayúsculas ni tildes). Sin línea para un valor, se compara el valor tal cual.
+6. **Consulta por `GET` con freno.** La página consulta `status.php` cada 3 s; el servidor sólo llama a la API si pasaron ≥ 3 s desde la última consulta de esa sesión de ingreso.
+
+## Risks / Trade-offs
+
+- **Phishing por QR (cross-device):** quien abre la página y le hace escanear el QR a otra persona entra como ella. Es propio de todo ingreso por QR entre dispositivos; lo mitiga que la billetera muestra el nombre del verificador (Atenea) antes de compartir. Se documenta en el README.
+- **El control de emisor depende de la plataforma:** el plugin confía en el `iss` que devuelve Sovra; la garantía de que corresponde a la firma verificada es de la plataforma. Antes de producción, confirmarla con el equipo de la plataforma.
+- **La billetera de la SuperApp y el claim `iss`:** la billetera de referencia (`holder-core`) no lo muestra ni lo divulga (es del sobre); si la billetera de la SuperApp fallara al pedirlo, la prueba punta a punta lo muestra antes de instalar.
+- **Búsqueda sin índice:** recorre la columna con funciones; aceptable para decenas de miles de cuentas. Si Atenea tiene cientos de miles, se agrega una columna normalizada.

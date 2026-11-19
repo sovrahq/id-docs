@@ -1,0 +1,94 @@
+# Ingreso a Moodle con la SuperApp (`auth_sovra`)
+
+Plugin de autenticación de Moodle para que una persona entre **sin usuario ni contraseña**, presentando la
+**Credencial de Identidad** de la SuperApp de Bogotá. Moodle la identifica por su **número de documento**.
+
+- Moodle 4.5 LTS y 5.1. PHP, sin dependencias fuera del núcleo.
+- Verificación OID4VP con [Sovra ID](../../../docs/guides/credentials/05-verificacion-de-credenciales.md): Sovra valida la firma del emisor, la posesión, la vigencia y la revocación.
+- **No crea cuentas.** Si no hay una cuenta con ese documento, muestra «No encontramos tu cuenta» y el enlace al registro.
+- Las personas pueden seguir entrando también con su contraseña.
+
+## Cómo funciona
+
+1. En la pantalla de ingreso aparece **«Ingresar con la SuperApp»**.
+2. Moodle abre una verificación en Sovra que pide sólo el **emisor**, el **tipo de credencial** y el **número de documento** (y el tipo de documento, si se activa la comparación por tipo). Muestra un QR y un botón **«Abrir en la SuperApp»** para quien ya está en el teléfono.
+3. La persona comparte la credencial desde la billetera. La página consulta el resultado cada 3 segundos (la billetera no vuelve a la página); si el webhook está configurado, el resultado llega antes.
+4. Moodle controla que el emisor esté en la lista de **emisores permitidos**, busca la cuenta por documento y la deja entrar sólo si hay **exactamente una**.
+
+| Resultado | Qué ve la persona |
+|---|---|
+| Una cuenta, habilitada | Entra a Moodle, a la página que intentaba abrir |
+| Ninguna cuenta | «No encontramos tu cuenta» + enlace al registro |
+| Dos o más cuentas | Aviso de que contacte a soporte; nadie entra |
+| Cuenta suspendida, con método no aceptado o administradora del sitio | Aviso; nadie entra |
+| Credencial de otro emisor o de otro tipo | «Esa credencial no está aceptada»; nadie entra |
+| La billetera rechaza o Sovra no valida la credencial | «No pudimos validar tu credencial» |
+| Pasan 10 minutos sin presentación | El QR vence; botón para generar otro |
+
+## Instalación
+
+1. Copiar la carpeta `sovra/` a `auth/sovra/` del Moodle (en Moodle 5.1: `public/auth/sovra/`). **Copiar, no enlazar con symlink**: las páginas del plugin buscan `config.php` dos carpetas arriba.
+2. Entrar como administrador y completar la actualización (o `php admin/cli/upgrade.php`).
+3. **Administración del sitio → Plugins → Autenticación → Gestionar autenticación**: habilitar «Ingreso con la SuperApp (Sovra ID)».
+4. Completar la configuración (abajo) y apretar **«Probar la conexión»** en **Administración del sitio → Informes → Registro del ingreso con la SuperApp**.
+
+## Configuración
+
+| Opción | Valor para Atenea | Notas |
+|---|---|---|
+| URL de la API | `https://api.sovra.io` (prueba: `https://test-api-sovra.flagonsa.com`) | |
+| API key | La del **workspace verificador de Atenea** (`sovra_sk_…`) | Se guarda cifrada |
+| Secreto del webhook | El del endpoint creado en la consola de Sovra | Opcional |
+| Workspace ID | El del workspace de Atenea | Opcional: ignora avisos de otros workspaces |
+| **Emisores permitidos** | El DID del workspace de la Alcaldía que emite la Credencial de Identidad | **Obligatorio.** Vacío = el botón no aparece |
+| Tipos de credencial aceptados | `IdentidadMigrante` | El `vct` de la Credencial de Identidad |
+| Claim del número de documento | `num_doc` | |
+| Claim del tipo de documento | `tipo_doc` | Sólo si se compara el tipo |
+| Campo con el número de documento | `idnumber` o el campo de perfil donde Atenea lo guarda | **Dato pendiente de Atenea** |
+| Comparar también el tipo de documento | Desactivado hasta saber si Atenea lo guarda | **Dato pendiente de Atenea** |
+| Campo con el tipo de documento | El campo de perfil con el tipo | Sólo si se compara |
+| Equivalencias de tipos | `Cédula de ciudadanía = CC`, `Pasaporte = PA`, … | La credencial trae el nombre largo |
+| Métodos de autenticación aceptados | `manual`, `email`, `sovra` | Los de las cuentas existentes |
+| Permitir administradores del sitio | No | Recomendado |
+| Página de registro | La URL del registro de Atenea | **Dato pendiente de Atenea.** Vacío = el registro de Moodle, si está habilitado |
+
+El número se compara **sin puntos, espacios ni guiones y sin distinguir mayúsculas**, tanto el de la credencial
+como el de Moodle: `1.020.304-5` y `10203045` coinciden. Los ceros a la izquierda **sí** cuentan.
+
+Para un despliegue automatizado, los valores se pueden fijar en `config.php`:
+
+```php
+$CFG->forced_plugin_settings['auth_sovra'] = [
+    'apiurl' => 'https://api.sovra.io',
+    'apikey' => getenv('SOVRA_API_KEY'),
+    'allowedissuers' => 'did:sovra:0x…',
+];
+```
+
+### Webhook (opcional)
+
+En la consola de Sovra, en el workspace de Atenea, crear un endpoint con la URL
+`https://<moodle>/auth/sovra/webhook.php` y los eventos `presentation.verified` y `presentation.failed`.
+Sin webhook el ingreso funciona igual: la página consulta el resultado a la API.
+
+## Seguridad
+
+- **Emisores permitidos, falla cerrada.** Sin esta lista cualquier workspace de la red podría emitirse una credencial con un documento ajeno. El plugin pide el claim `iss` de la credencial y compara el DID de su ruta con la lista.
+- **Exactamente una cuenta.** Con duplicados nadie entra.
+- **Sesión atada al navegador.** La verificación sólo la puede consultar y completar el navegador que la abrió (token aleatorio en la sesión de Moodle + `sesskey`), una sola vez y dentro de los 5 minutos de verificada.
+- **Sin datos personales guardados.** Ni el número ni el tipo de documento ni el DID de la persona se guardan en la base ni en el registro; sólo el resultado y el id de la cuenta.
+- **Riesgo propio del ingreso por QR:** quien muestre un QR de ingreso a otra persona y la convenza de escanearlo entra como ella. La billetera muestra el nombre del verificador antes de compartir; conviene que el nombre de la organización de Atenea en Sovra sea claro.
+
+## Pruebas
+
+```bash
+# Moodle 4.5
+php admin/tool/phpunit/cli/init.php
+vendor/bin/phpunit --testsuite auth_sovra_testsuite
+# Moodle 5.1
+php public/admin/tool/phpunit/cli/init.php
+vendor/bin/phpunit --testsuite auth_sovra_testsuite
+```
+
+La especificación, con cada escenario, está en
+[`openspec/changes/agregar-autenticacion-moodle`](../../../openspec/changes/agregar-autenticacion-moodle/).

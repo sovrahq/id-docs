@@ -21,7 +21,7 @@ require_once($CFG->libdir . '/authlib.php');
  * No maneja contraseñas: el ingreso lo completa auth/sovra/finish.php con complete_user_login, después de
  * que Sovra verificó la presentación y el plugin encontró exactamente una cuenta con ese documento. Las cuentas
  * pueden tener cualquier método de los aceptados en la configuración (por defecto manual, email y sovra), así
- * que las personas siguen pudiendo entrar también con su contraseña.
+ * que las cuentas manual o email siguen pudiendo entrar también con su contraseña; las de método sovra, no.
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra

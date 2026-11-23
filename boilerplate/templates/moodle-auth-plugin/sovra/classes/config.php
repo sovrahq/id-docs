@@ -227,6 +227,41 @@ class config {
     }
 
     /**
+     * Avisos si la persona puede editar el campo con su documento (o su tipo) desde su perfil.
+     *
+     * Con el campo editable, alguien puede poner el documento de otra persona: si esa persona tiene cuenta, queda
+     * como duplicada y no puede entrar; si no tiene, entra con la SuperApp a la cuenta de quien lo puso.
+     * `idnumber` se bloquea por método de autenticación («Bloquear el valor» del ID number); un campo de perfil,
+     * marcándolo como bloqueado.
+     *
+     * @return string[] Un texto por problema, para el administrador.
+     */
+    public static function document_field_warnings(): array {
+        global $DB;
+        $warnings = [];
+        $fields = [self::document_field()];
+        if (self::match_document_type()) {
+            $fields[] = self::document_type_field();
+        }
+        foreach (array_unique($fields) as $field) {
+            if ($field === 'idnumber') {
+                $editable = array_filter(self::allowed_auths(), fn($auth) => $auth !== 'nologin' && is_enabled_auth($auth)
+                    && get_config('auth_' . $auth, 'field_lock_idnumber') !== 'locked');
+                if ($editable) {
+                    $warnings[] = get_string('warn_idnumber_editable', self::PLUGIN, implode(', ', $editable));
+                }
+            } else if (strpos($field, 'profile_field_') === 0) {
+                $shortname = substr($field, strlen('profile_field_'));
+                $locked = $DB->get_field('user_info_field', 'locked', ['shortname' => $shortname]);
+                if ($locked !== false && empty($locked)) {
+                    $warnings[] = get_string('warn_profilefield_editable', self::PLUGIN, $shortname);
+                }
+            }
+        }
+        return $warnings;
+    }
+
+    /**
      * URL pública del webhook, para pegar en la consola de Sovra.
      *
      * @return \moodle_url
@@ -276,8 +311,11 @@ class config {
             return \core\encryption::decrypt($value);
         } catch (\moodle_exception $e) {
             // Nunca se loguea el valor: sólo que no se pudo descifrar. debugging() no se ve en producción:
-            // también va al log de PHP, y logs.php y la prueba de conexión lo avisan (undecryptable()).
-            error_log("auth_sovra: no se pudo descifrar '{$name}'; hay que volver a guardarlo en la configuración.");
+            // también va al log de PHP, como mucho una vez por minuto (se lee en cada vista de la pantalla de
+            // ingreso), y logs.php y la prueba de conexión lo avisan (undecryptable()).
+            if (log::once_per_minute('lastundecryptable')) {
+                error_log("auth_sovra: no se pudo descifrar '{$name}'; hay que volver a guardarlo en la configuración.");
+            }
             debugging("auth_sovra: no se pudo descifrar '{$name}'; volvé a guardarlo en la configuración.");
             return '';
         }

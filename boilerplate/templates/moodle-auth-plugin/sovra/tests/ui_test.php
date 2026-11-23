@@ -59,7 +59,8 @@ final class ui_test extends \advanced_testcase {
     }
 
     public function test_cuentas_que_no_pueden_entrar_no_ofrecen_reintentar(): void {
-        foreach ([resolver::DUPLICATE, resolver::SUSPENDED, resolver::UNCONFIRMED] as $result) {
+        foreach ([resolver::DUPLICATE, resolver::SUSPENDED, resolver::UNCONFIRMED, resolver::AUTH_NOT_ALLOWED, resolver::ADMIN,
+                resolver::MISCONFIGURED] as $result) {
             $html = ui::result($result);
             $this->assertStringContainsString(s(get_string('result_' . $result, 'auth_sovra')), $html, $result);
             $this->assertStringNotContainsString(get_string('retry', 'auth_sovra'), $html, $result);

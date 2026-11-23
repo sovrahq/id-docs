@@ -31,3 +31,12 @@
 - [x] 5.4 Un solo veredicto registrado (lock por sesión); excepciones del webhook, sesiones inválidas, configuración rota y secretos ilegibles a la vista del administrador
 - [x] 5.5 Pruebas de `status.php`/`finish.php` (`poll`/`finish`), privacidad, limpieza y bordes; PHPUnit verde en 4.5 y 5.1
   - Hecho 23/11: 95 pruebas (266 aserciones) en Moodle 4.5 y 5.1 con PHP 8.3 y PostgreSQL, con `scripts/probar-en-docker.sh`
+
+## 6. Segunda revisión
+
+- [x] 6.1 Cuentas con método deshabilitado no entran; aviso si el campo del documento es editable, y opciones de bloqueo de campos
+- [x] 6.2 Webhook: 503 ante firma inválida, 500 con evento y verificación ante un error al aplicar
+- [x] 6.3 La consulta nunca lanza: una excepción cierra el intento y queda registrada; sin API key también cierra; un lock que no se obtiene se reintenta
+- [x] 6.4 Detalle de las credenciales rechazadas, `throttled` registrado, el tope no cuenta las caídas de Sovra, el log de PHP de secretos ilegibles una vez por minuto
+- [x] 6.5 `login_session::open()` con pruebas de las puertas de `login.php`; pruebas del lock y de los huecos de la revisión
+  - Hecho 23/11: 112 pruebas (340 aserciones) en Moodle 4.5 y 5.1; la página de configuración arma sus 38 ajustes, con el bloqueo de campos

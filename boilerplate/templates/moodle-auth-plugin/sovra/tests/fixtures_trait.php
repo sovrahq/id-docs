@@ -38,6 +38,10 @@ trait fixtures_trait {
         set_config('allowedauths', config::DEFAULT_AUTHS, 'auth_sovra');
         set_config('allowadmins', 0, 'auth_sovra');
         set_config('auth', 'email,sovra');
+        // Como debe quedar en producción: nadie edita su propio ID number.
+        foreach (['manual', 'email', 'sovra'] as $auth) {
+            set_config('field_lock_idnumber', 'locked', 'auth_' . $auth);
+        }
     }
 
     /**
@@ -49,8 +53,10 @@ trait fixtures_trait {
         global $DB;
         $gen = $this->getDataGenerator();
         if (!$DB->record_exists('user_info_field', ['shortname' => 'documento'])) {
-            $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'documento', 'name' => 'Documento']);
-            $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'tipodoc', 'name' => 'Tipo de documento']);
+            $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'documento', 'name' => 'Documento',
+                'locked' => 1]);
+            $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'tipodoc', 'name' => 'Tipo de documento',
+                'locked' => 1]);
         }
         set_config('documentfield', 'profile_field_documento', 'auth_sovra');
         set_config('documenttypefield', 'profile_field_tipodoc', 'auth_sovra');

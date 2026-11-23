@@ -10,7 +10,8 @@
  *
  * Abrir una verificación cuesta una llamada a Sovra, así que sólo se hace con sesskey: el botón del login lo
  * trae, y un enlace sin él (guardado, de otro sitio, un bot) sólo muestra el botón para pedir el código.
- * Recargar la página vuelve a mostrar el mismo código mientras le quede vigencia; ?new=1 pide uno nuevo.
+ * Recargar la página vuelve a mostrar el mismo código mientras le queden al menos 2 minutos
+ * (login_session::REUSE_MIN_LEFT); ?new=1 pide uno nuevo. La decisión la toma login_session::open().
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra
@@ -37,8 +38,6 @@ if (isloggedin() && !isguestuser()) {
     redirect(new moodle_url('/'));
 }
 
-$enabled = is_enabled_auth('sovra') && config::ready();
-
 if ($result !== '') {
     echo $OUTPUT->header();
     echo $OUTPUT->heading(get_string('login_title', 'auth_sovra'), 2);
@@ -47,53 +46,37 @@ if ($result !== '') {
     exit;
 }
 
-if (!$enabled) {
-    echo $OUTPUT->header();
-    echo $OUTPUT->heading(get_string('login_title', 'auth_sovra'), 2);
-    echo $OUTPUT->notification(get_string('login_unavailable', 'auth_sovra'), 'warning', false);
-    echo html_writer::link(new moodle_url('/login/index.php'), get_string('back', 'auth_sovra'), ['class' => 'btn btn-secondary']);
-    echo $OUTPUT->footer();
-    exit;
-}
-
 $newurl = new moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey(), 'new' => 1]);
 $backlink = html_writer::link(new moodle_url('/login/index.php'), get_string('back', 'auth_sovra'), ['class' => 'btn btn-secondary']);
 
-if ($sesskey === '' || !confirm_sesskey($sesskey)) {
+$open = login_session::open(is_enabled_auth('sovra') && config::ready(), $sesskey !== '' && confirm_sesskey($sesskey), $new);
+if ($open['action'] !== 'show') {
     echo $OUTPUT->header();
     echo $OUTPUT->heading(get_string('login_title', 'auth_sovra'), 2);
-    echo html_writer::tag('p', get_string('login_intro', 'auth_sovra'));
-    echo html_writer::link(new moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey()]), get_string('login_start', 'auth_sovra'),
-        ['class' => 'btn btn-primary me-2 mr-2']);
-    echo $backlink;
-    echo $OUTPUT->footer();
-    exit;
-}
-
-$reuse = $new ? null : login_session::reusable();
-if ($reuse) {
-    [$session, $uri] = $reuse;
-} else if (!login_session::can_start()) {
-    echo $OUTPUT->header();
-    echo $OUTPUT->heading(get_string('login_title', 'auth_sovra'), 2);
-    echo $OUTPUT->notification(get_string('login_throttled', 'auth_sovra'), 'warning', false);
-    echo $backlink;
-    echo $OUTPUT->footer();
-    exit;
-} else {
-    try {
-        [$session, $uri] = login_session::start();
-    } catch (\auth_sovra\api_exception $e) {
-        // Ya quedó en el registro con el estado HTTP y el código. A la persona, sin detalles.
-        echo $OUTPUT->header();
-        echo $OUTPUT->heading(get_string('login_title', 'auth_sovra'), 2);
-        echo $OUTPUT->notification(get_string('login_error', 'auth_sovra'), 'error', false);
-        echo html_writer::link($newurl, get_string('retry', 'auth_sovra'), ['class' => 'btn btn-primary me-2 mr-2']);
-        echo $backlink;
-        echo $OUTPUT->footer();
-        exit;
+    switch ($open['action']) {
+        case 'unavailable':
+            echo $OUTPUT->notification(get_string('login_unavailable', 'auth_sovra'), 'warning', false);
+            break;
+        case 'ask':
+            // Sin sesskey no se llama a Sovra: un clic acá trae el sesskey de esta sesión.
+            echo html_writer::tag('p', get_string('login_intro', 'auth_sovra'));
+            echo html_writer::link(new moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey()]),
+                get_string('login_start', 'auth_sovra'), ['class' => 'btn btn-primary me-2 mr-2']);
+            break;
+        case 'throttled':
+            echo $OUTPUT->notification(get_string('login_throttled', 'auth_sovra'), 'warning', false);
+            break;
+        default:
+            // error: ya quedó en el registro con el estado HTTP y el código. A la persona, sin detalles.
+            echo $OUTPUT->notification(get_string('login_error', 'auth_sovra'), 'error', false);
+            echo html_writer::link($newurl, get_string('retry', 'auth_sovra'), ['class' => 'btn btn-primary me-2 mr-2']);
     }
+    echo $backlink;
+    echo $OUTPUT->footer();
+    exit;
 }
+$session = $open['session'];
+$uri = $open['uri'];
 
 // El QR codifica la URI tal cual. Se genera acá, sin servicios externos.
 $qr = new TCPDF2DBarcode($uri, 'QRCODE,M');

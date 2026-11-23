@@ -17,6 +17,9 @@ Atenea corre Moodle 4.5 LTS y evalúa 5.x. Ya usa nuestro `local_sovracred` para
 5. **Tipo de documento por tabla de equivalencias.** Línea por línea `valor en la credencial = valor en Moodle` (comparación sin mayúsculas ni tildes). Sin línea para un valor, se compara el valor tal cual.
 6. **Consulta por `GET` con freno.** La página consulta `status.php` cada 3 s; el servidor sólo llama a la API si pasaron ≥ 3 s desde la última consulta de esa sesión de ingreso. Un 401/403/404 cierra el intento; la red y los 5xx se reintentan.
 7. **Abrir verificaciones con freno.** El botón del login lleva `sesskey`; sin él, `login.php` sólo muestra un botón y no llama a la API, así que un enlace de otro sitio o un bot sin cookies no gastan cuota. Recargar vuelve a mostrar el código vigente (la URI queda en `$SESSION`), y cada navegador puede pedir 5 códigos nuevos cada 10 minutos. Un tope global por sitio no se pone: sería una palanca para dejar a todos sin ingreso; va en el servidor web.
+8. **El webhook nunca responde 4xx.** Sovra descarta para siempre un evento que recibe 4xx y firma los reintentos con el secreto vigente. Por eso una firma inválida da 503 (sin procesar nada) y un error al aplicar da 500: corregir el secreto o la base recupera los eventos pendientes.
+9. **El lock de la sesión espera 2 s.** Sovra corta la entrega a los 5 s. Si no se consigue y la sesión sigue pendiente, se registra `lockfailed` y se lanza `lock_exception`: el webhook responde 500 y la consulta reintenta en la vuelta siguiente.
+10. **El campo del documento tiene que estar bloqueado.** Moodle deja editar el ID number desde el propio perfil si el método de autenticación no lo bloquea. El plugin agrega las opciones de bloqueo de campos (como `auth_manual`) y avisa en la prueba de conexión y en el registro si el campo del documento o del tipo es editable; no lo impide, porque el bloqueo es del sitio.
 
 ## Risks / Trade-offs
 

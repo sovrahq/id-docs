@@ -13,7 +13,7 @@ El plugin SHALL agregar «Ingresar con la SuperApp» a la pantalla de ingreso de
 - **AND** abrir la página de ingreso del plugin directamente muestra que el ingreso con la SuperApp no está disponible, sin llamar a la API
 
 ### Requirement: Solicitud de la credencial
-Al abrir la página de ingreso, el plugin SHALL crear una verificación en `POST /api/v1/verifier/verifications` con una consulta DCQL de una sola credencial `vc+sd-jwt` que pida `iss`, `vct`, el claim del tipo de documento (sólo si la comparación por tipo está activa) y el claim del número de documento, con los nombres de claim configurables. Si hay tipos de credencial configurados, SHALL enviarlos en `meta.vct_values`. MUST NOT pedir otros datos personales (nombre, correo, fecha de nacimiento).
+Cada verificación nueva SHALL crearse en `POST /api/v1/verifier/verifications` con una consulta DCQL de una sola credencial `vc+sd-jwt` que pida `iss`, `vct`, el claim del tipo de documento (sólo si la comparación por tipo está activa) y el claim del número de documento, con los nombres de claim configurables. Si hay tipos de credencial configurados, SHALL enviarlos en `meta.vct_values`. MUST NOT pedir otros datos personales (nombre, correo, fecha de nacimiento).
 
 #### Scenario: Datos pedidos
 - **WHEN** el plugin crea la verificación con tipos de credencial configurados y sin comparación por tipo
@@ -74,7 +74,7 @@ Cada verificación SHALL quedar atada a la sesión del navegador que la pidió m
 - **AND** un resultado que llegue después del vencimiento no permite entrar
 
 ### Requirement: Recepción del resultado por webhook
-El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `presentation.failed` firmado con HMAC (`X-Sovra-Signature` sobre el cuerpo crudo). Un aviso con firma inválida MUST NOT cambiar nada. Un aviso de una verificación que el plugin no creó, o de otro workspace si el Workspace ID está configurado, SHALL ignorarse. Un mismo resultado recibido dos veces SHALL aplicarse una sola vez.
+El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `presentation.failed` firmado con HMAC (`X-Sovra-Signature` sobre el cuerpo crudo). Un aviso con firma inválida MUST NOT cambiar nada y SHALL recibir 503, nunca un 4xx, para que Sovra lo reintente. Un aviso de una verificación que el plugin no creó, o de otro workspace si el Workspace ID está configurado, SHALL ignorarse. Un mismo resultado recibido dos veces SHALL aplicarse una sola vez.
 
 #### Scenario: Llega el webhook
 - **WHEN** llega un `presentation.verified` firmado de una verificación pendiente del plugin
@@ -82,7 +82,8 @@ El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `p
 
 #### Scenario: Firma inválida
 - **WHEN** llega un aviso con una firma que no corresponde al cuerpo
-- **THEN** el plugin responde 401, no cambia ninguna sesión de ingreso y lo registra (como mucho una fila por minuto, porque el endpoint es público)
+- **THEN** el plugin responde 503, no cambia ninguna sesión de ingreso y lo registra (como mucho una fila por minuto, porque el endpoint es público)
+- **AND** cuando se corrige el secreto, los reintentos de Sovra se aplican
 
 #### Scenario: Aviso repetido
 - **WHEN** el mismo aviso llega dos veces, o el aviso y la consulta por `GET` traen el resultado a la vez
@@ -99,8 +100,13 @@ Mientras la página espera, el plugin SHALL consultar el resultado con `GET /api
 - **WHEN** llega `presentation.failed` (o el `GET` informa `failed`)
 - **THEN** la página muestra que la credencial no pudo validarse y ofrece reintentar, y nadie entra
 
+#### Scenario: Error al resolver
+- **WHEN** resolver la cuenta falla de forma inesperada (por ejemplo, la base no responde)
+- **THEN** el intento termina, la página muestra que no se pudo completar el ingreso y el registro guarda la causa
+- **AND** si pasa al recibir el webhook, el plugin responde 500 para que Sovra reintente
+
 #### Scenario: La API no deja seguir
-- **WHEN** el `GET` responde 401, 403 o 404 (por ejemplo, la API key fue revocada)
+- **WHEN** el `GET` responde 401, 403 o 404 (por ejemplo, la API key fue revocada), o ya no hay API key configurada
 - **THEN** el intento termina en ese momento y la página muestra que no se pudo completar el ingreso, en lugar de esperar al vencimiento
 
 ### Requirement: Sólo emisores permitidos
@@ -154,11 +160,15 @@ Si la comparación por tipo está activa, el plugin SHALL comparar además el ti
 - **THEN** entra la que coincide en tipo
 
 ### Requirement: Cuentas que no pueden entrar
-El plugin MUST NOT iniciar sesión en una cuenta suspendida, sin confirmar, con método de autenticación `nologin`, con un método de autenticación fuera de la lista de métodos aceptados, ni (salvo que la configuración lo permita) en la cuenta de un administrador del sitio.
+El plugin MUST NOT iniciar sesión en una cuenta suspendida, sin confirmar, con un método de autenticación deshabilitado o `nologin`, con un método de autenticación fuera de la lista de métodos aceptados, ni (salvo que la configuración lo permita) en la cuenta de un administrador del sitio.
 
 #### Scenario: Cuenta suspendida
 - **WHEN** la única cuenta coincidente está suspendida
 - **THEN** nadie entra y la página indica que la cuenta está suspendida
+
+#### Scenario: Método deshabilitado
+- **WHEN** la cuenta coincidente usa un método de autenticación aceptado pero deshabilitado en el sitio
+- **THEN** nadie entra, igual que con contraseña
 
 #### Scenario: Cuenta sin confirmar
 - **WHEN** la única cuenta coincidente se registró por email y no confirmó su correo
@@ -183,3 +193,11 @@ El plugin SHALL registrar cada llamada a la API y cada aviso del webhook (qué p
 #### Scenario: Prueba de conexión
 - **WHEN** el administrador prueba la conexión
 - **THEN** el plugin crea una verificación de prueba y muestra si la API key y la URL funcionan, sin mostrar la API key completa
+
+#### Scenario: Campo de documento editable
+- **WHEN** la persona puede editar desde su perfil el campo configurado con el documento (o con el tipo)
+- **THEN** la prueba de conexión y el registro avisan al administrador que lo bloquee
+
+#### Scenario: Credencial rechazada
+- **WHEN** una credencial se rechaza por emisor, tipo de credencial o falta de documento
+- **THEN** el registro guarda el DID del emisor, el `vct` y los nombres de los claims recibidos, sin sus valores

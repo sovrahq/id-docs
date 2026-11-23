@@ -71,6 +71,13 @@ final class resolver_test extends \advanced_testcase {
             resolver::resolve($this->claims('10203045', ['vct' => 'CertificadoDeCurso'])));
     }
 
+    public function test_sin_vct_con_tipos_configurados(): void {
+        $this->create_person('10203045');
+        $claims = $this->claims('10203045');
+        unset($claims['vct']);
+        $this->assertSame([resolver::TYPE_NOT_ALLOWED, null], resolver::resolve($claims));
+    }
+
     public function test_sin_tipos_configurados_no_se_exige_vct(): void {
         $user = $this->create_person('10203045');
         set_config('credentialtypes', '', 'auth_sovra');
@@ -192,6 +199,19 @@ final class resolver_test extends \advanced_testcase {
         // Autorregistro por email sin confirmar: con contraseña no entra, con la SuperApp tampoco.
         $this->create_person('10203045', ['auth' => 'email', 'confirmed' => 0]);
         $this->assertSame([resolver::UNCONFIRMED, null], resolver::resolve($this->claims('10203045')));
+    }
+
+    public function test_metodo_deshabilitado(): void {
+        // Aceptado en el plugin pero deshabilitado en el sitio: con contraseña no entra, con la SuperApp tampoco.
+        $this->create_person('10203045', ['auth' => 'email']);
+        set_config('auth', 'sovra');
+        $this->assertSame([resolver::AUTH_NOT_ALLOWED, null], resolver::resolve($this->claims('10203045')));
+    }
+
+    public function test_sin_metodos_aceptados_nadie_entra(): void {
+        $this->create_person('10203045');
+        set_config('allowedauths', '', 'auth_sovra');
+        $this->assertSame([resolver::AUTH_NOT_ALLOWED, null], resolver::resolve($this->claims('10203045')));
     }
 
     public function test_metodo_no_aceptado(): void {

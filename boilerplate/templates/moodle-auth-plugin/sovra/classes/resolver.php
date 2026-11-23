@@ -38,7 +38,7 @@ class resolver {
     const SUSPENDED = 'suspended';
     /** @var string La cuenta no confirmó su email: con contraseña el núcleo tampoco la deja entrar. */
     const UNCONFIRMED = 'unconfirmed';
-    /** @var string La cuenta usa un método de autenticación que no se acepta (incluido nologin). */
+    /** @var string La cuenta usa un método de autenticación que no se acepta o está deshabilitado (incluido nologin). */
     const AUTH_NOT_ALLOWED = 'authnotallowed';
     /** @var string La cuenta es administradora del sitio y no se permite. */
     const ADMIN = 'admin';
@@ -121,7 +121,9 @@ class resolver {
         if (empty($user->confirmed)) {
             return self::UNCONFIRMED;
         }
-        if ($user->auth === 'nologin' || !in_array($user->auth, config::allowed_auths(), true)) {
+        // Un método deshabilitado es la forma vieja de suspender: con contraseña tampoco entra.
+        if ($user->auth === 'nologin' || !is_enabled_auth($user->auth)
+                || !in_array($user->auth, config::allowed_auths(), true)) {
             return self::AUTH_NOT_ALLOWED;
         }
         if (!config::allow_admins() && is_siteadmin($user->id)) {
@@ -147,6 +149,21 @@ class resolver {
         }
         $path = (string) parse_url($iss, PHP_URL_PATH);
         return ltrim($path, '/');
+    }
+
+    /**
+     * Qué trajo una presentación rechazada, para que el administrador pueda corregir la configuración.
+     *
+     * El DID del emisor, el `vct` y los nombres de los claims: ninguno es un dato personal. Nunca los valores
+     * del documento.
+     *
+     * @param array $claims
+     * @return string
+     */
+    public static function describe(array $claims): string {
+        $iss = is_string($claims['iss'] ?? null) ? self::issuer_did($claims['iss']) : '-';
+        $vct = is_string($claims['vct'] ?? null) ? $claims['vct'] : '-';
+        return "iss={$iss} vct={$vct} claims=" . implode(',', array_map('strval', array_keys($claims)));
     }
 
     /**
@@ -179,7 +196,7 @@ class resolver {
      * Trae también las suspendidas, para poder decir «suspendida» en vez de «no existe».
      *
      * @param string $number Ya normalizado.
-     * @return \stdClass[] id, auth, suspended, deleted
+     * @return \stdClass[] id, auth, confirmed, suspended, deleted
      */
     public static function find_by_document(string $number): array {
         global $DB, $CFG;

@@ -101,17 +101,35 @@ final class webhook_test extends \advanced_testcase {
     public function test_firma_invalida(): void {
         global $DB;
         $body = $this->body('presentation.verified', 'e1', $this->verified('10203045'));
-        $this->assertSame(401, webhook::handle($body, hmac::sign($body . ' ', self::SECRET), self::SECRET));
-        $this->assertSame(401, webhook::handle($body, null, self::SECRET));
+        // 503 y no 401: un 4xx haría que Sovra descarte el evento para siempre.
+        $this->assertSame(503, webhook::handle($body, hmac::sign($body . ' ', self::SECRET), self::SECRET));
+        $this->assertSame(503, webhook::handle($body, null, self::SECRET));
         $this->assertSame(login_session::PENDING, $this->session()->status);
         // Registrado, pero una sola vez por minuto.
         $this->assertSame(1, $DB->count_records(log::TABLE, ['kind' => log::WEBHOOK, 'result' => 'badsignature']));
     }
 
     public function test_sin_secreto(): void {
+        global $DB;
+        set_config('webhooksecret', '', 'auth_sovra');
         $body = $this->body('presentation.verified', 'e1', $this->verified('10203045'));
-        $this->assertSame(503, webhook::handle($body, hmac::sign($body, self::SECRET), ''));
+        $this->assertSame(503, webhook::handle($body, hmac::sign($body, self::SECRET), config::webhook_secret()));
         $this->assertSame(login_session::PENDING, $this->session()->status);
+        $this->assertTrue($DB->record_exists(log::TABLE, ['kind' => log::WEBHOOK, 'httpstatus' => 503, 'result' => 'notconfigured']));
+    }
+
+    public function test_error_al_aplicar_da_500_con_el_evento(): void {
+        global $CFG, $DB;
+        // Una fábrica de locks rota: apply() falla. Sovra tiene que reintentar, y el registro decir qué evento era.
+        $CFG->lock_factory = '\\auth_sovra\\no_existe';
+        $body = $this->body('presentation.verified', 'e10', $this->verified('10203045'));
+        $this->assertSame(500, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertSame(login_session::PENDING, $this->session()->status);
+        $log = $DB->get_record(log::TABLE, ['kind' => log::WEBHOOK, 'result' => 'exception'], '*', MUST_EXIST);
+        $this->assertEquals(500, $log->httpstatus);
+        $this->assertSame('presentation.verified', $log->action);
+        $this->assertSame(self::VID, $log->verificationid);
+        $this->assertSame('e10', $log->eventid);
     }
 
     public function test_presentacion_rechazada(): void {
@@ -131,6 +149,8 @@ final class webhook_test extends \advanced_testcase {
         $this->assertSame(200, webhook::handle($body, $sig, self::SECRET));
         $this->assertEquals($first, $this->session());
         $this->assertTrue($DB->record_exists(log::TABLE, ['kind' => log::WEBHOOK, 'result' => 'alreadysettled']));
+        // Un solo veredicto en el registro.
+        $this->assertSame(1, $DB->count_records(log::TABLE, ['kind' => log::LOGIN, 'verificationid' => self::VID]));
     }
 
     public function test_verificacion_ajena(): void {
@@ -161,9 +181,9 @@ final class webhook_test extends \advanced_testcase {
     public function test_variantes_de_la_firma(): void {
         $body = $this->body('presentation.verified', 'e8', $this->verified('10203045'));
         $hex = hash_hmac('sha256', $body, self::SECRET);
-        $this->assertSame(401, webhook::handle($body, hmac::sign($body, 'otro-secreto'), self::SECRET));
-        $this->assertSame(401, webhook::handle($body, $hex, self::SECRET), 'Sin el prefijo sha256=');
-        $this->assertSame(401, webhook::handle($body, '', self::SECRET));
+        $this->assertSame(503, webhook::handle($body, hmac::sign($body, 'otro-secreto'), self::SECRET));
+        $this->assertSame(503, webhook::handle($body, $hex, self::SECRET), 'Sin el prefijo sha256=');
+        $this->assertSame(503, webhook::handle($body, '', self::SECRET));
         $this->assertSame(login_session::PENDING, $this->session()->status);
         // Mayúsculas y espacios alrededor se aceptan.
         $this->assertSame(200, webhook::handle($body, '  SHA256=' . strtoupper($hex) . ' ', self::SECRET));
@@ -222,6 +242,36 @@ final class webhook_test extends \advanced_testcase {
         $this->assertSame(get_string('secret_undecryptable', 'auth_sovra', 'apikey'), $message);
         $this->assertCount(1, $this->history, 'Ni siquiera llama a la API');
         // secret() avisa con debugging() cada vez que no puede descifrar; acá no es lo que se prueba.
+        $this->resetDebugging();
+    }
+
+    public function test_aviso_si_el_documento_es_editable(): void {
+        $this->assertSame([], config::document_field_warnings());
+
+        // ID number sin bloquear para email: alguien podría escribir el documento de otra persona.
+        set_config('field_lock_idnumber', 'unlockedifempty', 'auth_email');
+        $warnings = config::document_field_warnings();
+        $this->assertSame([get_string('warn_idnumber_editable', 'auth_sovra', 'email')], $warnings);
+        $this->mock->append($this->verification_created('55555555-5555-5555-5555-555555555555', time() + 600));
+        [$ok, $message] = connection_test::run();
+        $this->assertFalse($ok);
+        $this->assertStringContainsString(s($warnings[0]), $message);
+
+        // Un método deshabilitado no cuenta: con él no se entra.
+        set_config('auth', 'sovra');
+        $this->assertSame([], config::document_field_warnings());
+
+        // Un campo de perfil sin bloquear.
+        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'abierto',
+            'name' => 'Abierto', 'locked' => 0]);
+        set_config('documentfield', 'profile_field_abierto', 'auth_sovra');
+        $this->assertSame([get_string('warn_profilefield_editable', 'auth_sovra', 'abierto')], config::document_field_warnings());
+    }
+
+    public function test_boton_con_api_key_ilegible(): void {
+        set_config('apikey', 'sodium:' . base64_encode(random_bytes(48)), 'auth_sovra');
+        $this->assertFalse(config::ready());
+        $this->assertSame([], get_auth_plugin('sovra')->loginpage_idp_list('/'));
         $this->resetDebugging();
     }
 

@@ -300,15 +300,62 @@ final class login_session_test extends \advanced_testcase {
         $this->assertTrue(login_session::can_start());
     }
 
-    public function test_el_tope_cuenta_los_intentos_que_fallan(): void {
+    public function test_el_tope_no_cuenta_las_caidas_de_sovra(): void {
         global $SESSION;
+        // Sovra caído (5xx o red): la persona tiene que ver el error real, no «pediste muchos códigos».
         $this->mock->append($this->json_response(503, ['error' => 'unavailable']));
+        $this->assertSame(['action' => 'error'], login_session::open(true, true, true));
+        $this->assertCount(0, $SESSION->auth_sovra_starts);
+        // Un 4xx sí lo atendió la API: cuenta.
+        $this->mock->append($this->json_response(400, ['error' => 'invalid_dcql_query']));
+        $this->assertSame(['action' => 'error'], login_session::open(true, true, true));
+        $this->assertCount(1, $SESSION->auth_sovra_starts);
+    }
+
+    public function test_session_id_demasiado_largo(): void {
+        global $DB;
+        $this->mock->append($this->verification_created(self::VID . '-extra', time() + 600));
         try {
             login_session::start();
             $this->fail('Tenía que fallar');
         } catch (api_exception $e) {
-            $this->assertCount(1, $SESSION->auth_sovra_starts);
+            $this->assertSame('invalidresponse', $e->errorcode);
         }
+        $this->assertSame(0, $DB->count_records(login_session::TABLE));
+    }
+
+    // Lo que decide login.php: nada que no sea mostrar un código llama a Sovra.
+
+    public function test_open_no_llama_a_la_api_si_no_corresponde(): void {
+        global $DB;
+        $this->assertSame(['action' => 'unavailable'], login_session::open(false, true, false));
+        $this->assertSame(['action' => 'ask'], login_session::open(true, false, false));
+        $this->assertCount(0, $this->history);
+
+        for ($i = 0; $i < login_session::MAX_STARTS; $i++) {
+            $this->mock->append($this->verification_created(sprintf('00000000-0000-0000-0000-%012d', $i), time() + 600));
+            $this->assertSame('show', login_session::open(true, true, true)['action']);
+        }
+        $this->assertSame(['action' => 'throttled'], login_session::open(true, true, true));
+        $this->assertSame(['action' => 'throttled'], login_session::open(true, true, true));
+        $this->assertCount(login_session::MAX_STARTS, $this->history);
+        // Registrado, como mucho una vez por minuto.
+        $this->assertSame(1, $DB->count_records(log::TABLE, ['kind' => log::LOGIN, 'result' => 'throttled']));
+    }
+
+    public function test_open_reutiliza_y_new_pide_otro(): void {
+        $this->mock->append($this->verification_created(self::VID, time() + 600));
+        $first = login_session::open(true, true, false);
+        $this->assertSame('show', $first['action']);
+        $again = login_session::open(true, true, false);
+        $this->assertEquals($first['session']->id, $again['session']->id);
+        $this->assertSame($first['uri'], $again['uri']);
+        $this->assertCount(1, $this->history, 'Recargar no llama a Sovra');
+
+        $this->mock->append($this->verification_created(self::VID2, time() + 600));
+        $other = login_session::open(true, true, true);
+        $this->assertSame(self::VID2, $other['session']->verificationid);
+        $this->assertCount(2, $this->history);
     }
 
     public function test_un_navegador_recuerda_hasta_max_tokens(): void {
@@ -366,6 +413,47 @@ final class login_session_test extends \advanced_testcase {
         $record = $this->start_session($this->mock, self::VID);
         $DB->set_field(login_session::TABLE, 'timeexpires', time() - 2 * MINSECS, ['id' => $record->id]);
         $this->assertSame(['state' => 'expired'], login_session::poll($record->token, true));
+    }
+
+    public function test_la_api_no_deja_seguir_403_404(): void {
+        foreach ([403 => self::VID, 404 => self::VID2] as $status => $vid) {
+            $record = $this->start_session($this->mock, $vid);
+            $this->mock->append($this->json_response($status, ['error' => 'x']));
+            $record = login_session::refresh($this->age($record));
+            $this->assertSame(login_session::FAILED, $record->status, (string) $status);
+            $this->assertSame(login_session::UNAVAILABLE, $record->result, (string) $status);
+        }
+    }
+
+    public function test_sin_api_key_cierra_el_intento(): void {
+        global $DB;
+        $record = $this->start_session($this->mock, self::VID);
+        set_config('apikey', '', 'auth_sovra');
+        $record = login_session::refresh($this->age($record));
+        $this->assertSame(login_session::UNAVAILABLE, $record->result);
+        $log = $DB->get_record(log::TABLE, ['kind' => log::LOGIN, 'verificationid' => self::VID], '*', MUST_EXIST);
+        $this->assertStringContainsString('notconfigured', $log->detail);
+    }
+
+    public function test_red_caida_se_reintenta(): void {
+        $record = $this->start_session($this->mock, self::VID);
+        $this->mock->append(new \GuzzleHttp\Exception\ConnectException('sin red',
+            new \GuzzleHttp\Psr7\Request('GET', 'https://api.example.test')));
+        $this->assertSame(login_session::PENDING, login_session::refresh($this->age($record))->status);
+    }
+
+    public function test_error_inesperado_en_la_consulta_queda_registrado(): void {
+        global $CFG, $DB;
+        $record = $this->start_session($this->mock, self::VID);
+        $this->mock->append($this->verification_state(self::VID, 'completed', $this->claims('10203045')));
+        // Una fábrica de locks rota: settle() falla con una excepción que no es de la API.
+        $CFG->lock_factory = '\\auth_sovra\\no_existe';
+        $record = login_session::refresh($this->age($record));
+        // No lanza (status.php no tiene a quién pasársela) y el administrador ve la causa.
+        $this->assertSame(login_session::PENDING, $record->status);
+        $log = $DB->get_record(log::TABLE, ['kind' => log::LOGIN, 'result' => 'exception'], '*', MUST_EXIST);
+        $this->assertSame(self::VID, $log->verificationid);
+        $this->assertStringContainsString('coding_exception', $log->detail);
     }
 
     public function test_api_key_revocada_cierra_el_intento(): void {
@@ -468,6 +556,76 @@ final class login_session_test extends \advanced_testcase {
         $this->assertSame(1, $DB->count_records(log::TABLE, ['kind' => log::LOGIN, 'verificationid' => self::VID]));
     }
 
+    public function test_un_objeto_viejo_no_pisa_el_veredicto(): void {
+        global $DB;
+        // refresh() llama a settle() con el objeto que recibe: la relectura dentro del lock es la que protege.
+        $this->create_person('10203045');
+        $stale = $this->age($this->start_session($this->mock, self::VID));
+        $this->assertSame(resolver::OK, $this->verify(self::VID, '10203045'));
+
+        $this->mock->append($this->json_response(401, ['error' => 'invalid_api_key']));
+        login_session::refresh($stale);
+        $stale->timeexpires = time() - 2 * MINSECS;
+        login_session::refresh($stale);
+
+        $session = $DB->get_record(login_session::TABLE, ['verificationid' => self::VID]);
+        $this->assertSame(login_session::RESOLVED, $session->status);
+        $this->assertSame(resolver::OK, $session->result);
+        $this->assertSame(1, $DB->count_records(log::TABLE, ['kind' => log::LOGIN, 'verificationid' => self::VID]));
+    }
+
+    public function test_lock_ocupado(): void {
+        global $CFG, $DB;
+        // Con locks por archivo, otro lock sobre el mismo recurso choca aunque sea el mismo proceso.
+        $CFG->lock_factory = '\\core\\lock\\file_lock_factory';
+        $this->create_person('10203045');
+        $record = $this->start_session($this->mock, self::VID);
+        $held = \core\lock\lock_config::get_lock_factory('auth_sovra')->get_lock('session_' . $record->id, 0);
+        $this->assertNotFalse($held);
+        try {
+            $this->verify(self::VID, '10203045');
+            $this->fail('Tenía que lanzar lock_exception');
+        } catch (lock_exception $e) {
+            $this->assertSame(login_session::PENDING, $DB->get_field(login_session::TABLE, 'status', ['id' => $record->id]));
+            $this->assertTrue($DB->record_exists(log::TABLE, ['kind' => log::LOGIN, 'result' => 'lockfailed']));
+        } finally {
+            $held->release();
+        }
+        // Suelto el lock, el siguiente aviso lo aplica.
+        $this->assertSame(resolver::OK, $this->verify(self::VID, '10203045'));
+    }
+
+    public function test_detalle_de_una_credencial_rechazada(): void {
+        global $DB;
+        $this->create_person('10203045');
+        $this->start_session($this->mock, self::VID);
+        login_session::apply(self::VID, 'completed', ['credentials' => [['id' => 'identidad', 'claims' =>
+            $this->claims('10203045', ['iss' => 'https://test-api-sovra.flagonsa.com/' . self::$otherdid])]]], null, 'webhook');
+        $log = $DB->get_record(log::TABLE, ['kind' => log::LOGIN, 'verificationid' => self::VID], '*', MUST_EXIST);
+        $this->assertSame(resolver::ISSUER_NOT_ALLOWED, $log->result);
+        $this->assertSame('iss=' . self::$otherdid . ' vct=IdentidadMigrante claims=iss,vct,tipo_doc,num_doc', $log->detail);
+    }
+
+    public function test_al_completar_se_revisa_la_cuenta_de_nuevo(): void {
+        global $DB;
+        $cases = [
+            'borrada' => [fn($user) => delete_user($user), resolver::NOT_FOUND],
+            'nologin' => [fn($user) => $DB->set_field('user', 'auth', 'nologin', ['id' => $user->id]), resolver::AUTH_NOT_ALLOWED],
+            'deshabilitado' => [fn($user) => set_config('auth', 'sovra'), resolver::AUTH_NOT_ALLOWED],
+            'admin' => [fn($user) => set_config('siteadmins', get_admin()->id . ',' . $user->id), resolver::ADMIN],
+        ];
+        $i = 0;
+        foreach ($cases as $name => [$change, $expected]) {
+            $this->configure_plugin();
+            $user = $this->create_person('5000000' . $i, ['auth' => 'email']);
+            $vid = sprintf('99999999-0000-0000-0000-%012d', $i++);
+            $record = $this->start_session($this->mock, $vid);
+            $this->assertSame(resolver::OK, $this->verify($vid, $user->idnumber), $name);
+            $change($user);
+            $this->assertSame([$expected, null], login_session::consume(login_session::for_browser($record->token)), $name);
+        }
+    }
+
     public function test_get_informa_vencida(): void {
         $record = $this->start_session($this->mock, self::VID);
         $this->mock->append($this->verification_state(self::VID, 'expired'));
@@ -505,8 +663,8 @@ final class login_session_test extends \advanced_testcase {
         // Sin escapar: con \u00e9 en el volcado, buscar «Cédula» no probaría nada.
         $dump = json_encode([$DB->get_records(login_session::TABLE), $DB->get_records(log::TABLE)],
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        foreach (['10203045', '10.203.045', "C\u{00E9}dula", "Ce\u{0301}dula", 'ciudadan', self::$issuerdid, self::$otherdid,
-                self::HOLDER] as $secret) {
+        // El DID del emisor sí puede aparecer (es del workspace, no del ciudadano): en el detalle del rechazo.
+        foreach (['10203045', '10.203.045', "C\u{00E9}dula", "Ce\u{0301}dula", 'ciudadan', self::HOLDER] as $secret) {
             $this->assertStringNotContainsString($secret, $dump);
         }
         $this->assertSame(2, $DB->count_records(log::TABLE, ['kind' => log::LOGIN, 'result' => resolver::OK]));

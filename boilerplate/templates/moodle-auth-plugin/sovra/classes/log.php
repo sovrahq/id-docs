@@ -107,18 +107,6 @@ class log {
     }
 
     /**
-     * El último aviso del webhook firmado correctamente.
-     *
-     * @return \stdClass|null
-     */
-    public static function last_webhook(): ?\stdClass {
-        global $DB;
-        $records = $DB->get_records_select(self::TABLE, "kind = :kind AND result NOT IN ('badsignature', 'notconfigured')",
-            ['kind' => self::WEBHOOK], 'timecreated DESC, id DESC', '*', 0, 1);
-        return $records ? reset($records) : null;
-    }
-
-    /**
      * Para lo que puede llegar sin autenticar: ¿pasó un minuto desde la última vez que se registró?
      *
      * Si pasó, marca este momento y devuelve true. Así un endpoint público escribe como mucho una fila por minuto.

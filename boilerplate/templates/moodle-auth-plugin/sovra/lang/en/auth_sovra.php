@@ -109,7 +109,7 @@ $string['test_error'] = 'The test failed: {$a}';
 $string['test_issuers_missing'] = 'There are no allowed issuers: the button is hidden and nobody can log in.';
 $string['test_ok'] = 'Connection works: the API accepted the query and opened a test verification (it expires on its own in 10 minutes). API key {$a}.';
 $string['warn_idnumber_editable'] = 'The document number is in the ID number and it is not locked for these authentication methods: {$a}. Each person can change it from their profile and enter someone else\'s document. Lock it ("Lock value" for ID number) in the settings of each method.';
-$string['warn_profilefield_editable'] = 'The profile field "{$a}" is not locked: each person can change it from their profile and enter someone else\'s document. Mark it as locked in the field settings.';
+$string['warn_profilefield_editable'] = 'The profile field "{$a}" is not locked: each person can change it from their profile and enter someone else\'s document. Lock it in Site administration → Users → User profile fields → edit the field → "Is this field locked?" = Yes.';
 $string['webhooksecret'] = 'Webhook secret';
 $string['webhooksecret_desc'] = 'The secret Sovra signs deliveries with. Optional. Stored encrypted.';
 $string['workspaceid'] = 'Workspace ID';

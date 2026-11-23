@@ -109,7 +109,7 @@ $string['test_error'] = 'La prueba falló: {$a}';
 $string['test_issuers_missing'] = 'No hay emisores permitidos: el botón no aparece y nadie puede entrar.';
 $string['test_ok'] = 'Conexión correcta: la API aceptó la consulta y abrió una verificación de prueba (vence sola en 10 minutos). API key {$a}.';
 $string['warn_idnumber_editable'] = 'El número de documento está en el ID number y no está bloqueado para estos métodos de autenticación: {$a}. Cada persona puede cambiarlo desde su perfil y poner el documento de otra. Bloquéalo («Bloquear el valor» del ID number) en la configuración de cada método.';
-$string['warn_profilefield_editable'] = 'El campo de perfil «{$a}» no está bloqueado: cada persona puede cambiarlo desde su perfil y poner el documento de otra. Márcalo como bloqueado en la configuración del campo.';
+$string['warn_profilefield_editable'] = 'El campo de perfil «{$a}» no está bloqueado: cada persona puede cambiarlo desde su perfil y poner el documento de otra. Bloquéalo en Administración del sitio → Usuarios → Campos de perfil del usuario → editar el campo → «¿Está bloqueado este campo?» = Sí.';
 $string['webhooksecret'] = 'Secreto del webhook';
 $string['webhooksecret_desc'] = 'El secreto con el que Sovra firma los avisos. Opcional. Se guarda cifrado.';
 $string['workspaceid'] = 'Workspace ID';

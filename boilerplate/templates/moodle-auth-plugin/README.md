@@ -32,7 +32,8 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 1. Copiar la carpeta `sovra/` a `auth/sovra/` del Moodle (en Moodle 5.1: `public/auth/sovra/`). **Copiar, no enlazar con symlink**: las páginas del plugin buscan `config.php` dos carpetas arriba.
 2. Entrar como administrador y completar la actualización (o `php admin/cli/upgrade.php`).
 3. **Administración del sitio → Plugins → Autenticación → Gestionar autenticación**: habilitar «Ingreso con la SuperApp (Sovra ID)».
-4. Completar la configuración (abajo) y apretar **«Probar la conexión»** en **Administración del sitio → Informes → Registro del ingreso con la SuperApp**.
+4. **Bloquear los campos del documento**, para que nadie pueda escribir el documento de otra persona desde su perfil: en **Administración del sitio → Usuarios → Campos de perfil del usuario**, editar `numero_documento` y `tipo_documento` y poner **«¿Está bloqueado este campo?» = Sí**. (Si el documento está en el ID number: **«Bloquear el valor»** del ID number en la configuración de cada método de autenticación aceptado.)
+5. Completar la configuración (abajo) y apretar **«Probar la conexión»** en **Administración del sitio → Informes → Registro del ingreso con la SuperApp**. Si un campo del documento sigue editable, la prueba da error y dice cuál.
 
 ## Configuración
 

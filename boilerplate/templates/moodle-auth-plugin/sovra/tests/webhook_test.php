@@ -150,6 +150,39 @@ final class webhook_test extends \advanced_testcase {
         $this->assertSame(login_session::RESOLVED, $this->session()->status);
     }
 
+    public function test_sin_workspace_id_con_workspace_configurado(): void {
+        set_config('workspaceid', self::WORKSPACE, 'auth_sovra');
+        $body = '{"event": "presentation.verified", "id": "e7", "data": '
+            . json_encode($this->verified('10203045'), JSON_UNESCAPED_SLASHES) . '}';
+        $this->assertSame(200, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
+        $this->assertSame(login_session::PENDING, $this->session()->status);
+    }
+
+    public function test_variantes_de_la_firma(): void {
+        $body = $this->body('presentation.verified', 'e8', $this->verified('10203045'));
+        $hex = hash_hmac('sha256', $body, self::SECRET);
+        $this->assertSame(401, webhook::handle($body, hmac::sign($body, 'otro-secreto'), self::SECRET));
+        $this->assertSame(401, webhook::handle($body, $hex, self::SECRET), 'Sin el prefijo sha256=');
+        $this->assertSame(401, webhook::handle($body, '', self::SECRET));
+        $this->assertSame(login_session::PENDING, $this->session()->status);
+        // Mayúsculas y espacios alrededor se aceptan.
+        $this->assertSame(200, webhook::handle($body, '  SHA256=' . strtoupper($hex) . ' ', self::SECRET));
+        $this->assertSame(login_session::RESOLVED, $this->session()->status);
+    }
+
+    public function test_secreto_que_no_se_puede_descifrar(): void {
+        global $DB;
+        // Como queda tras migrar el sitio con otra clave: cifrado, pero ilegible.
+        set_config('webhooksecret', 'sodium:' . base64_encode(random_bytes(48)), 'auth_sovra');
+        $this->assertSame('', config::webhook_secret());
+        $this->assertSame(['webhooksecret'], config::undecryptable());
+        $body = $this->body('presentation.verified', 'e9', $this->verified('10203045'));
+        $this->assertSame(503, webhook::handle($body, hmac::sign($body, self::SECRET), config::webhook_secret()));
+        $this->assertTrue($DB->record_exists(log::TABLE, ['kind' => log::WEBHOOK, 'result' => 'undecryptable']));
+        // secret() avisa con debugging() cada vez que no puede descifrar; acá no es lo que se prueba.
+        $this->resetDebugging();
+    }
+
     public function test_otros_eventos_y_basura(): void {
         $body = $this->body('credential.issued', 'e5', ['credential_id' => 'x']);
         $this->assertSame(200, webhook::handle($body, hmac::sign($body, self::SECRET), self::SECRET));
@@ -182,10 +215,28 @@ final class webhook_test extends \advanced_testcase {
         $this->assertStringContainsString('invalid_api_key', $message);
     }
 
+    public function test_prueba_de_conexion_avisa_la_clave_ilegible(): void {
+        set_config('apikey', 'sodium:' . base64_encode(random_bytes(48)), 'auth_sovra');
+        [$ok, $message] = connection_test::run();
+        $this->assertFalse($ok);
+        $this->assertSame(get_string('secret_undecryptable', 'auth_sovra', 'apikey'), $message);
+        $this->assertCount(1, $this->history, 'Ni siquiera llama a la API');
+        // secret() avisa con debugging() cada vez que no puede descifrar; acá no es lo que se prueba.
+        $this->resetDebugging();
+    }
+
     public function test_boton_solo_con_configuracion_completa(): void {
         $auth = get_auth_plugin('sovra');
-        $this->assertCount(1, $auth->loginpage_idp_list('/'));
-        set_config('allowedissuers', '', 'auth_sovra');
-        $this->assertSame([], $auth->loginpage_idp_list('/'));
+        $buttons = $auth->loginpage_idp_list('/');
+        $this->assertCount(1, $buttons);
+        // Con sesskey: un enlace de otro sitio no abre verificaciones.
+        $this->assertSame(sesskey(), $buttons[0]['url']->get_param('sesskey'));
+        foreach (['allowedissuers', 'apiurl', 'apikey'] as $name) {
+            $saved = get_config('auth_sovra', $name);
+            set_config($name, '', 'auth_sovra');
+            $this->assertSame([], $auth->loginpage_idp_list('/'), $name);
+            set_config($name, $saved, 'auth_sovra');
+        }
+        $this->assertCount(1, $this->history, 'Sin configuración completa no se llama a la API');
     }
 }

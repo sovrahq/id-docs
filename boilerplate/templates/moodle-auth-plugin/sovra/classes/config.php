@@ -215,6 +215,18 @@ class config {
     }
 
     /**
+     * Los secretos guardados que no se pueden descifrar (por ejemplo, después de migrar el sitio con otra clave).
+     *
+     * Sin esto, el plugin los trata como vacíos y el botón desaparece sin explicación.
+     *
+     * @return string[] apikey y/o webhooksecret.
+     */
+    public static function undecryptable(): array {
+        return array_values(array_filter(['apikey', 'webhooksecret'],
+            fn($name) => trim((string) get_config(self::PLUGIN, $name)) !== '' && self::secret($name) === ''));
+    }
+
+    /**
      * URL pública del webhook, para pegar en la consola de Sovra.
      *
      * @return \moodle_url
@@ -263,7 +275,9 @@ class config {
         try {
             return \core\encryption::decrypt($value);
         } catch (\moodle_exception $e) {
-            // Nunca se loguea el valor: sólo que no se pudo descifrar.
+            // Nunca se loguea el valor: sólo que no se pudo descifrar. debugging() no se ve en producción:
+            // también va al log de PHP, y logs.php y la prueba de conexión lo avisan (undecryptable()).
+            error_log("auth_sovra: no se pudo descifrar '{$name}'; hay que volver a guardarlo en la configuración.");
             debugging("auth_sovra: no se pudo descifrar '{$name}'; volvé a guardarlo en la configuración.");
             return '';
         }

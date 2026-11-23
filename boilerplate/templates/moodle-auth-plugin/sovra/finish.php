@@ -15,11 +15,11 @@
 require(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/login/lib.php');
 
-use auth_sovra\log;
 use auth_sovra\login_session;
 use auth_sovra\resolver;
 
 $token = required_param('token', PARAM_ALPHANUM);
+$sesskey = optional_param('sesskey', '', PARAM_RAW);
 
 $PAGE->set_url(new moodle_url('/auth/sovra/finish.php'));
 $PAGE->set_context(context_system::instance());
@@ -31,17 +31,10 @@ if (isloggedin() && !isguestuser()) {
     redirect(new moodle_url('/'));
 }
 
-// Sesskey y token: los dos tienen que ser de este navegador.
-$record = confirm_sesskey() ? login_session::for_browser($token) : null;
-if (!$record) {
-    redirect(new moodle_url('/auth/sovra/login.php', ['result' => 'generic']));
-}
-
-[$result, $user] = login_session::consume($record);
-log::login('finish', $result, $record->verificationid, $user ? (int) $user->id : null);
-
+// Valida sesskey y token, consume la sesión de ingreso (un solo uso) y lo registra.
+[$result, $user] = login_session::finish($token, $sesskey !== '' && confirm_sesskey($sesskey));
 if ($result !== resolver::OK) {
-    redirect(new moodle_url('/auth/sovra/login.php', ['result' => in_array($result, ['notready', 'gone']) ? 'generic' : $result]));
+    redirect(new moodle_url('/auth/sovra/login.php', ['result' => $result]));
 }
 
 $user = get_complete_user_data('id', $user->id);

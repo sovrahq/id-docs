@@ -161,8 +161,24 @@ final class resolver_test extends \advanced_testcase {
     }
 
     public function test_campo_de_perfil_inexistente(): void {
+        global $DB;
         set_config('documentfield', 'profile_field_noexiste', 'auth_sovra');
         $this->assertSame([resolver::MISCONFIGURED, null], resolver::resolve($this->claims('10203045')));
+        // El administrador ve la causa en el registro, sin el documento.
+        $log = $DB->get_record(log::TABLE, ['kind' => log::LOGIN, 'action' => 'resolve'], '*', MUST_EXIST);
+        $this->assertSame(resolver::MISCONFIGURED, $log->result);
+        $this->assertStringContainsString('no existe', $log->detail);
+        $this->assertStringNotContainsString('10203045', $log->detail);
+    }
+
+    public function test_solo_cuentas_de_este_sitio(): void {
+        global $DB;
+        // Una cuenta MNet de otro sitio con el mismo documento no cuenta, ni como duplicado.
+        $remote = $this->create_person('10203045');
+        $DB->set_field('user', 'mnethostid', 999, ['id' => $remote->id]);
+        $this->assertSame([resolver::NOT_FOUND, null], resolver::resolve($this->claims('10203045')));
+        $local = $this->create_person('10203045');
+        $this->assertSame([resolver::OK, (int) $local->id], resolver::resolve($this->claims('10203045')));
     }
 
     // Cuentas que no pueden entrar.
@@ -170,6 +186,12 @@ final class resolver_test extends \advanced_testcase {
     public function test_cuenta_suspendida(): void {
         $this->create_person('10203045', ['suspended' => 1]);
         $this->assertSame([resolver::SUSPENDED, null], resolver::resolve($this->claims('10203045')));
+    }
+
+    public function test_cuenta_sin_confirmar(): void {
+        // Autorregistro por email sin confirmar: con contraseña no entra, con la SuperApp tampoco.
+        $this->create_person('10203045', ['auth' => 'email', 'confirmed' => 0]);
+        $this->assertSame([resolver::UNCONFIRMED, null], resolver::resolve($this->claims('10203045')));
     }
 
     public function test_metodo_no_aceptado(): void {
@@ -244,6 +266,15 @@ final class resolver_test extends \advanced_testcase {
         $this->create_atenea_person('60001234', 'PEP');
         $this->assertSame([resolver::NOT_FOUND, null],
             resolver::resolve($this->claims('60001234', ['tipo_doc' => 'PEP Tutor'])));
+    }
+
+    public function test_iss_raro_no_entra(): void {
+        $this->create_person('10203045');
+        $this->assertSame([resolver::ISSUER_MISSING, null],
+            resolver::resolve($this->claims('10203045', ['iss' => [self::$issuerdid]])));
+        // Falla cerrada: una barra de más ya no es el DID de la lista.
+        $this->assertSame([resolver::ISSUER_NOT_ALLOWED, null],
+            resolver::resolve($this->claims('10203045', ['iss' => 'https://api.sovra.io/' . self::$issuerdid . '/'])));
     }
 
     public function test_normalizaciones(): void {

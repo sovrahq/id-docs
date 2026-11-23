@@ -35,7 +35,10 @@ try {
     $status = \auth_sovra\webhook::handle($rawbody, $signature, \auth_sovra\config::webhook_secret());
 } catch (\Throwable $e) {
     // Sin esto, el manejador de Moodle responde 404, y un 4xx hace que Sovra descarte el evento sin reintentar.
+    // Con 500 Sovra reintenta; la causa queda en el log de PHP y, si la base responde, en el registro del plugin.
     $status = 500;
+    error_log('auth_sovra webhook: ' . get_class($e) . ': ' . $e->getMessage());
+    \auth_sovra\log::webhook('', 500, 'exception', [], get_class($e) . ': ' . $e->getMessage());
 }
 
 http_response_code($status);

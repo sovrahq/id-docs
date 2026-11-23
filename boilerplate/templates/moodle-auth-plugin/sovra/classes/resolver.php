@@ -36,6 +36,8 @@ class resolver {
     const DUPLICATE = 'duplicate';
     /** @var string La cuenta está suspendida. */
     const SUSPENDED = 'suspended';
+    /** @var string La cuenta no confirmó su email: con contraseña el núcleo tampoco la deja entrar. */
+    const UNCONFIRMED = 'unconfirmed';
     /** @var string La cuenta usa un método de autenticación que no se acepta (incluido nologin). */
     const AUTH_NOT_ALLOWED = 'authnotallowed';
     /** @var string La cuenta es administradora del sitio y no se permite. */
@@ -80,6 +82,8 @@ class resolver {
         try {
             $candidates = self::find_by_document($number);
         } catch (\coding_exception $e) {
+            // A la persona, un aviso genérico; al administrador, la causa (no tiene datos personales).
+            log::login('resolve', self::MISCONFIGURED, null, null, $e->getMessage());
             return [self::MISCONFIGURED, null];
         }
         if ($matchtype) {
@@ -103,7 +107,7 @@ class resolver {
      *
      * Se vuelve a correr al completar el ingreso: la cuenta puede haber cambiado desde la verificación.
      *
-     * @param \stdClass $user Con id, auth, suspended y deleted.
+     * @param \stdClass $user Con id, auth, confirmed, suspended y deleted.
      * @return string|null
      */
     public static function cannot_login(\stdClass $user): ?string {
@@ -112,6 +116,10 @@ class resolver {
         }
         if (!empty($user->suspended)) {
             return self::SUSPENDED;
+        }
+        // complete_user_login no lo revisa: sin esto, la SuperApp saltearía la confirmación del email.
+        if (empty($user->confirmed)) {
+            return self::UNCONFIRMED;
         }
         if ($user->auth === 'nologin' || !in_array($user->auth, config::allowed_auths(), true)) {
             return self::AUTH_NOT_ALLOWED;
@@ -142,7 +150,10 @@ class resolver {
     }
 
     /**
-     * Número de documento comparable: sin puntos, espacios ni guiones, en mayúsculas.
+     * Número de documento comparable: sin puntos, espacios en blanco ni guiones, en mayúsculas.
+     *
+     * Es el lado de la credencial. El de Moodle lo normaliza el SQL de find_by_document, que sólo quita el
+     * espacio común (no tabuladores ni espacios duros).
      *
      * @param string $value
      * @return string
@@ -193,7 +204,7 @@ class resolver {
 
         // REPLACE y UPPER existen en PostgreSQL, MySQL/MariaDB, SQL Server y Oracle.
         $normalized = "REPLACE(REPLACE(REPLACE(UPPER($column), '.', ''), ' ', ''), '-', '')";
-        $sql = "SELECT u.id, u.auth, u.suspended, u.deleted
+        $sql = "SELECT u.id, u.auth, u.confirmed, u.suspended, u.deleted
                   FROM {user} u
                   $join
                  WHERE u.deleted = 0 AND u.mnethostid = :mnethostid AND $normalized = :number

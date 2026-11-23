@@ -9,9 +9,10 @@ namespace auth_sovra;
  * Registro de lo que el plugin habla con Sovra y de cada intento de ingreso.
  *
  * Es lo que el administrador mira cuando algo no anda («¿llegan los avisos?», «¿por qué no entró?»).
- * **Nunca** guarda el número ni el tipo de documento, el DID del ciudadano, los claims ni los cuerpos:
- * sólo qué pasó, cuándo, con qué verificación y, si alguien entró, el id de su cuenta.
- * Escribir acá nunca hace fallar el flujo.
+ * **Nunca** guarda el número ni el tipo de documento, el DID del ciudadano, los claims ni el cuerpo de los
+ * avisos: sólo qué pasó, cuándo, con qué verificación y, si se resolvió o entró una cuenta, su id. De las
+ * llamadas a la API guarda el código de error y el `details` que devuelve Sovra, que no traen datos personales.
+ * Escribir acá nunca hace fallar el flujo; si no se puede, queda en el log de errores de PHP.
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra
@@ -66,9 +67,11 @@ class log {
      * @param int $httpstatus Lo que respondió Moodle.
      * @param string $result
      * @param array $payload El sobre decodificado (vacío si no se pudo leer o no estaba firmado).
+     * @param string|null $detail Sin datos personales (por ejemplo, la clase de una excepción).
      * @return void
      */
-    public static function webhook(string $event, int $httpstatus, string $result, array $payload = []): void {
+    public static function webhook(string $event, int $httpstatus, string $result, array $payload = [],
+            ?string $detail = null): void {
         self::write([
             'kind' => self::WEBHOOK,
             'action' => $event !== '' ? $event : '—',
@@ -77,16 +80,17 @@ class log {
             'verificationid' => is_string($payload['data']['verification_id'] ?? null) ? $payload['data']['verification_id'] : null,
             'eventid' => is_string($payload['id'] ?? null) ? $payload['id'] : null,
             'workspaceid' => is_string($payload['workspace_id'] ?? null) ? $payload['workspace_id'] : null,
+            'detail' => $detail,
         ]);
     }
 
     /**
      * Registra el veredicto de un intento de ingreso.
      *
-     * @param string $action De dónde salió: webhook, poll, finish.
+     * @param string $action De dónde salió: webhook, poll, finish, status o resolve.
      * @param string $result Un código de resolver o de login_session.
      * @param string|null $verificationid
-     * @param int|null $userid La cuenta, si se resolvió una.
+     * @param int|null $userid La cuenta, si se resolvió una (aunque después no llegue a entrar).
      * @param string|null $detail Sin datos personales.
      * @return void
      */
@@ -112,6 +116,22 @@ class log {
         $records = $DB->get_records_select(self::TABLE, "kind = :kind AND result NOT IN ('badsignature', 'notconfigured')",
             ['kind' => self::WEBHOOK], 'timecreated DESC, id DESC', '*', 0, 1);
         return $records ? reset($records) : null;
+    }
+
+    /**
+     * Para lo que puede llegar sin autenticar: ¿pasó un minuto desde la última vez que se registró?
+     *
+     * Si pasó, marca este momento y devuelve true. Así un endpoint público escribe como mucho una fila por minuto.
+     *
+     * @param string $key Ajuste del plugin donde se guarda el último momento (lastrejected, lastbadsession…).
+     * @return bool
+     */
+    public static function once_per_minute(string $key): bool {
+        if ((int) get_config(config::PLUGIN, $key) >= time() - MINSECS) {
+            return false;
+        }
+        set_config($key, time(), config::PLUGIN);
+        return true;
     }
 
     /**
@@ -145,7 +165,9 @@ class log {
         try {
             $DB->insert_record(self::TABLE, (object) $row);
         } catch (\Throwable $e) {
-            // El registro es para diagnosticar: si no se puede escribir, el ingreso sigue igual.
+            // El registro es para diagnosticar: si no se puede escribir, el ingreso sigue igual. debugging() no se
+            // ve en producción, así que también va al log de errores de PHP (sin el contenido de la fila).
+            error_log('auth_sovra: no se pudo escribir el registro: ' . get_class($e) . ': ' . $e->getMessage());
             debugging('auth_sovra: no se pudo escribir el registro: ' . get_class($e), DEBUG_NORMAL);
         }
     }

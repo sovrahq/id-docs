@@ -24,7 +24,7 @@ Al abrir la página de ingreso, el plugin SHALL crear una verificación en `POST
 La página de ingreso SHALL mostrar el QR y el enlace `openid4vp://` de la verificación (paso por referencia) y SHALL consultar el resultado desde el navegador, porque la billetera no vuelve al sitio.
 
 #### Scenario: Página de ingreso
-- **WHEN** una persona sin sesión abre la página de ingreso del plugin
+- **WHEN** una persona sin sesión llega a la página de ingreso del plugin con el botón de la pantalla de ingreso
 - **THEN** el plugin crea una verificación con la consulta descrita
 - **AND** la página muestra un QR y un botón con el enlace `openid4vp://` de la verificación, y una cuenta regresiva hasta su vencimiento
 
@@ -36,6 +36,26 @@ La página de ingreso SHALL mostrar el QR y el enlace `openid4vp://` de la verif
 - **WHEN** la API responde un error o no responde al crear la verificación
 - **THEN** la página muestra que no se pudo iniciar el ingreso y ofrece reintentar, sin mostrar detalles técnicos ni la API key
 - **AND** el registro guarda el estado HTTP y el código de error
+
+#### Scenario: Espera sin conexión
+- **WHEN** la página no logra consultar el resultado varias veces seguidas
+- **THEN** avisa que hay problemas de conexión y sigue intentando
+- **AND** al pasar el vencimiento muestra que el código venció y ofrece generar uno nuevo, aunque el servidor no responda
+
+### Requirement: Apertura de verificaciones con freno
+Cada verificación cuesta una llamada a Sovra. El plugin SHALL abrirla sólo con el `sesskey` de la sesión, SHALL volver a mostrar el código vigente del navegador al recargar la página y MUST NOT abrir más de 5 verificaciones nuevas por navegador cada 10 minutos.
+
+#### Scenario: Enlace sin sesskey
+- **WHEN** alguien abre la página de ingreso sin `sesskey` válido (un enlace guardado, otro sitio, un bot)
+- **THEN** la página muestra el botón para pedir el código, sin llamar a la API
+
+#### Scenario: Recargar la página
+- **WHEN** la persona recarga la página y su código vence en más de 2 minutos
+- **THEN** la página muestra el mismo código, sin abrir otra verificación
+
+#### Scenario: Demasiados códigos
+- **WHEN** un navegador ya pidió 5 códigos nuevos en los últimos 10 minutos
+- **THEN** la página pide esperar unos minutos, sin llamar a la API
 
 ### Requirement: Sesión de ingreso atada al navegador
 Cada verificación SHALL quedar atada a la sesión del navegador que la pidió mediante un identificador aleatorio guardado sólo en esa sesión. Sólo esa sesión SHALL poder consultar su resultado y completar el ingreso. Cada verificación SHALL servir para un único ingreso y MUST NOT servir después de su vencimiento.
@@ -62,11 +82,11 @@ El plugin SHALL aceptar el resultado por el webhook `presentation.verified` / `p
 
 #### Scenario: Firma inválida
 - **WHEN** llega un aviso con una firma que no corresponde al cuerpo
-- **THEN** el plugin responde 401, no cambia ninguna sesión de ingreso y lo registra
+- **THEN** el plugin responde 401, no cambia ninguna sesión de ingreso y lo registra (como mucho una fila por minuto, porque el endpoint es público)
 
 #### Scenario: Aviso repetido
-- **WHEN** el mismo aviso llega dos veces
-- **THEN** el segundo no cambia el resultado ya aplicado
+- **WHEN** el mismo aviso llega dos veces, o el aviso y la consulta por `GET` traen el resultado a la vez
+- **THEN** el segundo no cambia el resultado ya aplicado y el registro tiene un solo veredicto
 
 ### Requirement: Recepción del resultado por consulta
 Mientras la página espera, el plugin SHALL consultar el resultado con `GET /api/v1/verifier/verifications/{id}`, para no depender del webhook, y SHALL aplicarlo igual que si hubiera llegado por webhook.
@@ -78,6 +98,10 @@ Mientras la página espera, el plugin SHALL consultar el resultado con `GET /api
 #### Scenario: Presentación rechazada
 - **WHEN** llega `presentation.failed` (o el `GET` informa `failed`)
 - **THEN** la página muestra que la credencial no pudo validarse y ofrece reintentar, y nadie entra
+
+#### Scenario: La API no deja seguir
+- **WHEN** el `GET` responde 401, 403 o 404 (por ejemplo, la API key fue revocada)
+- **THEN** el intento termina en ese momento y la página muestra que no se pudo completar el ingreso, en lugar de esperar al vencimiento
 
 ### Requirement: Sólo emisores permitidos
 El plugin SHALL aceptar sólo credenciales cuyo emisor (el DID del `iss`, que en Sovra es la ruta de la URL del emisor) esté en la lista de emisores permitidos. Con la lista vacía, o si el resultado no trae `iss`, MUST rechazar el ingreso (falla cerrada). Si hay tipos de credencial configurados, el `vct` presentado SHALL estar entre ellos.
@@ -130,11 +154,15 @@ Si la comparación por tipo está activa, el plugin SHALL comparar además el ti
 - **THEN** entra la que coincide en tipo
 
 ### Requirement: Cuentas que no pueden entrar
-El plugin MUST NOT iniciar sesión en una cuenta suspendida, con método de autenticación `nologin`, con un método de autenticación fuera de la lista de métodos aceptados, ni (salvo que la configuración lo permita) en la cuenta de un administrador del sitio.
+El plugin MUST NOT iniciar sesión en una cuenta suspendida, sin confirmar, con método de autenticación `nologin`, con un método de autenticación fuera de la lista de métodos aceptados, ni (salvo que la configuración lo permita) en la cuenta de un administrador del sitio.
 
 #### Scenario: Cuenta suspendida
 - **WHEN** la única cuenta coincidente está suspendida
 - **THEN** nadie entra y la página indica que la cuenta está suspendida
+
+#### Scenario: Cuenta sin confirmar
+- **WHEN** la única cuenta coincidente se registró por email y no confirmó su correo
+- **THEN** nadie entra y la página indica que primero confirme la cuenta
 
 #### Scenario: Método no aceptado
 - **WHEN** la cuenta coincidente usa un método de autenticación que no está en la lista aceptada (por defecto: `manual`, `email` y `sovra`)
@@ -145,7 +173,7 @@ El plugin MUST NOT iniciar sesión en una cuenta suspendida, con método de aute
 - **THEN** nadie entra
 
 ### Requirement: Registro sin datos personales
-El plugin SHALL registrar cada llamada a la API y cada aviso del webhook (qué pasó, estado HTTP, resultado, verificación) y el resultado de cada intento de ingreso, y MUST NOT guardar en el registro ni en sus tablas el número de documento, el tipo de documento ni el DID del ciudadano en claro. El administrador SHALL poder ver ese registro y probar la conexión con la API.
+El plugin SHALL registrar cada llamada a la API y cada aviso del webhook (qué pasó, estado HTTP, resultado, verificación; los avisos sin firma válida, como mucho uno por minuto) y el resultado de cada intento de ingreso, y MUST NOT guardar en el registro ni en sus tablas el número de documento, el tipo de documento ni el DID del ciudadano en claro. El administrador SHALL poder ver ese registro y probar la conexión con la API.
 
 #### Scenario: Ingreso registrado
 - **WHEN** una persona entra con la SuperApp, o un intento falla por cualquier motivo

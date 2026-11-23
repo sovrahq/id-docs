@@ -24,6 +24,9 @@ class connection_test {
      * @return array{0: bool, 1: string} [salió bien, mensaje]
      */
     public static function run(?api_client $api = null): array {
+        if ($names = config::undecryptable()) {
+            return [false, get_string('secret_undecryptable', 'auth_sovra', implode(', ', $names))];
+        }
         try {
             $api = $api ?? api_client::from_config();
             $api->create_verification(login_session::dcql());

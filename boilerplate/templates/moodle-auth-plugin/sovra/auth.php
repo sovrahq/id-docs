@@ -86,7 +86,8 @@ class auth_plugin_sovra extends auth_plugin_base {
             return [];
         }
         return [[
-            'url' => new moodle_url('/auth/sovra/login.php'),
+            // Con sesskey: sólo un clic desde este sitio abre una verificación en Sovra.
+            'url' => new moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey()]),
             'iconurl' => new moodle_url('/auth/sovra/pix/superapp.svg'),
             'name' => get_string('loginbutton', 'auth_sovra'),
         ]];

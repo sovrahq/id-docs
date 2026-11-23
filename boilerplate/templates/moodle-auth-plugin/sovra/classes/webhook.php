@@ -11,9 +11,10 @@ namespace auth_sovra;
  * Qué responder importa: un 4xx hace que Sovra descarte el evento sin reintentar. Por eso sólo la firma
  * inválida da 401; todo lo demás con firma válida da 200, y un secreto sin configurar da 503.
  *
- * El webhook es opcional: la página de ingreso consulta la verificación por GET mientras espera. Si llega,
- * el ingreso es más rápido. Los dos caminos escriben el mismo veredicto con la misma función, y el que llega
- * segundo no cambia nada.
+ * El webhook es opcional: la página de ingreso consulta la verificación por GET mientras espera, así que no
+ * lo hace más rápido; lo que aporta es que el veredicto no dependa de que la API responda a cada consulta.
+ * Los dos caminos escriben el mismo veredicto con login_session::apply(), y el que llega segundo no cambia
+ * nada (queda registrado como alreadysettled).
  *
  * Referencia: docs/guides/credentials/06-webhooks.md
  *
@@ -39,16 +40,14 @@ class webhook {
      */
     public static function handle(string $rawbody, ?string $signature, string $secret): int {
         if ($secret === '') {
-            if ((int) get_config(config::PLUGIN, 'lastunconfigured') < time() - MINSECS) {
-                set_config('lastunconfigured', time(), config::PLUGIN);
-                log::webhook('', 503, 'notconfigured');
+            if (log::once_per_minute('lastunconfigured')) {
+                log::webhook('', 503, config::undecryptable() ? 'undecryptable' : 'notconfigured');
             }
             return 503;
         }
         if (!hmac::is_valid($rawbody, $signature, $secret)) {
             // Como mucho una escritura por minuto: el endpoint es público. No se guarda el cuerpo.
-            if ((int) get_config(config::PLUGIN, 'lastrejected') < time() - MINSECS) {
-                set_config('lastrejected', time(), config::PLUGIN);
+            if (log::once_per_minute('lastrejected')) {
                 log::webhook('', 401, 'badsignature');
             }
             return 401;

@@ -40,3 +40,7 @@
 - [x] 6.4 Detalle de las credenciales rechazadas, `throttled` registrado, el tope no cuenta las caídas de Sovra, el log de PHP de secretos ilegibles una vez por minuto
 - [x] 6.5 `login_session::open()` con pruebas de las puertas de `login.php`; pruebas del lock y de los huecos de la revisión
   - Hecho 23/11: 112 pruebas (340 aserciones) en Moodle 4.5 y 5.1; la página de configuración arma sus 38 ajustes, con el bloqueo de campos
+
+## 7. Documento no editable
+
+- [x] 7.1 La persona no cambia su propio número ni tipo de documento (hook `before_user_updated`), sin bloquear los campos ni tocar el registro; reemplaza los avisos de campo editable

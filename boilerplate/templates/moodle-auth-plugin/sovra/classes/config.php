@@ -227,38 +227,18 @@ class config {
     }
 
     /**
-     * Avisos si la persona puede editar el campo con su documento (o su tipo) desde su perfil.
+     * Los campos de la cuenta con el documento: el número y, si se compara, el tipo.
      *
-     * Con el campo editable, alguien puede poner el documento de otra persona: si esa persona tiene cuenta, queda
-     * como duplicada y no puede entrar; si no tiene, entra con la SuperApp a la cuenta de quien lo puso.
-     * `idnumber` se bloquea por método de autenticación («Bloquear el valor» del ID number); un campo de perfil,
-     * marcándolo como bloqueado.
+     * La persona no los puede cambiar desde su perfil (hook_callbacks::before_user_updated).
      *
-     * @return string[] Un texto por problema, para el administrador.
+     * @return string[] idnumber o profile_field_<shortname>.
      */
-    public static function document_field_warnings(): array {
-        global $DB;
-        $warnings = [];
+    public static function document_fields(): array {
         $fields = [self::document_field()];
         if (self::match_document_type()) {
             $fields[] = self::document_type_field();
         }
-        foreach (array_unique($fields) as $field) {
-            if ($field === 'idnumber') {
-                $editable = array_filter(self::allowed_auths(), fn($auth) => $auth !== 'nologin' && is_enabled_auth($auth)
-                    && get_config('auth_' . $auth, 'field_lock_idnumber') !== 'locked');
-                if ($editable) {
-                    $warnings[] = get_string('warn_idnumber_editable', self::PLUGIN, implode(', ', $editable));
-                }
-            } else if (strpos($field, 'profile_field_') === 0) {
-                $shortname = substr($field, strlen('profile_field_'));
-                $locked = $DB->get_field('user_info_field', 'locked', ['shortname' => $shortname]);
-                if ($locked !== false && empty($locked)) {
-                    $warnings[] = get_string('warn_profilefield_editable', self::PLUGIN, $shortname);
-                }
-            }
-        }
-        return $warnings;
+        return array_values(array_unique($fields));
     }
 
     /**

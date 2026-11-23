@@ -245,29 +245,6 @@ final class webhook_test extends \advanced_testcase {
         $this->resetDebugging();
     }
 
-    public function test_aviso_si_el_documento_es_editable(): void {
-        $this->assertSame([], config::document_field_warnings());
-
-        // ID number sin bloquear para email: alguien podría escribir el documento de otra persona.
-        set_config('field_lock_idnumber', 'unlockedifempty', 'auth_email');
-        $warnings = config::document_field_warnings();
-        $this->assertSame([get_string('warn_idnumber_editable', 'auth_sovra', 'email')], $warnings);
-        $this->mock->append($this->verification_created('55555555-5555-5555-5555-555555555555', time() + 600));
-        [$ok, $message] = connection_test::run();
-        $this->assertFalse($ok);
-        $this->assertStringContainsString(s($warnings[0]), $message);
-
-        // Un método deshabilitado no cuenta: con él no se entra.
-        set_config('auth', 'sovra');
-        $this->assertSame([], config::document_field_warnings());
-
-        // Un campo de perfil sin bloquear.
-        $this->getDataGenerator()->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'abierto',
-            'name' => 'Abierto', 'locked' => 0]);
-        set_config('documentfield', 'profile_field_abierto', 'auth_sovra');
-        $this->assertSame([get_string('warn_profilefield_editable', 'auth_sovra', 'abierto')], config::document_field_warnings());
-    }
-
     public function test_boton_con_api_key_ilegible(): void {
         set_config('apikey', 'sodium:' . base64_encode(random_bytes(48)), 'auth_sovra');
         $this->assertFalse(config::ready());

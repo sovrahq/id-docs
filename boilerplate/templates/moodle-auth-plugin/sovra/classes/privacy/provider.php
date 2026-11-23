@@ -13,7 +13,8 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * Privacidad: el registro de ingresos y las sesiones en curso guardan el id de la cuenta. Nada más.
+ * Privacidad: el registro de ingresos y las sesiones en curso guardan el id de la cuenta, el resultado y la
+ * verificación. Nada del documento.
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra

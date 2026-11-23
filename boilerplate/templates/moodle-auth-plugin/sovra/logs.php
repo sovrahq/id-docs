@@ -21,6 +21,15 @@ $test = optional_param('test', 0, PARAM_BOOL);
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('logs', 'auth_sovra'));
 
+// Un secreto que no se puede descifrar deja el ingreso apagado sin otro aviso.
+if ($undecryptable = \auth_sovra\config::undecryptable()) {
+    echo $OUTPUT->notification(get_string('secret_undecryptable', 'auth_sovra', implode(', ', $undecryptable)), 'error', false);
+}
+// Un campo de documento que la persona puede editar permite apropiarse del documento de otra.
+foreach (\auth_sovra\config::document_field_warnings() as $warning) {
+    echo $OUTPUT->notification(s($warning), 'warning', false);
+}
+
 if ($test && confirm_sesskey()) {
     [$ok, $message] = \auth_sovra\connection_test::run();
     echo $OUTPUT->notification($message, $ok ? 'success' : 'error', false);

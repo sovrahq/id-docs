@@ -10,9 +10,13 @@ namespace auth_sovra;
  *
  * Atada al navegador por un token aleatorio que sólo conoce su $SESSION: sólo ese navegador puede consultar
  * el resultado y completar el ingreso. El veredicto lo escribe quien llegue primero (webhook o consulta por
- * GET) con una actualización condicionada a que siga pendiente, así que un segundo aviso no lo cambia.
+ * GET), bajo un lock por sesión y sólo si sigue pendiente: un segundo aviso no lo cambia ni deja otro veredicto
+ * en el registro (si el segundo es el webhook, su entrega queda anotada como alreadysettled).
  * Completar el ingreso borra la fila: un solo uso. Moodle serializa las peticiones de una misma sesión
  * (lock de sesión), así que dos «finish» simultáneos del mismo navegador no pueden pasar los dos.
+ *
+ * Abrir una verificación cuesta una llamada a Sovra: sólo con sesskey (lo controla login.php), reutilizando
+ * el código vigente del navegador y con un tope de códigos nuevos por navegador.
  *
  * La fila nunca guarda documento, tipo ni DID del ciudadano: sólo el id de la cuenta resuelta.
  *
@@ -34,6 +38,9 @@ class login_session {
     /** @var string Venció sin presentación. */
     const EXPIRED = 'expired';
 
+    /** @var string Resultado de FAILED cuando la API no deja seguir (API key revocada, verificación que no existe). */
+    const UNAVAILABLE = 'unavailable';
+
     /** @var int Segundos mínimos entre consultas por GET de una misma sesión. */
     const POLL_INTERVAL = 3;
 
@@ -45,6 +52,18 @@ class login_session {
 
     /** @var int Cuántas sesiones de ingreso recuerda un navegador (pestañas abiertas). */
     const MAX_TOKENS = 5;
+
+    /** @var int Cuántos códigos nuevos puede pedir un navegador dentro de START_WINDOW. */
+    const MAX_STARTS = 5;
+
+    /** @var int Ventana del tope de códigos nuevos. */
+    const START_WINDOW = 10 * MINSECS;
+
+    /** @var int Vigencia mínima que le tiene que quedar a un código para volver a mostrarlo. */
+    const REUSE_MIN_LEFT = 2 * MINSECS;
+
+    /** @var int Segundos que settle() espera el lock de una sesión. */
+    const LOCK_TIMEOUT = 2;
 
     /** @var string Etiqueta de la consulta DCQL. */
     const DCQL_ID = 'identidad';
@@ -81,27 +100,159 @@ class login_session {
      * @throws api_exception
      */
     public static function start(?api_client $api = null): array {
-        global $DB;
+        global $DB, $SESSION;
 
+        // El tope es sobre las llamadas a Sovra que la API atendió. Si Sovra está caído (red o 5xx), el intento no
+        // cuenta: la persona tiene que ver «no pudimos iniciar el ingreso», no «pediste muchos códigos».
+        $starts = self::recent_starts();
+        $SESSION->auth_sovra_starts = array_merge($starts, [time()]);
         $api = $api ?? api_client::from_config();
-        $data = $api->create_verification(self::dcql());
+        try {
+            $data = $api->create_verification(self::dcql());
+        } catch (api_exception $e) {
+            if ($e->httpstatus === 0 || $e->httpstatus >= 500) {
+                $SESSION->auth_sovra_starts = $starts;
+            }
+            throw $e;
+        }
+        // Un id más largo que la columna no se puede recortar: el GET y el webhook no lo encontrarían.
+        if (\core_text::strlen($data['session_id']) > 36) {
+            throw new api_exception('invalidresponse', 0, 'session_id de más de 36 caracteres');
+        }
 
         $now = time();
         $expires = strtotime((string) ($data['expires_at'] ?? '')) ?: $now + 10 * MINSECS;
         $record = (object) [
             'token' => bin2hex(random_bytes(32)),
-            'verificationid' => \core_text::substr($data['session_id'], 0, 36),
+            'verificationid' => $data['session_id'],
             'status' => self::PENDING,
             'timecreated' => $now,
             'timeexpires' => $expires,
             'timelastpoll' => $now,
         ];
         $record->id = $DB->insert_record(self::TABLE, $record);
-        self::remember($record->token);
 
         // Por referencia: el QR queda corto aunque crezca la consulta.
         $uri = (string) ($data['authorization_request_uri_ref'] ?? $data['authorization_request_uri']);
+        self::remember($record->token, $uri);
         return [$record, $uri];
+    }
+
+    /**
+     * El código vigente de este navegador, para volver a mostrarlo sin abrir otra verificación (recargar la página).
+     *
+     * @return array{0: \stdClass, 1: string}|null [la sesión, la URI] o null si no hay uno que sirva.
+     */
+    public static function reusable(): ?array {
+        global $SESSION;
+        $tokens = $SESSION->auth_sovra_tokens ?? [];
+        $token = $tokens ? end($tokens) : '';
+        $uri = $SESSION->auth_sovra_uris[$token] ?? null;
+        $record = $uri ? self::for_browser($token) : null;
+        if (!$record || $record->status !== self::PENDING || $record->timeexpires - time() < self::REUSE_MIN_LEFT) {
+            return null;
+        }
+        return [$record, $uri];
+    }
+
+    /**
+     * ¿Puede este navegador pedir otro código? MAX_STARTS por START_WINDOW.
+     *
+     * @return bool
+     */
+    public static function can_start(): bool {
+        return count(self::recent_starts()) < self::MAX_STARTS;
+    }
+
+    /**
+     * Qué hace login.php: decide si se puede abrir una verificación y, si corresponde, la abre o reutiliza.
+     *
+     * Sólo los casos `show` (reutilizada o nueva) y `error` (la API falló) llaman a Sovra, y `show` reutilizada
+     * tampoco. Así un enlace sin sesskey, el tope o la configuración incompleta nunca gastan una llamada.
+     *
+     * @param bool $enabled El plugin está habilitado y config::ready().
+     * @param bool $sesskeyok La petición trae el sesskey de esta sesión.
+     * @param bool $new La persona pidió un código nuevo (?new=1).
+     * @return array{action: string, session?: \stdClass, uri?: string}
+     *         action: unavailable, ask (mostrar el botón para pedir el código), throttled, error o show.
+     */
+    public static function open(bool $enabled, bool $sesskeyok, bool $new): array {
+        if (!$enabled) {
+            return ['action' => 'unavailable'];
+        }
+        if (!$sesskeyok) {
+            return ['action' => 'ask'];
+        }
+        if (!$new && ($reuse = self::reusable())) {
+            return ['action' => 'show', 'session' => $reuse[0], 'uri' => $reuse[1]];
+        }
+        if (!self::can_start()) {
+            if (log::once_per_minute('lastthrottled')) {
+                log::login('start', 'throttled', null);
+            }
+            return ['action' => 'throttled'];
+        }
+        try {
+            [$session, $uri] = self::start();
+        } catch (api_exception $e) {
+            // Ya quedó en el registro con el estado HTTP y el código. A la persona, sin detalles.
+            return ['action' => 'error'];
+        }
+        return ['action' => 'show', 'session' => $session, 'uri' => $uri];
+    }
+
+    /**
+     * Lo que contesta status.php a la página de espera. Todo estado final trae `url`, salvo `expired`: con ese,
+     * la página muestra el botón para generar un código nuevo.
+     *
+     * @param string $token
+     * @param bool $sesskeyok
+     * @return array{state: string, url?: string}
+     */
+    public static function poll(string $token, bool $sesskeyok): array {
+        $record = $sesskeyok ? self::for_browser($token) : null;
+        if (!$record) {
+            self::log_bad_session('status');
+            return ['state' => 'gone', 'url' => self::result_url('generic')];
+        }
+        $record = self::refresh($record);
+        switch ($record->status) {
+            case self::PENDING:
+                return ['state' => 'pending'];
+            case self::EXPIRED:
+                return ['state' => 'expired'];
+            case self::RESOLVED:
+                if ($record->result === resolver::OK) {
+                    return ['state' => 'ok', 'url' => (new \moodle_url('/auth/sovra/finish.php',
+                        ['token' => $token, 'sesskey' => sesskey()]))->out(false)];
+                }
+                return ['state' => 'done', 'url' => self::result_url($record->result)];
+            default:
+                // FAILED: el error de Sovra no se le muestra a la persona.
+                return ['state' => 'done', 'url' => self::result_url($record->result === self::UNAVAILABLE
+                    ? self::UNAVAILABLE : 'failed')];
+        }
+    }
+
+    /**
+     * Lo que hace finish.php antes de iniciar la sesión: valida, consume y registra.
+     *
+     * @param string $token
+     * @param bool $sesskeyok
+     * @return array{0: string, 1: \stdClass|null} [resultado para la persona, cuenta si es OK]
+     */
+    public static function finish(string $token, bool $sesskeyok): array {
+        $record = $sesskeyok ? self::for_browser($token) : null;
+        if (!$record) {
+            self::log_bad_session('finish');
+            return ['generic', null];
+        }
+        [$result, $user] = self::consume($record);
+        log::login('finish', $result, $record->verificationid, $user ? (int) $user->id : null);
+        if ($result !== resolver::OK) {
+            return [in_array($result, ['notready', 'gone'], true) ? 'generic' : $result, null];
+        }
+        return [resolver::OK, $user];
     }
 
     /**
@@ -122,7 +273,8 @@ class login_session {
     /**
      * Pone al día una sesión pendiente: la vence o, cada POLL_INTERVAL, le pregunta a Sovra.
      *
-     * Es la red de contención del webhook: con él caído o bloqueado, el ingreso funciona igual.
+     * Es la red de contención del webhook: con él caído o bloqueado, el ingreso funciona igual. Nunca lanza:
+     * status.php no tiene a quién pasarle un error, y la persona vería «problemas de conexión» hasta el vencimiento.
      *
      * @param \stdClass $record
      * @param api_client|null $api
@@ -134,23 +286,45 @@ class login_session {
             return $record;
         }
         $now = time();
-        if ($now > $record->timeexpires + self::CLOCK_SKEW) {
-            self::settle($record, self::EXPIRED, null, null, 'poll');
-            return self::reload($record);
-        }
-        if ($now - $record->timelastpoll < self::POLL_INTERVAL) {
-            return $record;
-        }
-        $DB->set_field(self::TABLE, 'timelastpoll', $now, ['id' => $record->id]);
         try {
-            $api = $api ?? api_client::from_config();
-            $data = $api->get_verification($record->verificationid);
-        } catch (api_exception $e) {
-            // Ya quedó en el registro; se reintenta en la próxima consulta.
+            if ($now > $record->timeexpires + self::CLOCK_SKEW) {
+                self::settle($record, self::EXPIRED, null, null, 'poll');
+                return self::reload($record);
+            }
+            if ($now - $record->timelastpoll < self::POLL_INTERVAL) {
+                return $record;
+            }
+            $DB->set_field(self::TABLE, 'timelastpoll', $now, ['id' => $record->id]);
+            try {
+                $api = $api ?? api_client::from_config();
+                $data = $api->get_verification($record->verificationid);
+            } catch (api_exception $e) {
+                // Los errores de la API ya quedaron en el registro; notconfigured no (lo lanza from_config antes de
+                // llamar), así que va en el detalle. Sin API key o con un 401/403/404 no se arregla solo: se cierra
+                // el intento en lugar de dejar a la persona esperando hasta el vencimiento. Red y 5xx se reintentan.
+                if ($e->errorcode === 'notconfigured' || in_array($e->httpstatus, [401, 403, 404], true)) {
+                    self::settle($record, self::FAILED, self::UNAVAILABLE, null, 'poll', $e->summary());
+                }
+                return self::reload($record);
+            }
+            $presentation = $data['presentation_data'] ?? null;
+            $error = $data['error'] ?? null;
+            self::apply($record->verificationid, (string) ($data['status'] ?? ''), is_array($presentation) ? $presentation : null,
+                is_string($error) ? $error : null, 'poll');
+        } catch (lock_exception $e) {
+            // Otra petición está escribiendo el veredicto: se vuelve a mirar en la próxima consulta.
             return self::reload($record);
+        } catch (\Throwable $e) {
+            // Algo inesperado al resolver (la base, una respuesta con otra forma…). Al administrador, la causa; a la
+            // persona, «no pudimos completar el ingreso» en lugar de esperar a que venza.
+            $detail = 'exception: ' . get_class($e) . ': ' . $e->getMessage();
+            error_log('auth_sovra poll: ' . $detail);
+            try {
+                self::settle($record, self::FAILED, self::UNAVAILABLE, null, 'poll', $detail);
+            } catch (\Throwable $again) {
+                log::login('poll', 'exception', $record->verificationid, null, $detail);
+            }
         }
-        self::apply($record->verificationid, (string) ($data['status'] ?? ''), $data['presentation_data'] ?? null,
-            $data['error'] ?? null, 'poll');
         return self::reload($record);
     }
 
@@ -162,7 +336,8 @@ class login_session {
      * @param array|null $presentation presentation_data (GET) o data (webhook): con `credentials`.
      * @param string|null $error El error de Sovra, si falló.
      * @param string $source poll o webhook, para el registro.
-     * @return string|null El resultado aplicado, o null si no había nada que aplicar.
+     * @return string|null El resultado aplicado, o null si no había nada que aplicar (o lo aplicó otro antes).
+     * @throws lock_exception Si no pudo tomar el lock y la sesión sigue pendiente.
      */
     public static function apply(string $verificationid, string $status, ?array $presentation, ?string $error,
             string $source): ?string {
@@ -173,21 +348,22 @@ class login_session {
         }
         if (time() > $record->timeexpires + self::CLOCK_SKEW) {
             // Un resultado tardío no habilita a entrar.
-            self::settle($record, self::EXPIRED, null, null, $source);
-            return self::EXPIRED;
+            return self::settle($record, self::EXPIRED, null, null, $source) ? self::EXPIRED : null;
         }
         switch ($status) {
             case 'completed':
-                [$result, $userid] = resolver::resolve(self::claims_of($presentation));
-                self::settle($record, self::RESOLVED, $result, $userid, $source);
-                return $result;
+                $claims = self::claims_of($presentation);
+                [$result, $userid] = resolver::resolve($claims);
+                // Si la credencial no sirvió, qué trajo: el administrador lo necesita para corregir emisores o claims.
+                $rejected = [resolver::ISSUER_MISSING, resolver::ISSUER_NOT_ALLOWED, resolver::TYPE_NOT_ALLOWED,
+                    resolver::NO_DOCUMENT];
+                $detail = in_array($result, $rejected, true) ? resolver::describe($claims) : null;
+                return self::settle($record, self::RESOLVED, $result, $userid, $source, $detail) ? $result : null;
             case 'failed':
                 $code = $error !== null && $error !== '' ? $error : 'failed';
-                self::settle($record, self::FAILED, $code, null, $source);
-                return $code;
+                return self::settle($record, self::FAILED, $code, null, $source) ? $code : null;
             case 'expired':
-                self::settle($record, self::EXPIRED, null, null, $source);
-                return self::EXPIRED;
+                return self::settle($record, self::EXPIRED, null, null, $source) ? self::EXPIRED : null;
             default:
                 return null;
         }
@@ -213,6 +389,7 @@ class login_session {
         // Se borra antes de cualquier otra cosa: pase lo que pase, esta verificación no sirve otra vez.
         $DB->delete_records(self::TABLE, ['id' => $record->id]);
         $SESSION->auth_sovra_tokens = array_values(array_diff($SESSION->auth_sovra_tokens ?? [], [$record->token]));
+        unset($SESSION->auth_sovra_uris[$record->token]);
 
         if (time() > (int) $record->timecompleted + self::FINISH_WINDOW) {
             return [self::EXPIRED, null];
@@ -260,26 +437,84 @@ class login_session {
     /**
      * Escribe el veredicto sólo si la sesión sigue pendiente, y lo registra.
      *
+     * El webhook y la consulta pueden llegar a la vez: el lock por sesión hace que escriba y registre uno solo.
+     *
      * @param \stdClass $record
      * @param string $status
      * @param string|null $result
      * @param int|null $userid
      * @param string $source
+     * @param string|null $detail Para el registro (sin datos personales).
+     * @return bool Si lo escribió esta llamada (false: ya no estaba pendiente).
+     * @throws lock_exception Si no pudo tomar el lock y la sesión sigue pendiente: nadie escribió el veredicto.
+     */
+    private static function settle(\stdClass $record, string $status, ?string $result, ?int $userid, string $source,
+            ?string $detail = null): bool {
+        global $DB;
+        // Espera corta: Sovra corta la entrega del webhook a los 5 s.
+        $lock = \core\lock\lock_config::get_lock_factory('auth_sovra')->get_lock('session_' . $record->id, self::LOCK_TIMEOUT);
+        if (!$lock) {
+            if ($DB->get_field(self::TABLE, 'status', ['id' => $record->id]) !== self::PENDING) {
+                // Lo tenía otra petición, y ya escribió el veredicto.
+                return false;
+            }
+            log::login($source, 'lockfailed', $record->verificationid);
+            throw new lock_exception('auth_sovra: no se pudo tomar el lock de la sesión ' . $record->id);
+        }
+        try {
+            if ($DB->get_field(self::TABLE, 'status', ['id' => $record->id]) !== self::PENDING) {
+                return false;
+            }
+            $DB->execute('UPDATE {' . self::TABLE . '}
+                             SET status = :status, result = :result, userid = :userid, timecompleted = :now
+                           WHERE id = :id AND status = :pending', [
+                'status' => $status,
+                'result' => $result !== null ? \core_text::substr($result, 0, 64) : null,
+                'userid' => $userid,
+                'now' => time(),
+                'id' => $record->id,
+                'pending' => self::PENDING,
+            ]);
+        } finally {
+            $lock->release();
+        }
+        log::login($source, $result ?? $status, $record->verificationid, $userid, $detail);
+        return true;
+    }
+
+    /**
+     * La página que muestra un resultado a la persona.
+     *
+     * @param string $result
+     * @return string
+     */
+    private static function result_url(string $result): string {
+        return (new \moodle_url('/auth/sovra/login.php', ['result' => $result]))->out(false);
+    }
+
+    /**
+     * Registra una consulta o un «finish» sin sesión de ingreso válida (otro navegador, sesión de Moodle perdida).
+     *
+     * Como mucho una fila por minuto: no hace falta estar logueado para llegar acá.
+     *
+     * @param string $action status o finish.
      * @return void
      */
-    private static function settle(\stdClass $record, string $status, ?string $result, ?int $userid, string $source): void {
-        global $DB;
-        $DB->execute('UPDATE {' . self::TABLE . '}
-                         SET status = :status, result = :result, userid = :userid, timecompleted = :now
-                       WHERE id = :id AND status = :pending', [
-            'status' => $status,
-            'result' => $result !== null ? \core_text::substr($result, 0, 64) : null,
-            'userid' => $userid,
-            'now' => time(),
-            'id' => $record->id,
-            'pending' => self::PENDING,
-        ]);
-        log::login($source, $result ?? $status, $record->verificationid, $userid);
+    private static function log_bad_session(string $action): void {
+        if (log::once_per_minute('lastbadsession')) {
+            log::login($action, 'badsession', null);
+        }
+    }
+
+    /**
+     * Los inicios de este navegador dentro de START_WINDOW.
+     *
+     * @return int[]
+     */
+    private static function recent_starts(): array {
+        global $SESSION;
+        $cutoff = time() - self::START_WINDOW;
+        return array_values(array_filter($SESSION->auth_sovra_starts ?? [], fn($time) => $time > $cutoff));
     }
 
     /**
@@ -294,15 +529,18 @@ class login_session {
     }
 
     /**
-     * Recuerda el token en la sesión del navegador.
+     * Recuerda el token, y la URI para volver a mostrar el código, en la sesión del navegador.
      *
      * @param string $token
+     * @param string $uri
      * @return void
      */
-    private static function remember(string $token): void {
+    private static function remember(string $token, string $uri): void {
         global $SESSION;
         $tokens = $SESSION->auth_sovra_tokens ?? [];
         $tokens[] = $token;
         $SESSION->auth_sovra_tokens = array_slice($tokens, -self::MAX_TOKENS);
+        $uris = ($SESSION->auth_sovra_uris ?? []) + [$token => $uri];
+        $SESSION->auth_sovra_uris = array_intersect_key($uris, array_flip($SESSION->auth_sovra_tokens));
     }
 }

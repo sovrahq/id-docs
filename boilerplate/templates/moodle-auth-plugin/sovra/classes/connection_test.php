@@ -24,6 +24,9 @@ class connection_test {
      * @return array{0: bool, 1: string} [salió bien, mensaje]
      */
     public static function run(?api_client $api = null): array {
+        if ($names = config::undecryptable()) {
+            return [false, get_string('secret_undecryptable', 'auth_sovra', implode(', ', $names))];
+        }
         try {
             $api = $api ?? api_client::from_config();
             $api->create_verification(login_session::dcql());
@@ -33,6 +36,10 @@ class connection_test {
         $message = get_string('test_ok', 'auth_sovra', s(config::masked(config::api_key())));
         if (!config::allowed_issuers()) {
             return [false, $message . ' ' . get_string('test_issuers_missing', 'auth_sovra')];
+        }
+        // La conexión anda, pero el ingreso no es seguro si la persona puede escribir su propio documento.
+        if ($warnings = config::document_field_warnings()) {
+            return [false, $message . ' ' . implode(' ', array_map('s', $warnings))];
         }
         return [true, $message];
     }

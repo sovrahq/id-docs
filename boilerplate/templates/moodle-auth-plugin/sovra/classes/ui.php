@@ -23,7 +23,8 @@ class ui {
     public static function result(string $result): string {
         global $OUTPUT;
 
-        $retry = \html_writer::link(new \moodle_url('/auth/sovra/login.php'), get_string('retry', 'auth_sovra'),
+        $retry = \html_writer::link(new \moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey(), 'new' => 1]),
+            get_string('retry', 'auth_sovra'),
             ['class' => 'btn btn-primary me-2 mr-2']);
         $back = \html_writer::link(new \moodle_url('/login/index.php'), get_string('back', 'auth_sovra'),
             ['class' => 'btn btn-secondary']);
@@ -42,6 +43,7 @@ class ui {
         switch ($result) {
             case resolver::DUPLICATE:
             case resolver::SUSPENDED:
+            case resolver::UNCONFIRMED:
             case resolver::AUTH_NOT_ALLOWED:
             case resolver::ADMIN:
             case resolver::MISCONFIGURED:
@@ -61,6 +63,10 @@ class ui {
                 break;
             case 'generic':
                 $key = 'result_generic';
+                break;
+            case login_session::UNAVAILABLE:
+                // La API no deja seguir (API key revocada…): no es culpa de la credencial.
+                $key = 'login_error';
                 break;
             default:
                 // Un error de Sovra (credential_revoked, holder_key_mismatch…): la credencial no pasó.

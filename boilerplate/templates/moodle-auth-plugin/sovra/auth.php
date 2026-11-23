@@ -21,7 +21,7 @@ require_once($CFG->libdir . '/authlib.php');
  * No maneja contraseñas: el ingreso lo completa auth/sovra/finish.php con complete_user_login, después de
  * que Sovra verificó la presentación y el plugin encontró exactamente una cuenta con ese documento. Las cuentas
  * pueden tener cualquier método de los aceptados en la configuración (por defecto manual, email y sovra), así
- * que las personas siguen pudiendo entrar también con su contraseña.
+ * que las cuentas manual o email siguen pudiendo entrar también con su contraseña; las de método sovra, no.
  *
  * @package    auth_sovra
  * @copyright  2026 Sovra
@@ -86,7 +86,8 @@ class auth_plugin_sovra extends auth_plugin_base {
             return [];
         }
         return [[
-            'url' => new moodle_url('/auth/sovra/login.php'),
+            // Con sesskey: sólo un clic desde este sitio abre una verificación en Sovra.
+            'url' => new moodle_url('/auth/sovra/login.php', ['sesskey' => sesskey()]),
             'iconurl' => new moodle_url('/auth/sovra/pix/superapp.svg'),
             'name' => get_string('loginbutton', 'auth_sovra'),
         ]];

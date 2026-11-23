@@ -19,44 +19,13 @@ define('READ_ONLY_SESSION', true);
 require(__DIR__ . '/../../config.php');
 
 use auth_sovra\login_session;
-use auth_sovra\resolver;
 
 $token = required_param('token', PARAM_ALPHANUM);
+// confirm_sesskey() sin argumento corta con una excepción si falta el parámetro: acá es un «gone» más.
+$sesskey = optional_param('sesskey', '', PARAM_RAW);
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-if (!confirm_sesskey()) {
-    echo json_encode(['state' => 'gone']);
-    exit;
-}
-
-$record = login_session::for_browser($token);
-if (!$record) {
-    echo json_encode(['state' => 'gone', 'url' => (new moodle_url('/auth/sovra/login.php', ['result' => 'generic']))->out(false)]);
-    exit;
-}
-
-$record = login_session::refresh($record);
-
-switch ($record->status) {
-    case login_session::PENDING:
-        $response = ['state' => 'pending'];
-        break;
-    case login_session::EXPIRED:
-        $response = ['state' => 'expired'];
-        break;
-    case login_session::RESOLVED:
-        if ($record->result === resolver::OK) {
-            $response = ['state' => 'ok', 'url' => (new moodle_url('/auth/sovra/finish.php',
-                ['token' => $token, 'sesskey' => sesskey()]))->out(false)];
-            break;
-        }
-        $response = ['state' => 'done', 'url' => (new moodle_url('/auth/sovra/login.php',
-            ['result' => $record->result]))->out(false)];
-        break;
-    default:
-        // FAILED: el error de Sovra no se le muestra a la persona.
-        $response = ['state' => 'done', 'url' => (new moodle_url('/auth/sovra/login.php', ['result' => 'failed']))->out(false)];
-}
-echo json_encode($response);
+// Todo estado final trae la URL a la que tiene que ir la página.
+echo json_encode(login_session::poll($token, $sesskey !== '' && confirm_sesskey($sesskey)));

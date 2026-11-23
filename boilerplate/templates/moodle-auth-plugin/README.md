@@ -32,8 +32,9 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 1. Copiar la carpeta `sovra/` a `auth/sovra/` del Moodle (en Moodle 5.1: `public/auth/sovra/`). **Copiar, no enlazar con symlink**: las páginas del plugin buscan `config.php` dos carpetas arriba.
 2. Entrar como administrador y completar la actualización (o `php admin/cli/upgrade.php`).
 3. **Administración del sitio → Plugins → Autenticación → Gestionar autenticación**: habilitar «Ingreso con la SuperApp (Sovra ID)».
-4. **Bloquear los campos del documento**, para que nadie pueda escribir el documento de otra persona desde su perfil: en **Administración del sitio → Usuarios → Campos de perfil del usuario**, editar `numero_documento` y `tipo_documento` y poner **«¿Está bloqueado este campo?» = Sí**. (Si el documento está en el ID number: **«Bloquear el valor»** del ID number en la configuración de cada método de autenticación aceptado.)
-5. Completar la configuración (abajo) y apretar **«Probar la conexión»** en **Administración del sitio → Informes → Registro del ingreso con la SuperApp**. Si un campo del documento sigue editable, la prueba da error y dice cuál.
+4. Completar la configuración (abajo) y apretar **«Probar la conexión»** en **Administración del sitio → Informes → Registro del ingreso con la SuperApp**.
+
+No hace falta bloquear los campos del documento: el plugin no deja que la persona los cambie desde su perfil (ver «Seguridad»).
 
 ## Configuración
 
@@ -47,7 +48,7 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 | Tipos de credencial aceptados | `IdentidadMigrante` | El `vct` de la Credencial de Identidad |
 | Claim del número de documento | `num_doc` | |
 | Claim del tipo de documento | `tipo_doc` | Sólo si se compara el tipo |
-| Campo con el número de documento | `profile_field_numero_documento` | Atenea: sólo números, obligatorio y único. **Tiene que estar bloqueado** (ver «Seguridad») |
+| Campo con el número de documento | `profile_field_numero_documento` | Atenea: sólo números, obligatorio y único. La persona no lo puede cambiar desde su perfil |
 | Comparar también el tipo de documento | **Sí** | Ver «Tipos de documento» abajo: evita que un número de otro tipo entre a una cuenta ajena |
 | Campo con el tipo de documento | `profile_field_tipo_documento` | Siglas: RC, PPT, CC, TI, CE, PTP, PEP, PIP, NES, PA, NIT, SC |
 | Equivalencias de tipos | El valor por defecto (abajo) | La credencial trae el nombre largo; Atenea guarda la sigla |
@@ -114,7 +115,7 @@ Sin webhook el ingreso funciona igual: la página consulta el resultado a la API
 - **Sesión atada al navegador.** La verificación sólo la puede consultar y completar el navegador que la abrió (token aleatorio en la sesión de Moodle + `sesskey`), una sola vez y dentro de los 5 minutos de verificada.
 - **Verificaciones con freno.** Sólo el botón de la pantalla de ingreso (con `sesskey`) abre una verificación en Sovra; un enlace de otro sitio o un bot sin cookies no gastan cuota. El tope es por sesión de Moodle: un bot que guarda cookies puede pedir otra sesión. Recargar muestra el mismo código, y cada navegador puede pedir 5 códigos nuevos cada 10 minutos. Para un tope por IP, configurarlo en el servidor web.
 - **Cuentas sin confirmar o con un método deshabilitado.** No entran, igual que con contraseña.
-- **El campo del documento tiene que estar bloqueado.** Si la persona puede editarlo desde su perfil, puede poner el documento de otra: esa otra queda como duplicada, o, si no tiene cuenta, entra con la SuperApp a la cuenta de quien lo puso. Para el ID number: «Bloquear el valor» en la configuración de cada método aceptado (manual, email y este plugin). Para un campo de perfil: marcarlo como bloqueado. «Probar la conexión» y el registro avisan si no lo está. Con autorregistro, quien se registra elige su documento: eso lo tiene que controlar el proceso de registro.
+- **Nadie cambia su propio documento.** Si la persona pudiera editarlo desde su perfil, podría poner el documento de otra: esa otra quedaría como duplicada, o, si no tiene cuenta, entraría con la SuperApp a la cuenta de quien lo puso. Por eso el plugin descarta el cambio del número (y del tipo, si se compara) cuando quien edita es la propia persona; le avisa y lo anota en el registro (`documentlocked`). Lo siguen pudiendo cambiar los administradores, las sincronizaciones y los servicios web con permiso para editar cuentas. No se bloquea el campo, porque un campo de perfil bloqueado también queda congelado en el formulario de registro. Con autorregistro, quien se registra elige su documento: eso lo tiene que controlar el proceso de registro.
 - **Sin datos personales guardados.** Ni el número ni el tipo de documento ni el DID de la persona se guardan en la base ni en el registro; sólo el resultado, ids técnicos (verificación, evento) y el id de la cuenta. Si una credencial se rechaza por emisor, tipo o falta de documento, el registro anota el DID del emisor, el `vct` y los nombres de los claims recibidos (sin sus valores), para corregir la configuración.
 - **Errores a la vista del administrador.** El registro anota las excepciones del webhook y de la consulta, las consultas sin sesión válida (como mucho una por minuto) y la causa de una configuración rota. Si la API key o el secreto no se pueden descifrar (por ejemplo, después de migrar el sitio), lo avisan el registro y «Probar la conexión».
 - **Riesgo propio del ingreso por QR:** quien muestre un QR de ingreso a otra persona y la convenza de escanearlo entra como ella. La billetera muestra el nombre del verificador antes de compartir; conviene que el nombre de la organización de Atenea en Sovra sea claro.

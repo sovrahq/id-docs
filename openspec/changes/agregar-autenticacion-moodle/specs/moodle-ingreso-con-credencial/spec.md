@@ -182,6 +182,17 @@ El plugin MUST NOT iniciar sesión en una cuenta suspendida, sin confirmar, con 
 - **WHEN** la cuenta coincidente es administradora del sitio y la configuración no lo permite
 - **THEN** nadie entra
 
+### Requirement: La persona no cambia su documento
+Mientras el plugin está habilitado, una persona sin permiso para editar cuentas MUST NOT poder cambiar desde su propio perfil el campo del número de documento ni, si se compara, el del tipo. El resto del perfil SHALL guardarse igual. Crear la cuenta y los cambios de un administrador, una sincronización o un servicio web con ese permiso SHALL seguir funcionando.
+
+#### Scenario: Cambia su propio documento
+- **WHEN** la persona edita su perfil y cambia el número o el tipo de documento
+- **THEN** el documento queda como estaba, el resto de los cambios se guarda, se le avisa que no se puede cambiar y el registro lo anota sin el documento
+
+#### Scenario: Lo cambia un administrador
+- **WHEN** un administrador cambia el documento de una cuenta
+- **THEN** el cambio se guarda
+
 ### Requirement: Registro sin datos personales
 El plugin SHALL registrar cada llamada a la API y cada aviso del webhook (qué pasó, estado HTTP, resultado, verificación; los avisos sin firma válida, como mucho uno por minuto) y el resultado de cada intento de ingreso, y MUST NOT guardar en el registro ni en sus tablas el número de documento, el tipo de documento ni el DID del ciudadano en claro. El administrador SHALL poder ver ese registro y probar la conexión con la API.
 
@@ -194,9 +205,6 @@ El plugin SHALL registrar cada llamada a la API y cada aviso del webhook (qué p
 - **WHEN** el administrador prueba la conexión
 - **THEN** el plugin crea una verificación de prueba y muestra si la API key y la URL funcionan, sin mostrar la API key completa
 
-#### Scenario: Campo de documento editable
-- **WHEN** la persona puede editar desde su perfil el campo configurado con el documento (o con el tipo)
-- **THEN** la prueba de conexión y el registro avisan al administrador que lo bloquee
 
 #### Scenario: Credencial rechazada
 - **WHEN** una credencial se rechaza por emisor, tipo de credencial o falta de documento

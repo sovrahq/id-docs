@@ -37,10 +37,6 @@ class connection_test {
         if (!config::allowed_issuers()) {
             return [false, $message . ' ' . get_string('test_issuers_missing', 'auth_sovra')];
         }
-        // La conexión anda, pero el ingreso no es seguro si la persona puede escribir su propio documento.
-        if ($warnings = config::document_field_warnings()) {
-            return [false, $message . ' ' . implode(' ', array_map('s', $warnings))];
-        }
         return [true, $message];
     }
 }

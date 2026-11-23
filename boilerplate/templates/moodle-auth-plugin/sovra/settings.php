@@ -92,10 +92,4 @@ if ($ADMIN->fulltree) {
         get_string('signupurl', 'auth_sovra'), get_string('signupurl_desc', 'auth_sovra'), '', PARAM_URL));
     $settings->add(new admin_setting_configtext('auth_sovra/platformname',
         get_string('platformname', 'auth_sovra'), get_string('platformname_desc', 'auth_sovra'), '', PARAM_TEXT));
-
-    // Bloqueo de campos para las cuentas con este método, como en auth_manual: el ID number con el documento
-    // tiene que quedar bloqueado, o la persona podría escribir el documento de otra.
-    $authplugin = get_auth_plugin('sovra');
-    display_auth_lock_options($settings, $authplugin->authtype, $authplugin->userfields,
-        get_string('auth_fieldlocks_help', 'auth'), false, false);
 }

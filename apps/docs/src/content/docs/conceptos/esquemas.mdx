@@ -1,0 +1,174 @@
+---
+title: "Esquemas"
+description: "Qué es un esquema (el molde de todo lo que se emite), los tres tipos, los dos identificadores, el registro en la cadena, el versionado y el borrado."
+sidebar:
+  order: 4
+---
+
+Un **esquema** es el molde de todo lo que se emite. Así como un formulario en papel define qué casilleros tiene, un esquema define qué datos lleva una credencial o un documento, cuánto tiempo vale y en qué formato se firma. Sin esquema no se emite nada, y parte de lo que define queda firmado para siempre en cada credencial, así que conviene pensarlo antes de la primera emisión.
+
+Cómo crear cada tipo, campo por campo, está en [Esquema SD-JWT](/credenciales/sd-jwt-vc/esquema/), [Esquema mDoc](/credenciales/mdoc/esquema/) y [Crear un esquema de documento](/documentos/crear-un-esquema/).
+
+## Qué define un esquema
+
+- **Un identificador** (`schema_id`), por ejemplo `licencia_de_conducir`.
+- **Los campos** (`claims`): nombre, tipo, si es obligatorio y si el ciudadano puede elegir no mostrarlo.
+- **La vigencia** (`validity_period`): `1y`, `6m`, `30d`, o `null` para que no venza.
+- **Qué es** (`kind`): una credencial (`credential`) o un documento (`document`).
+- **El formato** (`format`): `vc+sd-jwt` (default) o `mso_mdoc`.
+
+Los esquemas se crean en el dashboard (**Schemas → New schema**) o por API ([`/api/create-schema/`](/api/create-schema/)).
+
+<Details title="Todos los campos del esquema">
+
+| Campo | Qué es |
+|---|---|
+| `schema_id` | Tu identificador estable (ver [los dos identificadores](#los-dos-identificadores)). |
+| `credential_type` | El tipo de credencial: viaja como `vct` en un SD-JWT, en el namespace meta en un mDoc, y es lo que se registra on-chain. **No se puede cambiar nunca más.** |
+| `name` | Nombre para mostrar. |
+| `claims` | Los campos: cada uno con `key`, `label`, `type`, `required` y, en credenciales, `disclosable`. |
+| `validity_period` | Cuánto vive lo emitido: `1y`, `6m`, `30d`, o `null` para que no venza. |
+| `kind` | `credential` (default) o `document`. |
+| `format` | `vc+sd-jwt` (default) o `mso_mdoc`. **Inmutable de por vida.** |
+| `doc_type`, `namespace` | Solo `mso_mdoc`: el docType y el namespace de los elementos. |
+
+El diseño de la tarjeta en la wallet también tiene API; el layout de la hoja de un documento, en cambio, **solo se diseña en el dashboard**.
+
+</Details>
+
+## Los tipos de esquema
+
+| Tipo | Para qué | Detalle |
+|---|---|---|
+| **Credencial SD-JWT VC** | Una credencial en la wallet del ciudadano. Admite diseño de tarjeta y adjuntos. | [Esquema SD-JWT](/credenciales/sd-jwt-vc/esquema/) |
+| **Credencial mDoc** | Una credencial en el formato ISO de la licencia de conducir móvil. | [Esquema mDoc](/credenciales/mdoc/esquema/) |
+| **Documento** | Un [documento firmado](/conceptos/documentos-firmados/), sin wallet. Admite diseño de hoja. | [Crear un esquema de documento](/documentos/crear-un-esquema/) |
+
+Los tipos no son intercambiables: emitir una oferta con un esquema de documento, o un documento con un esquema de credencial, responde `422 wrong_schema_kind`. Cuál formato de credencial conviene está en [Tipos de credenciales](/conceptos/tipos-de-credenciales/#cuál-elijo).
+
+<Details title="Cómo se combinan kind y format">
+
+| Tipo | `kind` | `format` |
+|---|---|---|
+| Credencial SD-JWT VC | `credential` | `vc+sd-jwt` |
+| Credencial mDoc | `credential` | `mso_mdoc` |
+| Documento | `document` | `vc+sd-jwt` |
+
+Un esquema de kind `document` no puede ser mDoc: mDoc admite únicamente `credential`.
+
+</Details>
+
+## Los dos identificadores
+
+Un esquema tiene dos ids, y confundirlos es el error más común:
+
+- **`schema_id`**: tu nombre para el esquema, por ejemplo `licencia_de_conducir`. **No cambia entre versiones.** Es el que usás casi siempre: para emitir, diseñar y revisar.
+- **`id`**: un UUID que identifica **una versión** concreta. Solo lo usás para borrar.
+
+Desde el dashboard, el `schema_id` se deriva del nombre ("Licencia de Conducir" → `licencia_de_conducir`); confirmalo en el listado antes de escribirlo en tu código. Por API lo elegís vos.
+
+<Details title="Detalles del schema_id">
+
+- **Desde el dashboard:** se toma el *name*, se pasa a minúsculas, todo lo que no sea `a-z0-9` se convierte en `_`, y se corta a 24 caracteres.
+- **Por API:** tiene que ser único en el workspace. Un duplicado se reporta como `validation_error` **sobre `issuer_id`**, con `has already been taken`, no sobre `schema_id`, que es donde uno lo busca.
+- En un mDoc con docType generado, el `schema_id` **pasa a formar parte del docType** (`io.sovra.<dirección>.<schema_id>.1`), así que también es irreversible ahí.
+- `POST /api/v1/issuer/schemas` devuelve el esquema con su `id`, pero **sin `version`**; esa solo aparece en el listado (`GET /api/v1/issuer/schemas`).
+
+</Details>
+
+## El registro on-chain
+
+**Un esquema recién creado todavía no sirve para emitir.** Primero se registra en SovraChain, en segundo plano. Mientras tanto está `pending`, y cuando termina pasa a `registered`: recién ahí podés emitir. Si el registro falla (`failed`), hay que crear el esquema de nuevo.
+
+**No hay webhook de registro.** Consultá el listado hasta ver `registered`:
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  | jq '.schemas[] | {schema_id, version, registration_status}'
+```
+
+<Details title="Los estados de registro y sus errores">
+
+| `registration_status` | Qué significa |
+|---|---|
+| `pending` | El registro está en curso. Emitir con él (una oferta o un documento) devuelve `409 schema_registration_pending`. |
+| `registered` | Listo: recién **acá** se puede emitir. |
+| `failed` | El registro agotó sus reintentos. `registration_error` dice por qué, y con ese esquema no se puede emitir nada (`409 schema_registration_failed`): hay que crearlo de nuevo. |
+
+</Details>
+
+## Versionado
+
+Editar un esquema **no lo modifica: crea una versión nueva** (`v1 → v2`). Lo ya emitido sigue siendo válido con la versión con la que se emitió, y lo nuevo se emite siempre con la más reciente. En el dashboard es el botón **Revise**; por API, `PUT /api/v1/issuer/schemas/{schema_id}`.
+
+Hay cosas que **no se pueden cambiar nunca**, porque quedan firmadas en cada credencial: `schema_id`, `credential_type`, `kind`, `format`, `doc_type` y `namespace`. Si van en una revisión, se ignoran en silencio.
+
+<Details title="Revisar un esquema por API">
+
+```bash
+curl -s -X PUT "$BASE_URL/api/v1/issuer/schemas/licencia_de_conducir" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Licencia de Conducir",
+    "base_version": 1,
+    "validity_period": "10y",
+    "claims": [ "…la lista completa, no un parche…" ]
+  }'
+```
+
+| | |
+|---|---|
+| **`claims` va entero** | Es la lista nueva completa, no un parche. Lo que no mandes desaparece de la versión nueva. |
+| **`base_version`** | La versión desde la que empezaste a editar. Si mientras tanto alguien publicó otra desde el dashboard, la llamada devuelve **`409 schema_revision_conflict`** en vez de pisarla: releé y rebasá tus cambios. |
+| **Lo que se hereda** | El diseño, el layout y el estado de registro de la versión anterior. |
+
+El `credential_type` es el `vct` que los verificadores reconocen; el docType de un mDoc lo declara cada consulta DCQL. Una revisión que los cambiara dejaría huérfanas a las credenciales que ya están en las wallets.
+
+En un mDoc, además, el conjunto de elementos `always shared` (`disclosable: false`) se congela dentro de cada credencial al emitirla: una revisión posterior no cambia qué debe divulgar una credencial ya emitida.
+
+</Details>
+
+## Borrado
+
+**Un esquema que ya se usó no se borra: se versiona.** El borrado solo funciona si ninguna versión tiene una oferta, una credencial o un documento emitido, sea cual sea su estado (si no, `409 schema_in_use`), y borra todas las versiones de una vez.
+
+<Details title="Borrar por API">
+
+El borrado toma el UUID (`id`) de una fila de versión, no el `schema_id`:
+
+```bash
+curl -s -X DELETE "$BASE_URL/api/v1/issuer/schemas/$SCHEMA_UUID" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+Borra todas las versiones de forma atómica. Una oferta vencida de hace un año también cuenta como uso.
+
+</Details>
+
+## El objeto Schema
+
+Los campos que más vas a usar de la respuesta son `schema_id`, `registration_status` y, para borrar, `id`. La lista completa está en la [referencia de API](/api/tags/esquemas/).
+
+<Details title="Todos los campos del objeto">
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `id` | uuid | El id de **esta fila de versión**. Es el que toma `DELETE /schemas/{id}`. |
+| `schema_id` | string | Tu identificador estable, el que se manda al emitir. |
+| `credential_type` | string | El `vct` del SD-JWT y el id del tipo on-chain. |
+| `name` | string | Nombre para mostrar. |
+| `claims` | array | Las definiciones de claim. |
+| `validity_period` | string \| null | `1y`, `6m`, `30d`; `null` si no vence. |
+| `version` | integer | Arranca en 1. **Ausente en la respuesta de creación.** |
+| `kind` | string | `credential` o `document`. |
+| `format` | string | `vc+sd-jwt` o `mso_mdoc`. |
+| `registration_status` | string | `pending`, `registered` o `failed`. **Solo con `registered` se puede emitir.** |
+| `registration_error` | string \| null | Por qué falló el registro. |
+| `doc_type` | string \| null | Solo `mso_mdoc`: el docType, generado si no declaraste uno. `null` hasta que el workspace esté aprovisionado. |
+| `namespace` | string \| null | Solo `mso_mdoc`: el primer segmento de todo path DCQL de mDoc. |
+| `layout` | object \| null | **Solo en el listado:** el layout de la hoja de un esquema `document`, definido en el dashboard. |
+
+</Details>
+
+El ciclo de vida del esquema, en un diagrama, está en [Ciclo de vida](/conceptos/ciclo-de-vida/#esquema).

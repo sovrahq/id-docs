@@ -1,0 +1,526 @@
+---
+title: "Emitir credenciales mDoc"
+description: "Crear la oferta de un mDoc, mandar cada dato con la forma que pide su tipo, incluir foto y firma, y recibir la credencial firmada en credential.issued."
+sidebar:
+  order: 2
+  label: "Emitir"
+---
+
+Emitir un mDoc es igual que emitir un SD-JWT: **creás la oferta, mostrás el QR y
+recibís un webhook**, con el mismo endpoint. El formato lo decide el esquema, no la
+llamada. Lo único que cambia es que cada valor tiene que venir **exactamente con la
+forma de su tipo**, porque el mDoc se codifica en CBOR (un formato binario) y no admite
+aproximaciones.
+
+Antes necesitás un esquema mDoc en `registered` (ver
+[Crear el esquema](/credenciales/mdoc/esquema/)) y un endpoint de webhook suscripto a
+`credential.issued`.
+
+## Paso 1: crear la oferta
+
+Mandás el `schema_id` y los valores, **en un objeto plano**: Sovra ubica cada valor en
+el namespace del esquema.
+
+<Tabs syncKey="namespace">
+<TabItem label="Namespace ISO">
+
+Una mDL ISO tiene que llevar los 11 elementos obligatorios de la norma:
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "claims": {
+      "family_name": "Lovelace",
+      "given_name": "Ada",
+      "birth_date": "1815-12-10",
+      "issue_date": "2026-01-15",
+      "expiry_date": "2036-01-15",
+      "issuing_country": "MX",
+      "issuing_authority": "Nuevo León",
+      "document_number": "NL-0001",
+      "un_distinguishing_sign": "MEX",
+      "portrait": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "driving_privileges": [
+        { "vehicle_category_code": "B", "issue_date": "2026-01-15", "expiry_date": "2036-01-15" }
+      ],
+      "age_over_18": true
+    }
+  }'
+```
+
+</TabItem>
+<TabItem label="Namespace propio">
+
+Con el esquema mínimo de `driving_licence_v2`:
+
+```bash
+curl -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "driving_licence_v2",
+    "valid_until": "2030-10-22T23:59:59Z",
+    "claims": {
+      "given_name": "Sofía",
+      "family_name": "Demo",
+      "birth_date": "1990-01-01",
+      "portrait": "/9j/4AAQSkZJRgABAQ...",
+      "curp": "DELS900101MNLXXX01"
+    }
+  }'
+```
+
+El ejemplo con los 24 claims de la licencia completa está al final, en
+[Ejemplos completos](#ejemplos-completos).
+
+</TabItem>
+</Tabs>
+
+<Aside type="note" title="Los claims van planos, no anidados por namespace">
+
+Mandá `{"family_name": "Lovelace"}`, no `{"org.iso.18013.5.1": {"family_name": "Lovelace"}}`.
+El namespace sale del esquema; la API no lo pide ni lo admite.
+
+</Aside>
+
+Tené en cuenta:
+
+- Los claims `required` no pueden faltar: si no, `422 missing_claims` con la lista.
+- **Una key que el esquema no declara se descarta en silencio.** Un error de tipeo no
+  da error: da una credencial sin ese dato.
+- `valid_until` (opcional) fija el vencimiento de esta credencial. Ver
+  [Vigencia](#vigencia).
+
+La respuesta (`201`) es la misma que en SD-JWT: guardá el **`credential_id`** (lo vas a
+usar para consultar y revocar), mostrá el **`offer_uri`** como QR y tené presente que la
+oferta vence en **24 horas** (`expires_at`). El campo `credential` es solo una vista
+previa sin firmar: el mDoc firmado todavía no existe, porque se arma recién cuando la
+wallet entrega su llave.
+
+<Details title="Detalles del request y de la respuesta">
+
+| Parámetro | Obligatorio | Descripción |
+|---|---|---|
+| `schema_id` | Sí | El **slug** del esquema, no su UUID. Se usa siempre su última versión. |
+| `claims` | No | Los valores, en estructura plana e indexados por `key`. Tiene que ser un objeto; si no, el request es un `500`. |
+| `valid_until` | No | ISO 8601, a futuro. Pisa el `validity_period` del esquema para esta credencial. **`null` se rechaza**, y omitir la clave no equivale a mandarla en `null`. |
+
+**Rate limit:** 120 solicitudes por minuto **por IP de origen**, contadas por separado
+en cada nodo, con `429 too_many_requests` sin `Retry-After`.
+
+```json
+{
+  "credential_id": "3f2a1c88-0f3e-4b1a-9b7e-7c5c9a2e4d11",
+  "offer_uri": "openid-credential-offer://?credential_offer_uri=https%3A%2F%2F…",
+  "pre_authorized_code": "8f7d…",
+  "expires_at": "2026-09-29T12:58:34Z",
+  "credential": { "…": "vista previa sin firmar" }
+}
+```
+
+`pre_authorized_code` es el código que la wallet canjea por un token; no hace falta
+tocarlo. La vista previa `credential` no tiene llave del holder ni MSO. La referencia
+del endpoint está en [Crear una oferta de credencial](/api/create-credential-offer/).
+
+</Details>
+
+## Codificación de cada claim
+
+Cada valor tiene que venir con la forma exacta de su tipo. Si no, la oferta falla con
+`422 unencodable_claims` y `details` te dice qué claves: Sovra no convierte nada por su
+cuenta, porque eso podría producir una credencial válida que dice algo falso.
+
+| Tipo | Cómo mandarlo | Ejemplo |
+|---|---|---|
+| `string` | Texto | `"Lovelace"` |
+| `integer` / `number` | Número **sin decimales**, nunca entre comillas | `170` |
+| `boolean` | `true` / `false`, nunca `"true"` | `true` |
+| `date` | `"YYYY-MM-DD"` | `"1815-12-10"` |
+| `datetime` | ISO 8601 con zona horaria | `"2026-01-15T10:30:00Z"` |
+| `bytes` | base64 estándar con padding | `"iVBORw0KGgo…"` |
+| `driving_privileges` | Array con al menos una categoría | ver abajo |
+
+`driving_privileges` es la lista de categorías que habilita la licencia. En el caso
+común alcanza con la categoría y sus fechas:
+
+```json
+[
+  { "vehicle_category_code": "B", "issue_date": "2020-03-15", "expiry_date": "2030-03-15" },
+  { "vehicle_category_code": "A" }
+]
+```
+
+<Details title="Reglas de codificación en detalle">
+
+| Tipo del esquema | Valor en el JSON | Representación en la credencial |
+|---|---|---|
+| `string` / `uri` | Texto | Texto |
+| `integer` | Entero JSON, nunca una cadena | Entero |
+| `number` | Entero, o float cuya parte decimal sea cero (`4` o `4.0`, no `4.5`) | Entero |
+| `boolean` | `true` / `false` | Booleano |
+| `date` | `"YYYY-MM-DD"`, diez caracteres exactos | `full-date` etiquetada |
+| `datetime` | ISO 8601 **con offset** (`…Z` o `+02:00`) | `tdate` etiquetada |
+| `bytes` | **base64 estándar con padding**, sin espacios ni alfabeto URL-safe | Byte string con los bytes decodificados |
+| `driving_privileges` | Array no vacío de categorías | Array de mapas, con las fechas etiquetadas adentro |
+
+**Por qué `number` no admite decimales.** Un float no tiene forma CBOR determinista: un
+verificador podría calcular sobre la misma credencial un hash distinto del usado en la
+firma. La comprobación se hace al crear la oferta, para que el error sea un `422` sobre
+tu solicitud y no un `500` en mitad del flujo de la wallet.
+
+**Por qué `bytes` es base64 estándar y solo así.** Es un cuerpo HTTP, no una URL:
+admitir varias grafías del mismo valor genera discrepancias sobre lo que efectivamente
+se envió.
+
+**`driving_privileges`.** `vehicle_category_code` es el único campo obligatorio de cada
+entrada y no puede ir vacío (`B` automóvil, `A` motocicleta, `C` camión). `issue_date` y
+`expiry_date` son opcionales, en `YYYY-MM-DD`: una categoría puede haberse obtenido en
+otra fecha que el documento. **Un array vacío se rechaza**: ISO exige al menos un
+privilegio.
+
+</Details>
+
+<Details title="Restricciones de cada categoría (codes)">
+
+`codes` es **opcional** y equivale a la columna de observaciones de una licencia de
+plástico:
+
+```text
+CATEGORÍAS                      RESTRICCIONES
+B   15/01/2026 – 15/01/2036     01   Usa lentes correctivos
+                                05   Velocidad máxima 70 km/h
+```
+
+Esa licencia, en JSON, con una entrada por renglón y en el mismo orden:
+
+```json
+"codes": [
+  { "code": "01" },
+  { "code": "05", "sign": "<=", "value": "70" }
+]
+```
+
+Hay dos clases de restricción. Las de sí o no ("usa lentes correctivos") solo necesitan
+`code`. Las que llevan una cantidad ("velocidad máxima 70") separan el *qué* del
+*cuánto*: `{ "code": "05", "sign": "<=", "value": "70" }` se lee **"restricción 05,
+como máximo 70"**.
+
+| Campo | Responde a | Obligatorio | Ejemplos |
+|---|---|---|---|
+| `code` | ¿Qué está restringido? | Sí | `"01"`, `"05"` |
+| `sign` | ¿En qué sentido? | No | `"<="`, `">="`, `"="` |
+| `value` | ¿Cuánto? | No | `"70"`, `"3500"` |
+
+- **La unidad no viaja en los datos.** La credencial dice `05`, `<=`, `70`, nunca
+  "km/h": la unidad es parte de lo que significa el código `05` en el catálogo de la
+  autoridad.
+- **`sign` y `value` van juntos**: o los dos, o ninguno. La API los acepta por
+  separado, pero ningún lector puede interpretar uno sin el otro.
+- **Los tres campos son texto.** `"value": 70`, como número, se rechaza con
+  `unencodable_claims`.
+
+**Quién define los códigos.** ISO no fija el catálogo: lo establece la autoridad
+emisora. En la Unión Europea son los códigos armonizados del Anexo I de la Directiva
+2006/126/CE; en otras jurisdicciones, el reglamento que corresponda. Los valores `01` y
+`05` de acá son **ilustrativos**: usá los de tu catálogo. **Si no tenés un catálogo de
+restricciones, omití `codes`.**
+
+</Details>
+
+## Foto y firma
+
+`portrait` y `signature_usual_mark` se mandan en **base64 estándar con padding**, sin
+prefijo `data:`, sin espacios ni saltos de línea. El alfabeto URL-safe (`-_`) se
+rechaza con `422 unencodable_claims`.
+
+```bash
+openssl base64 -A -in firma.png
+```
+
+Sovra no revisa el contenido de la imagen, pero te conviene respetar lo mismo que
+aplica el dashboard: **PNG o JPEG**, reescalada a **480 px** en su lado mayor y de
+**400 KB** como máximo. Una foto sacada directo con el celular pesa varios megabytes, y
+viaja firmada en cada presentación.
+
+<Details title="Más sobre imágenes: otras formas de generar el base64 y qué recibe el verificador">
+
+```bash
+# GNU/Linux
+base64 -w 0 firma.png
+
+# macOS / BSD
+base64 -i firma.png | tr -d '\n'
+```
+
+El `-A` / `-w 0` / `tr -d '\n'` no es opcional: sin eso, el base64 lleva saltos de
+línea. Usá PNG cuando la firma tiene fondo transparente.
+
+Del lado del verificador, la imagen vuelve en base64**url** **sin padding**, no en el
+base64 estándar que mandaste; esa asimetría es la causa más frecuente de una imagen
+ilegible (ver [Verificar mDoc](/verificadores/mdoc/verificar/)). Qué elemento muestra
+hoy la wallet, y por qué `bytes` no lleva media type, está en
+[Esquema mDoc](/credenciales/mdoc/esquema/#foto-y-firma).
+
+</Details>
+
+## Paso 2: mostrar el QR
+
+Igual que en [SD-JWT](/credenciales/sd-jwt-vc/emitir/#paso-2-mostrar-el-qr): renderizás
+el `offer_uri` como QR y el ciudadano lo escanea con la wallet de Sovra. La wallet
+entrega su llave, y Sovra arma y firma el mDoc vinculado a esa llave.
+
+## Paso 3: recibir credential.issued
+
+Es el mismo evento que en SD-JWT, con dos diferencias: trae `doc_type`, y `credential`
+es el mDoc firmado en **CBOR codificado en base64url**, no un JWT.
+
+```json
+{
+  "event": "credential.issued",
+  "id": "e0b1c2d3-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+  "timestamp": "2026-09-28T13:02:11.114208Z",
+  "workspace_id": "bfe85e0d-c2da-4ccd-bd99-d26827f7e45e",
+  "data": {
+    "credential_id": "3f2a1c88-0f3e-4b1a-9b7e-7c5c9a2e4d11",
+    "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+    "schema_type": "DrivingLicence",
+    "issued_at": "2026-09-28T13:02:11Z",
+    "expires_at": "2036-09-28T13:02:11Z",
+    "format": "mso_mdoc",
+    "doc_type": "org.iso.18013.5.1.mDL",
+    "credential": "omppc3N1ZXJBdXRohEShAS…"
+  }
+}
+```
+
+Si tu receptor maneja los dos formatos, usá `format` (`"mso_mdoc"`) para separarlos.
+Validar la firma del webhook está explicado en [Webhooks](/webhooks/).
+
+<Aside type="danger" title="Es la única entrega">
+
+Sovra no guarda el mDoc firmado y no hay forma de volver a pedirlo. Si tu sistema lo
+necesita, guardalo al recibir el webhook.
+
+</Aside>
+
+<Details title="Decodificar el mDoc y qué hay adentro">
+
+`credential` es el `IssuerSigned` en CBOR, en base64url sin padding (no tiene puntos ni
+`~`). `doc_type` aparece solo en mDoc; con namespace propio trae el docType generado
+(`io.sovra.0x….<schema_id>.1`).
+
+Para decodificarlo:
+
+```bash
+# El base64url sin padding se convierte a base64 estándar antes de decodificar.
+node -e '
+  const b64u = process.argv[1];
+  const b64 = b64u.replace(/-/g, "+").replace(/_/g, "/");
+  process.stdout.write(Buffer.from(b64, "base64"));
+' "$CREDENTIAL" > mdoc.cbor
+```
+
+La estructura:
+
+```text
+IssuerSigned
+├── nameSpaces: { <namespace> → [ #6.24(bstr .cbor IssuerSignedItem) ] }
+└── issuerAuth: COSE_Sign1( MobileSecurityObject )
+```
+
+| Campo del MSO | Observaciones |
+|---|---|
+| `version` | `"1.0"` |
+| `digestAlgorithm` | `"SHA-256"` |
+| `docType` | Tiene que coincidir con el del documento. |
+| `valueDigests` | Digest por elemento, agrupado por namespace. Calculado sobre el envoltorio tag-24, no sobre el mapa sin envolver. |
+| `deviceKeyInfo.deviceKey` | La llave P-256 del holder, en formato COSE. |
+| `validityInfo` | `signed`, `validFrom`, `validUntil`. `validUntil` es **obligatorio**. |
+
+Un mDoc se vincula a la llave misma del holder (`MSO.deviceKeyInfo.deviceKey`), no a
+una referencia `cnf` a un DID como el SD-JWT: por eso, sin la prueba de posesión con una
+llave COSE, la emisión no es posible. Además del namespace del esquema, todo mDoc lleva
+el namespace reservado `io.sovra.meta.1` (ver
+[Esquema mDoc](/credenciales/mdoc/esquema/#referencia)).
+
+</Details>
+
+## Vigencia
+
+Un mDoc **siempre vence**: ISO no permite una credencial sin fecha de fin. Si el
+esquema no tiene `validity_period`, el mDoc vence **al año** de emitido.
+
+<Aside type="caution" title="valid_until y expiry_date tienen que coincidir">
+
+`expiry_date` es solo un dato que se lee; lo que hace vencer la credencial es su
+vigencia interna. Si la licencia vence en otra fecha que la del esquema, mandá
+`valid_until` con esa misma fecha. Si no, una licencia que dice 2030 puede dejar de
+verificar antes, con `credential_expired`.
+
+</Aside>
+
+<Details title="Cómo se calcula el vencimiento">
+
+| Esquema | SD-JWT | mDoc |
+|---|---|---|
+| Con `validity_period` | `exp` = emisión + período | `validUntil` = emisión + período |
+| Sin `validity_period` | Sin `exp` | **`validUntil` = emisión + 1 año** |
+| Oferta con `valid_until` | `exp` = `valid_until` | `validUntil` = `valid_until` |
+
+En una mDL ISO, `expiry_date` es un elemento obligatorio: mantenelo alineado con el
+`validUntil` que resulte del esquema o de `valid_until`. Con namespace propio, el
+esquema de ejemplo declara `"4y"` y la oferta manda
+`"valid_until": "2030-10-22T23:59:59Z"` junto con `"expiry_date": "2030-10-22"`.
+
+</Details>
+
+## Errores frecuentes
+
+- **`422 unencodable_claims`**: un valor no tiene la forma de su tipo (decimales en
+  `number`, fechas mal escritas, base64 URL-safe, `value` numérico en `codes`, un
+  array de privilegios vacío). `details` dice qué claves.
+- **`422 missing_claims`**: faltan claims `required`.
+- **`422 document_signer_required`**: el esquema declara un docType y tu workspace no
+  tiene document signer. Ver [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/).
+
+Los demás (`schema_not_found`, `schema_registration_pending`, `invalid_valid_until`…)
+son los mismos que en SD-JWT. La tabla completa está en
+[Errores de credenciales](/errores/credenciales/).
+
+## Ejemplos completos
+
+<Details title="Oferta con namespace propio: la licencia de 24 claims">
+
+La licencia del esquema `driving_licence_v2` completo (namespace `mx.gob.nl.icv.1`):
+
+```bash
+curl -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "driving_licence_v2",
+    "valid_until": "2030-10-22T23:59:59Z",
+    "claims": {
+      "given_name": "Sofía",
+      "family_name": "Demo",
+      "second_family_name": "Lambda",
+      "birth_date": "1990-01-01",
+      "document_number": "NL-2026-0001",
+      "issue_date": "2026-10-22",
+      "expiry_date": "2030-10-22",
+      "driving_privileges": [
+        {
+          "vehicle_category_code": "B",
+          "issue_date": "2026-10-22",
+          "expiry_date": "2030-10-22",
+          "codes": [{"code": "01", "sign": "<=", "value": "70"}]
+        }
+      ],
+      "portrait": "/9j/4AAQSkZJRgABAQ...",
+      "signature_usual_mark": "iVBORw0KGgoAAAANSUhEUg...",
+      "issuing_authority": "Secretaría de Movilidad y Planeación Urbana",
+      "street": "Av. Constitución",
+      "exterior_number": "1234",
+      "interior_number": "5B",
+      "neighborhood": "Centro",
+      "resident_city": "Monterrey",
+      "resident_postal_code": "64000",
+      "issuing_country": "MX",
+      "age_over_18": true,
+      "curp": "DELS900101MNLXXX01",
+      "organ_donor": true,
+      "blood_type": "O+",
+      "allergies": "Penicilina",
+      "emergency_phone": "8181234567"
+    }
+  }'
+```
+
+Un domicilio sin número se emite sin inventar nada: `exterior_number` admite `"S/N"`, y
+un `interior_number` inexistente sencillamente no se envía.
+
+</Details>
+
+<Details title="Ejemplo completo en Node.js">
+
+```js
+const BASE_URL = process.env.BASE_URL;
+const API_KEY = process.env.SOVRA_API_KEY;
+
+/** Un PNG o JPEG en base64 estándar con padding, según exige el tipo `bytes`. */
+function portraitFrom(buffer) {
+  return buffer.toString("base64");
+}
+
+async function emitirLicencia(persona, fotoBuffer) {
+  const res = await fetch(`${BASE_URL}/api/v1/issuer/credential-offer`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      schema_id: "licencia_de_conducir",
+      claims: {
+        family_name: persona.apellido,
+        given_name: persona.nombre,
+        birth_date: persona.nacimiento,          // "1815-12-10"
+        issue_date: persona.emision,
+        expiry_date: persona.vencimiento,
+        issuing_country: "MX",
+        issuing_authority: "Nuevo León",
+        document_number: persona.numero,
+        un_distinguishing_sign: "MEX",
+        portrait: portraitFrom(fotoBuffer),
+        driving_privileges: persona.categorias.map((c) => ({
+          vehicle_category_code: c,
+          issue_date: persona.emision,
+          expiry_date: persona.vencimiento,
+        })),
+        age_over_18: persona.mayorDeEdad,
+      },
+    }),
+  });
+
+  const body = await res.json();
+
+  if (!res.ok) {
+    // `details` identifica con precisión el claim rechazado y su motivo.
+    throw new Error(`${body.error}: ${JSON.stringify(body.details ?? {})}`);
+  }
+
+  return body; // { credential_id, offer_uri, expires_at, ... }
+}
+```
+
+Y el receptor del webhook, separando por formato:
+
+```js
+app.post("/webhooks/sovra", verificarFirmaHmac, (req, res) => {
+  const { event, data } = req.body;
+
+  if (event === "credential.issued") {
+    if (data.format === "mso_mdoc") {
+      // `credential` es CBOR en base64url sin padding, y `doc_type` figura
+      // únicamente en mDoc. Es la única entrega: hay que persistirla acá.
+      guardarMdoc(data.credential_id, data.doc_type, data.credential);
+    } else {
+      guardarSdJwt(data.credential_id, data.credential);
+    }
+  }
+
+  res.sendStatus(200);
+});
+```
+
+Las colecciones de Postman tienen estas llamadas listas para probar:
+[mDoc ISO](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-mdoc.postman_collection.json)
+y [mDoc con namespace propio](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-mdoc-custom.postman_collection.json).
+
+</Details>
+
+Para suspender, reactivar o revocar un mDoc, ver
+[Estados y revocación](/credenciales/estados-y-revocacion/#particularidades-de-mdoc).

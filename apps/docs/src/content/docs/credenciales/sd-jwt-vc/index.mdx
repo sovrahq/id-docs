@@ -1,0 +1,29 @@
+---
+title: "SD-JWT VC"
+description: "El formato de credencial por defecto de Sovra: liviano, basado en JSON y con divulgación selectiva."
+sidebar:
+  order: 1
+  label: "Introducción"
+  group:
+    label: "SD-JWT VC"
+---
+
+**SD-JWT VC** es el formato de credencial por defecto de Sovra. Es un documento firmado,
+basado en JSON, que vive en la wallet del ciudadano y le permite mostrar **solo los datos
+que hacen falta**: por ejemplo, que es mayor de edad, sin revelar su fecha de nacimiento.
+
+Sirve para casi todo: licencias, credenciales de identidad, membresías, títulos o
+certificados de cursos. Si no tenés un motivo para elegir mDoc, usá este.
+
+Emitir una credencial SD-JWT VC lleva dos pasos:
+
+<CardGrid>
+  <Card title="1. Crear el esquema" icon="ph:list-checks" href="/credenciales/sd-jwt-vc/esquema/">
+    Definí qué datos lleva la credencial y cómo se ve en la wallet. Se hace una sola vez.
+  </Card>
+  <Card title="2. Emitir" icon="ph:qr-code" href="/credenciales/sd-jwt-vc/emitir/">
+    Por cada persona: creás una oferta, le mostrás un QR y la guarda en su wallet.
+  </Card>
+</CardGrid>
+
+¿Dudás entre formatos? Mirá la comparación en [Tipos de credenciales](/conceptos/tipos-de-credenciales/).

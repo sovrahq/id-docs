@@ -1,0 +1,26 @@
+---
+/* The site's logo: the Sovra mark plus the "Sovra" wordmark, inline so both
+   take the text colour in light and dark. The mark lives in logo.ts, which the
+   social cards read too; the wordmark is set in Figtree Bold, as in the press
+   kit (https://sovra.io/es/press-kit). */
+import "@fontsource/figtree/700.css";
+import { logo } from "./logo";
+
+interface Props { class?: string }
+// Callers size the logo by height; the mark is square and the word follows it.
+const { class: cls = "h-6" } = Astro.props;
+---
+<span class:list={["inline-flex items-center gap-2", cls]} aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${logo.width} ${logo.height}`} class="h-full w-auto">{logo.paths.map((d) => <path d={d} fill="currentColor" />)}</svg>
+  <span class="wordmark">Sovra</span>
+</span>
+
+<style>
+  .wordmark {
+    font-family: "Figtree", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+</style>

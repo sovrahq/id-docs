@@ -1,0 +1,275 @@
+---
+title: "Errores de verificación"
+description: "Errores al crear una sesión de verificación y errores de presentación (presentation.failed) en SD-JWT VC y mDoc: qué pasó y qué hacer, con missing_required_claim en detalle."
+sidebar:
+  order: 2
+  label: "Verificación"
+---
+
+Errores del lado del verificador: los que devuelve la API al crear la sesión, y los
+que llegan después, en el webhook `presentation.failed`, cuando una wallet presenta.
+Los errores de autenticación y de workspace, comunes a toda la API, están en el
+[resumen](/errores/#errores-http-de-la-api).
+
+## Errores al crear la sesión
+
+Corresponden a [`POST /api/v1/verifier/verifications`](/api/create-verification/) y a
+[`GET /api/v1/verifier/verifications/{id}`](/api/get-verification/). Los errores de
+forma de la consulta (DCQL) se detectan acá, al crear la sesión, y no después cuando
+el ciudadano ya escaneó el QR.
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `400 missing_dcql_query` | No mandaste `dcql_query`. | Agregalo al body. |
+| `400 invalid_dcql_query` | `dcql_query` no es un objeto, o `credentials` falta o está vacío. | Mandá al menos una credencial en `credentials`. |
+| `400 unsupported_dcql_format` | Falta el `format` de una credencial o no es uno soportado. | Usá `dc+sd-jwt`, `vc+sd-jwt` o `mso_mdoc`. Ojo con `mdoc`, `mso-mdoc` o `mDL`. |
+| `400 mixed_dcql_formats` | Pediste SD-JWT y mDoc en la misma consulta. | Usá dos sesiones, una por formato. |
+| `400 invalid_mdoc_claim_path` | **Solo mDoc:** un `path` no son exactamente dos strings. | `{"path": ["<namespace>", "<identificador>"]}`. |
+| `400` (sin código) | El id de `GET /verifier/verifications/{id}` no es un UUID. | Revisá el id. |
+| `401 invalid_api_key` | Falta la API key o no es válida. | Ver [`invalid_api_key`](/errores/#invalid_api_key). |
+| `403 workspace_inactive` / `organization_inactive` | El workspace o la organización están desactivados. | Ver [Autenticación](/errores/#autenticación). |
+| `404 workspace_not_found` | La API key no corresponde a ningún workspace. | Generá una clave nueva. |
+| `404 session_not_found` | La sesión no existe, o es de otro workspace. | Revisá el `session_id`. |
+| `409 workspace_not_provisioned` | El workspace todavía se está preparando. | Ver [`workspace_not_provisioned`](/errores/#workspace_not_provisioned). |
+| `422 validation_error` | La sesión no se pudo guardar. | Reintentá. |
+| `502 signer_unavailable` | No se pudo firmar la solicitud. | Es transitorio: reintentá. |
+
+## Errores de presentación
+
+Llegan en `data.error` del webhook
+[`presentation.failed`](/webhooks/#presentationfailed) y en el campo `error` de la
+sesión. La validación se corta en el primer fallo, así que el código te dice
+**exactamente** qué falló. El orden de los controles está en
+[Verificar SD-JWT VC](/verificadores/sd-jwt-vc/verificar/) y
+[Verificar mDoc](/verificadores/mdoc/verificar/).
+
+Si llega con `holder_did: null`, la falla ocurrió antes de identificar al holder
+(típicamente `malformed_vp_token`, `unknown_issuer` o `session_expired`): no es un
+problema de ese ciudadano.
+
+### Formato del `vp_token`
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `malformed_vp_token` | La wallet mandó una respuesta mal armada, que no se puede leer. | Casi siempre es una wallet de terceros no compatible. Probá con la wallet de Sovra. |
+| `session_expired` | El ciudadano presentó después de los 10 minutos que dura la sesión. | Generá un QR nuevo. |
+
+### Emisor
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `unknown_issuer` | La credencial la emitió alguien que Sovra no reconoce como emisor confiable. En mDoc con docType ISO, también si la raíz IACA no está admitida o el signer no está registrado. | Si viene de un emisor ajeno a la red, rechazala. En mDoc ISO, revisá [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/). |
+| `credential_signature_invalid` | La firma del emisor no es válida: la credencial fue alterada o está corrupta. En mDoc, también si el docType fue modificado. | **Rechazala.** |
+| `invalid_disclosure` | Los datos presentados no coinciden con lo que firmó el emisor. | SD-JWT: **tratalo como intento de fraude** (o una wallet con bugs). mDoc: suele ser un mDoc mal armado por quien lo generó. |
+
+<Details title="Detalle técnico de los errores de emisor">
+
+- `unknown_issuer` en mDoc: la dirección del docType no figura en el registro, o el
+  `x5chain` no encadena a una raíz admitida; o bien, ya resuelto, la `issuer_address`
+  del namespace meta no coincide con el workspace resuelto.
+- `credential_signature_invalid`: falla ES256 en SD-JWT, o el `issuerAuth` en mDoc.
+  En mDoc también cuando el `docType` del MSO firmado no coincide con el del
+  documento.
+- `invalid_disclosure`: en SD-JWT, una disclosure no corresponde a ningún digest `_sd`
+  del JWT firmado. En mDoc, los digests de los elementos divulgados no coinciden con
+  `valueDigests`; suele ser un envoltorio tag-24 mal armado.
+
+</Details>
+
+### Namespace meta y elementos obligatorios (solo mDoc)
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `missing_mandatory_element:io.sovra.meta.1` | Falta el namespace de control de Sovra (`io.sovra.meta.1`) o está incompleto. | Sus seis elementos son obligatorios; sin ellos la presentación no se acepta. |
+| `missing_mandatory_element:<ns>.<elemento>` | La wallet no incluyó un elemento que la credencial marca como `always shared`. | La wallet debería haberlo incluido igual; el conjunto queda fijo al emitir. |
+
+### Holder
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `holder_did_missing` | **SD-JWT:** la credencial no dice quién es su titular (`sub`). | La credencial está mal formada. |
+| `holder_did_unresolvable` | **SD-JWT:** no se pudo resolver la identidad del titular en la cadena. | La cuenta puede no estar aprovisionada, o es un problema de red. Pedile al ciudadano que reintente. |
+| `holder_key_mismatch` | La presentación no la firmó el titular de la credencial. En mDoc, suele ser una passkey rotada, un nonce viejo o una audiencia incorrecta. | **Rechazala**: no la presenta su dueño. |
+| `holder_did_mismatch` | **SD-JWT:** quien firmó la presentación no es el titular de la credencial. | Presentación de un tercero. Rechazala. |
+| `device_mac_unsupported` | **mDoc:** la wallet usó `DeviceMac` en lugar de `DeviceSignature`. | No está soportado. |
+| `unsupported_device_auth_alg` | **mDoc:** la wallet firmó con un algoritmo no admitido. | No está soportado. |
+
+### Prueba de presentación (KB-JWT, solo SD-JWT)
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `holder_nonce_mismatch` | La presentación no es para esta sesión. | Suele ser un intento de **replay** con una presentación vieja. |
+| `holder_audience_mismatch` | La presentación está dirigida a otro verificador. | Fue armada para otra sesión o para otro workspace. |
+| `holder_iat_out_of_range` | La hora del teléfono del ciudadano está desfasada más de 5 minutos. | Pedile que corrija la hora y reintente. |
+| `sd_hash_mismatch` | La presentación se modificó entre la firma y el envío. | **Rechazala.** |
+
+En mDoc no hay KB-JWT: el nonce y la audiencia se controlan dentro de la firma de
+dispositivo, y sus fallos aparecen como `holder_key_mismatch`.
+
+### Vigencia y estado
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `credential_expired` | La credencial venció (o, en mDoc, todavía no es válida). | Hay que emitir una nueva. En mDoc, ver [`credential_expired` en un mDoc recién emitido](#credential_expired-en-un-mdoc-recién-emitido). |
+| `credential_revoked` | El emisor la revocó, de forma permanente. | Rechazala. |
+| `credential_suspended` | El emisor la suspendió temporalmente. | Rechazala; puede volver a habilitarse. |
+| `status_check_failed` | No se pudo consultar el estado en la cadena. Es del lado de Sovra; la credencial puede ser válida. | Reintentá. |
+
+Los estados de una credencial están en
+[Estados y revocación](/credenciales/estados-y-revocacion/).
+
+### DCQL
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `missing_required_claim:<path>` | Pediste un dato que el ciudadano no compartió o que la credencial no tiene con ese nombre. En mDoc el path es `<ns>.<elemento>`. | Ver [`missing_required_claim`](#missing_required_claim). |
+| `format_mismatch:<formato>` | La credencial no es del formato que pediste. | SD-JWT: `vc+sd-jwt` o `dc+sd-jwt`. mDoc: `mso_mdoc`. |
+| `doctype_mismatch` | **mDoc:** el docType de la credencial no es el que pediste en `meta.doctype_value`. | Ojo con las mayúsculas: `mDL` ≠ `mdl`. |
+| `invalid_dcql_query` | La consulta de la sesión no tiene la forma esperada (en mDoc, un `path` que no es un par de strings). | Revisá la estructura. |
+
+## `missing_required_claim`
+
+Es el error más frecuente. Tiene tres causas distintas:
+
+1. **El nombre no coincide.** El `path` de la consulta tiene que ser igual, letra por
+   letra, al `key` del esquema. Si el esquema se cargó como `fist_name`, pedir
+   `first_name` falla aunque el dato esté.
+2. **Usaste el docType como namespace (solo mDoc).** Para un mDL ISO se pide
+   `["org.iso.18013.5.1", "family_name"]`, no `["org.iso.18013.5.1.mDL", "family_name"]`.
+3. **El ciudadano no compartió el campo.** En SD-JWT, todos los claims que pedís son
+   obligatorios: si desmarca uno, la presentación falla.
+
+<Details title="Causa 1 en detalle: el claim no existe con ese nombre">
+
+Un caso real:
+
+```json
+{ "event": "presentation.failed",
+  "data": { "error": "missing_required_claim:first_name", "success": false } }
+```
+
+La credencial presentada contenía:
+
+```json
+["sPwyJ5BurK5HJpYE8QUY3w", "fist_name", "Ada"]
+```
+
+`fist_name`, no `first_name`. El esquema se cargó con una errata, y esa errata quedó
+**dentro de la credencial firmada**.
+
+En mDoc pasa lo mismo: el `key` del esquema es el `elementIdentifier` de ISO y es un
+contrato literal. `first_name` no es `given_name`.
+
+**Cómo diagnosticarlo:** mirá los keys reales del esquema en **Schemas** del dashboard
+o en [`GET /schemas`](/api/list-schemas/), o decodificá una credencial ya emitida (ver
+[Cómo inspeccionar una credencial](/errores/credenciales/#cómo-inspeccionar-una-credencial)).
+
+**Cómo resolverlo:**
+
+- **Corto plazo:** pedí el `path` tal como está en la credencial (`fist_name`).
+- **Largo plazo:** creá una **versión nueva del esquema** con el key corregido. Las
+  credenciales viejas conservan el key viejo para siempre, así que durante la
+  transición vas a tener que aceptar los dos. Una forma de hacerlo: crear una sesión
+  de verificación por variante y aceptar la que salga bien.
+
+</Details>
+
+<Details title="Causa 2 en detalle: docType y namespace (solo mDoc)">
+
+```json
+{ "path": ["org.iso.18013.5.1.mDL", "family_name"] }   ❌
+{ "path": ["org.iso.18013.5.1",     "family_name"] }   ✅
+```
+
+ISO asocia el docType `org.iso.18013.5.1.mDL` con el namespace `org.iso.18013.5.1`.
+**Uno no se deriva del otro.** Con el docType generado por Sovra, las dos cadenas
+coinciden, y por eso esto no aparece hasta que migrás a ISO. El namespace correcto
+está en `io.sovra.meta.1/namespace` dentro de la credencial (ver
+[Procedimiento de diagnóstico de un mDoc](/errores/credenciales/#cómo-inspeccionar-una-credencial)).
+
+</Details>
+
+<Details title="Causa 3 en detalle: el holder no compartió el campo">
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+En la wallet, el ciudadano aprueba **campo por campo**. Si desmarca uno de los que
+pediste, la presentación falla completa: en Sovra **todos los claims del DCQL son
+obligatorios**.
+
+**Cómo resolverlo:** pedí menos campos. Es mejor para la privacidad y sube la tasa de
+éxito. Si necesitás campos opcionales, creá **dos sesiones**: una con el conjunto
+mínimo y otra con el conjunto ampliado.
+
+</TabItem>
+<TabItem label="mDoc">
+
+Si el elemento **no** está marcado como `always shared`, el ciudadano puede
+deseleccionarlo. No es un error de la integración: es como funciona el formato.
+
+Si un dato es imprescindible para el trámite, marcalo `disclosable: false` en el
+esquema. Tené en cuenta que eso lo incorpora a **todas** las presentaciones de esa
+credencial para siempre, y que el conjunto queda congelado en las credenciales ya
+emitidas.
+
+</TabItem>
+</Tabs>
+
+</Details>
+
+## Errores de certificado
+
+Solo para docTypes ISO. Llegan como `422` al admitir una raíz o registrar un signer:
+
+```json
+{ "error": "invalid_certificate", "reason": "dsc_profile.validity_too_long" }
+```
+
+Qué significa cada `reason` y cómo corregirlo está en
+[Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/).
+
+## Tres fallos que parecen el mismo
+
+Los tres se ven como «no funciona la verificación» de un mDoc, pero ocurren en etapas
+distintas. El mensaje dice en cuál:
+
+| Mensaje | Etapa | Causa |
+|---|---|---|
+| `422 unencodable_claims: portrait, signature_usual_mark` | Emisión | Los `bytes` llevan el prefijo `data:image/jpeg;base64,`. Van **pelados**. |
+| `Missing required OpenID4VP parameters` | La wallet lee el QR | La URI llegó cortada. Casi siempre, un generador de QR con tope de caracteres. |
+| `DID … publishes no P-256 assertion key #key-assert` | La wallet resuelve el DID | La wallet consulta una cadena donde ese workspace no está registrado. |
+
+Mientras el QR llegue cortado (el segundo), nunca vas a llegar a ver el tercero. Cómo
+comprobar en qué cadena está registrado el DID está en
+[Verificar mDoc](/verificadores/mdoc/verificar/#comprobar-en-qué-cadena-vive-el-did).
+
+## Incidencias frecuentes
+
+### El QR se escanea pero no pasa nada
+
+La sesión dura **10 minutos**. Si venció, generá un QR nuevo.
+
+### La wallet no ofrece la credencial (mDoc)
+
+La wallet busca la credencial **por docType**. Comprobá que `meta.doctype_value` sea
+exactamente el docType de la credencial, mayúsculas incluidas. Si tenés dudas, sacá
+`meta` de la consulta: sin él se acepta cualquier docType.
+
+### La wallet dice que este verificador no puede aceptar mDocs
+
+Falta el `response_uri`. Las sesiones creadas por la API siempre lo incluyen; si armás
+un verificador propio, tenés que exponerlo vos: la presentación mDoc se ata al
+verificador usando el hash de esa URL.
+
+### `credential_expired` en un mDoc recién emitido
+
+El esquema no declara `validity_period`, así que el mDoc se emitió con **un año** de
+vigencia (un SD-JWT, en cambio, quedaría sin vencimiento). ISO obliga a que un mDoc
+tenga vencimiento. Si querés otro plazo, declaralo en el esquema.
+
+### Las claves del resultado mDoc no coinciden con lo que espera mi código
+
+En `presentation.verified`, las claves de un mDoc llevan el namespace como prefijo:
+`"org.iso.18013.5.1.family_name"`, no `"family_name"`. Ver
+[`presentation.verified`](/webhooks/#presentationverified).

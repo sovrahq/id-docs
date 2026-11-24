@@ -1,0 +1,55 @@
+---
+title: "Sovra ID"
+description: "Emití y verificá credenciales digitales y documentos firmados por tu organización, comprobables por cualquiera sin depender de Sovra."
+sidebar:
+  order: 0
+  label: "Inicio"
+---
+
+Sovra ID es la plataforma para **emitir** y **verificar** datos firmados por tu organización: una licencia, una membresía, un certificado, una constancia. Todo lo que emitís lleva tu firma digital y su estado (vigente, suspendido, revocado) se publica en **SovraChain**, una cadena de bloques pública. Así, quien lo recibe puede comprobar que es auténtico sin tener que preguntarte nada.
+
+Tu servidor habla con la API usando una **API key de workspace** (`Authorization: Bearer sovra_sk_...`).
+
+## La primera decisión: credencial o documento
+
+La plataforma emite dos cosas distintas, y elegir bien entre las dos es lo primero.
+
+| | **Credencial verificable** | **Documento firmado** |
+|---|---|---|
+| Qué es | La versión digital de una tarjeta que la persona lleva en **su wallet** | Una hoja que la institución emite y reparte, **sin dueño** que la custodie |
+| Quién la guarda | La wallet del ciudadano | Quien la recibe: un archivo, un enlace, un papel |
+| Qué se muestra | Lo que la persona elige, campo por campo | Todo el contenido, a la vista |
+| Casos típicos | Licencias, identidad, membresías, títulos habilitantes | Certificados, constancias, actas, comprobantes |
+
+**La regla práctica:** si el dato es sobre una persona y ella decide cuándo y cuánto mostrarlo, es una **credencial**. Si es una hoja que la institución emite y reparte, es un **documento**.
+
+Una credencial, además, se puede emitir en dos formatos: **SD-JWT VC** (el formato por defecto) o **mDoc** (el de la licencia de conducir móvil). Los detalles están en [Tipos de credenciales](/conceptos/tipos-de-credenciales/).
+
+## Por dónde seguir
+
+<CardGrid>
+  <Card title="Conceptos" icon="ph:book-open" href="/conceptos/">
+    Cómo funciona todo, en lenguaje llano: quién participa, qué se emite y cómo cambia de estado.
+  </Card>
+  <Card title="Primeros pasos" icon="ph:key" href="/primeros-pasos/">
+    Acceso, workspace, API key, webhook y tu primera llamada.
+  </Card>
+  <Card title="Credenciales" icon="ph:identification-card" href="/credenciales/">
+    Crear el esquema y emitir credenciales SD-JWT VC y mDoc a la wallet del ciudadano.
+  </Card>
+  <Card title="Verificadores" icon="ph:seal-check" href="/verificadores/">
+    Pedir campos concretos de una credencial y leer el resultado.
+  </Card>
+  <Card title="Documentos" icon="ph:file-text" href="/documentos/">
+    Emitir, repartir, mostrar y verificar documentos firmados.
+  </Card>
+  <Card title="Referencia de API" icon="ph:plugs" href="/api/">
+    Cada endpoint, con sus parámetros y respuestas.
+  </Card>
+</CardGrid>
+
+<Aside type="caution" title="Plataforma anterior">
+
+La documentación de la plataforma anterior (`x-api-key`, `did:quarkid`, DIDComm, BBS+) está archivada y **no debe usarse para integraciones nuevas**.
+
+</Aside>

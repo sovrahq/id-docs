@@ -1,0 +1,37 @@
+---
+title: "Integraciones de referencia"
+description: "Integraciones de Sovra ID con canales y plataformas concretas —WhatsApp y Moodle— y los templates de código listos para usar."
+sidebar:
+  order: 0
+  label: "Resumen"
+---
+
+Las guías de [credenciales](/credenciales/) y [verificadores](/verificadores/)
+explican el flujo general: creás una oferta o una sesión, mostrás un QR y recibís un
+[webhook](/webhooks/). Estas integraciones lo llevan a un canal concreto, con un
+template de código que podés usar de punto de partida.
+
+<CardGrid>
+<Card title="Verificar por WhatsApp" icon="ph:chat-circle" href="/integraciones/whatsapp/">
+Un bot que verifica credenciales dentro del chat, directo contra la Cloud API de Meta.
+</Card>
+<Card title="Emitir desde Moodle" icon="ph:graduation-cap" href="/integraciones/moodle/">
+Un plugin local de Moodle que emite una credencial cuando un estudiante completa un curso.
+</Card>
+</CardGrid>
+
+## Templates
+
+| Template | Qué hace | Plataforma |
+|---|---|---|
+| [`whatsapp-meta`](https://github.com/sovrahq/id-docs/tree/main/templates/whatsapp-meta) | Bot de WhatsApp que verifica credenciales dentro del chat, directo contra la Cloud API de Meta (sin BSP). Node + TypeScript + Express. | ✅ Actual (SD-JWT VC, OID4VP + DCQL, `Bearer sovra_sk_...`) |
+| [`moodle-local-plugin`](https://github.com/sovrahq/id-docs/tree/main/templates/moodle-local-plugin) | Plugin local de Moodle que emite una credencial al completar un curso: notificación, QR o enlace directo a la cartera, webhook opcional con reconciliación. PHP, Moodle 4.5 LTS y 5.x. | ✅ Actual (SD-JWT VC, OID4VCI, `Bearer sovra_sk_...`) |
+| [`nextjs-nestjs`](https://github.com/sovrahq/id-docs/tree/main/templates/nextjs-nestjs) | Proyecto full-stack: frontend Next.js + backend Nest.js, con emisión y verificación. | ⚠️ Anterior (`x-api-key`, `did:quarkid`) — pendiente de migrar |
+
+<Aside type="caution" title="nextjs-nestjs usa la plataforma anterior">
+
+Este template todavía autentica con `x-api-key` y emite con `did:quarkid`. Está
+pendiente de migrar a la API actual (`Authorization: Bearer sovra_sk_...`, DIDs
+`did:sovra`): no lo uses como referencia de la API vigente.
+
+</Aside>

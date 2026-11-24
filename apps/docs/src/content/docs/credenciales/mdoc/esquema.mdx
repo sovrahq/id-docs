@@ -1,0 +1,556 @@
+---
+title: "Crear un esquema mDoc"
+description: "Elegir entre namespace ISO o propio, cerrar las decisiones que no tienen vuelta atrás y crear el esquema de un mDoc (ISO/IEC 18013-5)."
+sidebar:
+  order: 1
+  label: "Crear el esquema"
+---
+
+Lo que hace que una credencial sea un mDoc es su esquema: basta con
+`format: "mso_mdoc"`. Todo lo demás (emitir, verificar, revocar) usa los mismos
+endpoints que SD-JWT.
+
+El esquema es también donde se toman las decisiones que después **no se pueden
+cambiar**, así que esta página arranca por ahí. Lo que vale para cualquier esquema
+(identificadores, versiones, borrado) está en [Esquemas](/conceptos/esquemas/).
+
+## Namespace ISO o namespace propio
+
+El **namespace** es el "apellido" de los datos de un mDoc: el grupo dentro del cual vive
+cada campo. Hay dos caminos:
+
+- **Namespace ISO** (`org.iso.18013.5.1`): una licencia de conducir digital (mDL)
+  conforme a la norma, que **cualquier lector mDL de terceros** puede leer. A cambio,
+  solo admite los campos que define ISO, con los tipos que define ISO, y necesitás
+  registrar un document signer (un certificado de firma; ver
+  [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/)).
+- **Namespace propio** (por ejemplo `mx.gob.nl.icv.1`): para documentos que llevan datos
+  que ISO no define, como CURP, colonia, tipo sanguíneo o teléfono de emergencia. Podés
+  declarar los campos que quieras, no necesitás certificado, pero los lectores mDL de
+  terceros no lo van a interpretar como licencia.
+
+En pocas palabras: si la licencia tiene que reconocerse fuera de Sovra, ISO. Si
+necesitás campos propios, namespace propio.
+
+<Aside type="caution" title="Un esquema mDoc tiene un solo namespace">
+
+No se puede combinar `org.iso.18013.5.1` con una extensión propia en el mismo esquema
+(el patrón que usa AAMVA). La elección es excluyente: o ISO, o uno propio.
+
+</Aside>
+
+<Details title="Comparación completa entre las dos variantes">
+
+| | **Namespace ISO** | **Namespace propio** |
+|---|---|---|
+| `namespace` del esquema | `org.iso.18013.5.1` | El que declares, en DNS inverso |
+| Elementos fuera del catálogo de ISO | No: `undefined_iso_elements` al crear el esquema | Sin restricción |
+| Tipos de los elementos | Fijados por la norma | A elección del emisor |
+| Document signer (CSR, certificado, raíz IACA admitida) | Obligatorio si el docType es el de ISO | No se requiere |
+| Identidad del emisor | La cadena de certificados `x5chain` | La dirección contenida en el docType generado |
+| ¿El docType identifica al emisor? | No: `org.iso.18013.5.1.mDL` es idéntico para todo emisor | Sí: el docType generado lleva la dirección del workspace |
+| Lectores mDL de terceros | La interpretan | No la interpretan como licencia |
+
+**Por qué ISO es un conjunto cerrado.** La norma define exactamente qué identificadores
+existen y de qué tipo es cada uno. Un lector conforme que recibiera `curp` dentro del
+namespace ISO habría recibido algo que la norma declara imposible, así que un `key`
+ajeno a la lista se rechaza al crear el esquema. La vía que la norma prevé para extender
+un documento es **añadir un namespace**, como hace AAMVA con `org.iso.18013.5.1.aamva`;
+en Sovra, hoy, eso significa pasar a un namespace propio.
+
+**En un documento de alcance estatal**, pesa además el docType: con el docType de ISO,
+un verificador admite la licencia de **cualquier** emisor cuyo document signer esté
+admitido, y filtrar por entidad queda a su cargo, sobre `issuing_authority`, una vez
+recibido el resultado. Con el docType generado, la consulta misma ya ancla el
+workspace.
+
+</Details>
+
+## Las decisiones que no tienen vuelta atrás
+
+Estos campos quedan firmados dentro de cada credencial. Una revisión del esquema puede
+agregar o quitar claims, pero **ignora estos campos** si vienen en el body:
+
+- **`format`**: `mso_mdoc`.
+- **`namespace`**: el ISO o el tuyo, en DNS inverso (por ejemplo `mx.gob.nl.icv.1`).
+- **`doc_type`**: el tipo de documento. Si no lo declarás, Sovra lo **genera** a partir
+  de la dirección de tu workspace y el `schema_id`, por ejemplo
+  `io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1`. Para una
+  mDL ISO, se declara `org.iso.18013.5.1.mDL`, y eso exige el document signer.
+- **`schema_id`**: como pasa a formar parte del docType, solo admite minúsculas,
+  dígitos, `-` y `_`.
+- **`credential_type`**: el tipo que se registra en SovraChain.
+
+Además, cada **`key`** de claim es para siempre: es el nombre que un verificador tiene
+que pedir, literal.
+
+<Details title="Cómo se arma el docType">
+
+**Generado (por defecto).** No requiere ninguna acción. Sovra compone:
+
+```text
+io.sovra.<dirección-eoa-del-workspace-en-minúsculas>.<schema_id>.1
+```
+
+La dirección es siempre el segmento que sigue a `io.sovra.`, en minúsculas y con sus 40
+dígitos hexadecimales. Un verificador lee la dirección del emisor directamente del
+docType, que viaja firmado, y la resuelve contra SovraChain. No se requiere certificado
+alguno. Si no declarás `namespace`, el namespace es esa misma cadena; con namespace
+propio, docType y namespace son cadenas distintas.
+
+**ISO (declarado por vos).** Para una licencia reconocible fuera de Sovra:
+`doc_type: "org.iso.18013.5.1.mDL"` y `namespace: "org.iso.18013.5.1"`. Los dos
+**distinguen mayúsculas**: tienen forma de nombre de host pero no lo son, así que `mdl`
+y `mDL` son tipos de documento distintos.
+
+Declarar un docType sin document signer registrado da `409 document_signer_required` al
+crear el esquema por API, y `422 document_signer_required` al emitir. En el dashboard,
+el document signer es lo que habilita la opción.
+
+**Por qué el `schema_id` tiene alfabeto restringido.** Debe cumplir
+`^[a-z0-9][a-z0-9_-]*$` porque se convierte en un segmento del docType, y un punto
+agregaría un nivel sin querer. La regla no se aplica a esquemas `vc+sd-jwt`.
+
+</Details>
+
+## Crear el esquema
+
+<Steps>
+<Step title="Elegí el formato mDoc">
+
+En el dashboard, **Schemas → New schema**, y en **Format** elegí **Mobile driving license
+(mDoc)** (en modo developer se llama **mDoc (CBOR, ISO 18013-5)**). El asistente valida
+el namespace ISO campo por campo, por eso es el camino recomendado para el primer
+esquema ISO.
+
+Por API es [`POST /api/v1/issuer/schemas`](/api/create-schema/) con
+`"format": "mso_mdoc"`. Acá el `schema_id` lo elegís vos.
+
+</Step>
+<Step title="Declará los claims">
+
+Cada claim lleva `key`, `type`, `required` y `disclosable`. En mDoc **el `type`
+importa de verdad**: cada valor se codifica según su tipo, y un valor que no coincide
+se rechaza al emitir.
+
+<Tabs syncKey="namespace">
+<TabItem label="Namespace ISO">
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "credential_type": "DrivingLicence",
+    "name": "Licencia de Conducir",
+    "format": "mso_mdoc",
+    "namespace": "org.iso.18013.5.1",
+    "validity_period": "10y",
+    "claims": [
+      {"key": "family_name", "type": "string",  "required": true,  "disclosable": false},
+      {"key": "given_name",  "type": "string",  "required": true,  "disclosable": false},
+      {"key": "birth_date",  "type": "date",    "required": true,  "disclosable": false},
+      {"key": "portrait",    "type": "bytes",   "required": true,  "disclosable": false},
+      {"key": "age_over_18", "type": "boolean", "required": false, "disclosable": true}
+    ]
+  }'
+```
+
+Cada `key` tiene que ser un elemento definido por ISO, con su tipo (el catálogo está en
+[Referencia](#referencia)). Si no, el esquema no se guarda: `undefined_iso_elements`
+para un `key` que ISO no define, `wrong_iso_element_type` para uno con otro tipo (por
+ejemplo, `portrait` como `string` en vez de `bytes`). Para que lectores de terceros
+reconozcan la licencia, agregá `"doc_type": "org.iso.18013.5.1.mDL"`.
+
+Que falten elementos obligatorios de ISO **no** impide guardar el esquema: lo que tiene
+que estar completo es la credencial al emitirla.
+
+</TabItem>
+<TabItem label="Namespace propio">
+
+```bash
+curl -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "driving_licence_v2",
+    "credential_type": "DrivingLicence",
+    "name": "Driving Licence v2",
+    "format": "mso_mdoc",
+    "namespace": "mx.gob.nl.icv.1",
+    "validity_period": "4y",
+    "claims": [
+      {"key": "given_name",  "label": "Nombre",          "type": "string",  "required": true,  "disclosable": false},
+      {"key": "family_name", "label": "Apellido paterno", "type": "string",  "required": true,  "disclosable": false},
+      {"key": "birth_date",  "label": "Fecha de nacimiento", "type": "date", "required": true,  "disclosable": true},
+      {"key": "portrait",    "label": "Foto",            "type": "bytes",   "required": true,  "disclosable": false},
+      {"key": "curp",        "label": "CURP",            "type": "string",  "required": false, "disclosable": true}
+    ]
+  }'
+```
+
+Conservá los nombres de ISO donde ISO los define (`given_name`, `birth_date`…) y
+escribí las claves en inglés; el español va en el `label`. El ejemplo completo, con 24
+claims, está en [Referencia](#referencia).
+
+<Aside type="danger" title="No uses io.sovra.meta.1 como namespace">
+
+Es un namespace reservado de Sovra. Si lo declarás, los elementos del esquema se pierden
+en silencio.
+
+</Aside>
+
+</TabItem>
+</Tabs>
+
+</Step>
+<Step title="Definí la vigencia">
+
+`validity_period` (`10y`, `6m`, `30d`) **tiene que estar en el body**. Ojo: en mDoc,
+`null` **no** significa "sin vencimiento" sino **1 año**, porque ISO exige una fecha de
+fin. Una licencia cuyo `expiry_date` dice 2030 dejaría de verificar en un año. Declarás
+el período real, o mandás `valid_until` al emitir (ver
+[Vigencia](/credenciales/mdoc/emitir/#vigencia)).
+
+</Step>
+<Step title="Esperá el registro on-chain">
+
+El esquema nace en `registration_status: "pending"` y no se puede emitir hasta que pase
+a `registered` (si queda en `failed`, hay que crearlo de nuevo). **No hay webhook de
+registro**: consultá el listado.
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  | jq '.schemas[] | select(.format == "mso_mdoc") | {schema_id, version, doc_type, registration_status}'
+```
+
+Ese listado es **el único lugar donde aparece el `doc_type` generado**. Anotalo junto
+con el `namespace`: el verificador los va a necesitar.
+
+</Step>
+</Steps>
+
+## `required` frente a `always shared`
+
+Son dos cosas distintas, y confundirlas es el error más común:
+
+- **`required: true`**: el dato **tiene que venir al emitir**. Si falta,
+  `422 missing_claims`.
+- **`disclosable: false`** (el dashboard lo muestra como **always shared**): el
+  ciudadano **no puede ocultarlo** al presentar la credencial.
+
+Un dato puede ser obligatorio al emitir y opcional al mostrar. Por ejemplo,
+`birth_date` suele ser `required` pero divulgable, para que el ciudadano pueda probar
+que es mayor de edad con `age_over_18` sin revelar la fecha.
+
+<Aside type="caution" title="Por API, todo es always shared salvo que digas lo contrario">
+
+En el dashboard, los claims opcionales se marcan divulgables. Por API, lo que no
+declares `disclosable: true` queda **always shared**: viaja en cada presentación, para
+siempre. Un control de tránsito no necesita el historial médico.
+
+</Aside>
+
+<Details title="Qué pasa con el conjunto always shared dentro de la credencial">
+
+El conjunto `always shared` se **congela dentro de la credencial** al emitirla, en
+`io.sovra.meta.1/mandatory_elements`, dentro del MSO firmado y agrupado por namespace:
+
+- Un verificador no necesita consultar el esquema para saber cuáles son.
+- Una revisión posterior del esquema no cambia lo que una credencial ya emitida está
+  obligada a divulgar.
+- Si la presentación omite uno, falla con
+  `missing_mandatory_element:<namespace>.<elemento>`.
+
+La agrupación por namespace hace falta porque un identificador solo es único dentro de
+uno: dos namespaces distintos pueden tener cada uno su `document_number`.
+
+</Details>
+
+## Foto y firma
+
+`portrait` (foto) y `signature_usual_mark` (firma) se declaran como **`bytes`**. Hoy la
+wallet muestra **solo `portrait`** como imagen; la firma y cualquier otro `bytes` viajan
+bien firmados dentro de la credencial, pero se ven como una fila que dice "Imagen".
+Cuando la wallet aprenda a dibujarlos, se van a ver solos, sin reemitir nada. Cómo
+mandarlas al emitir está en [Emitir mDoc](/credenciales/mdoc/emitir/#foto-y-firma).
+
+<Details title="Imágenes: media type y qué ve el ciudadano">
+
+En el namespace ISO, `portrait` es obligatorio y tiene que ser `bytes`; declararlo
+`string` da `wrong_iso_element_type`.
+
+**`bytes` no lleva media type.** Nada en la credencial dice si la imagen es PNG o JPEG.
+O lo fijás por convención (por ejemplo, PNG para la firma y JPEG para la foto,
+documentado), o el lector mira los primeros bytes (`\x89PNG`, `\xFF\xD8\xFF`). Suponer
+el tipo equivocado produce una imagen rota, no un error.
+
+| Elemento | ¿Lo ve el ciudadano? |
+|---|---|
+| `portrait` | Sí: se renderiza como fotografía. |
+| `signature_usual_mark` | No: una fila que dice "Imagen". |
+| Cualquier otro `bytes` | No: igual. |
+
+</Details>
+
+## Revisar o borrar el esquema
+
+Editar un esquema crea una **versión nueva** (en el dashboard, **Revise (v2)**). Las
+credenciales ya emitidas siguen con su versión, y `format`, `kind`, `credential_type`,
+`doc_type` y `namespace` no cambian. Un esquema que ya se usó no se puede borrar
+(`409 schema_in_use`). El detalle está en [Esquemas](/conceptos/esquemas/).
+
+## Referencia
+
+<Details title="Todos los campos del esquema mDoc">
+
+| Campo | Valores | Observaciones |
+|---|---|---|
+| `format` | `vc+sd-jwt` · `mso_mdoc` | **`"mso_mdoc"`.** Sin él, el esquema nace `vc+sd-jwt`. Inmutable. |
+| `kind` | `credential` | El default. mDoc **no** admite `document`: un documento se firma a un PDF, sin wallet ni holder, y un mDoc no puede expresar ese modelo. |
+| `schema_id` | `^[a-z0-9][a-z0-9_-]*$` | Se convierte en un segmento del docType. |
+| `doc_type` | DNS inverso, **distingue mayúsculas** | Vacío → generado. Declararlo exige document signer. |
+| `namespace` | DNS inverso | Vacío → idéntico al docType. Para ISO, `org.iso.18013.5.1`. Es el primer segmento de todo `path` DCQL de mDoc. |
+| `validity_period` | `^[1-9]\d*(y\|m\|d)$` o `null` | La clave tiene que estar; omitirla da `422`. Con `null`, el mDoc vale **1 año**. |
+| `claims[].key` | | El `elementIdentifier` de ISO: lo que viaja en el `IssuerSignedItem`, lo que muestra la wallet y lo que el verificador pide en el DCQL. |
+| `claims[].type` | Ver tipos abajo | Determina la codificación CBOR. **En mDoc se exige**, a diferencia de `vc+sd-jwt`, donde es indicativo. |
+| `claims[].required` | bool | Debe figurar en la oferta. |
+| `claims[].disclosable` | bool | `false` = **always shared**. |
+| `attachment` | | **No admitido.** Exclusivo de `vc+sd-jwt`. |
+
+El listado `GET /api/v1/issuer/schemas` trae el `doc_type` en `null` hasta que el
+workspace termina de aprovisionarse; la respuesta de creación (`201`) también, en ese
+caso.
+
+</Details>
+
+<Details title="Tipos de claim y su codificación CBOR">
+
+Un mDoc codifica cada valor **estrictamente según el tipo declarado**. Un valor con una
+forma incorrecta se rechaza en lugar de convertirse: una conversión produciría una
+credencial que verifica y afirma algo falso.
+
+| Tipo | Valor en el JSON | Codificación CBOR | Observaciones |
+|---|---|---|---|
+| `string` | Texto | Texto | |
+| `uri` | Una URL, como texto | Texto | |
+| `integer` | Entero | Entero | ISO lo usa para `sex`, `height` y `weight`. |
+| `number` | Entero, o float **integral** (`4.0` sí, `4.5` no) | Entero | Un float no tiene forma CBOR determinista. |
+| `boolean` | `true` / `false` | Booleano | Es como `age_over_NN` atestigua una edad sin revelar la fecha. |
+| `date` | `"YYYY-MM-DD"` | Tag `full-date` | Diez caracteres exactos. |
+| `datetime` | ISO 8601 con offset | Tag `tdate` | |
+| `bytes` | **base64 estándar con padding** | Byte string | Retrato, firma o plantilla biométrica. La credencial lleva los bytes decodificados. |
+| `driving_privileges` | Array de categorías (ISO 18013-5 §7.2.4) | Array de mapas con fechas etiquetadas | El único tipo no escalar. |
+| `attachment` | | | **Exclusivo de `vc+sd-jwt`.** `bytes` ya cubre el caso de un archivo. |
+
+Un tipo que el codificador no reconoce se interpreta como texto si el valor ya es una
+cadena, y se rechaza en cualquier otro caso.
+
+**`driving_privileges`** es un array de categorías de vehículo. Cada una lleva
+`vehicle_category_code` (obligatorio: `B` automóvil, `A` motocicleta, `C` camión),
+`issue_date` y `expiry_date` opcionales (`YYYY-MM-DD`, codificadas como `full-date`
+anidadas), y `codes` opcional con las restricciones (explicado en
+[Emitir mDoc](/credenciales/mdoc/emitir/#codificación-de-cada-claim)). **Un array vacío
+se rechaza**: ISO exige al menos un privilegio. Es un tipo propio y no JSON libre por
+las fechas: un tipo genérico las transportaría como texto y ningún lector conforme
+podría extraerlas.
+
+</Details>
+
+<Details title="Catálogo de elementos del namespace ISO">
+
+Un `key` que no figura acá se rechaza al guardar con `undefined_iso_elements`, y uno con
+tipo incorrecto con `wrong_iso_element_type`.
+
+**Obligatorios (11).** ISO exige su presencia en la credencial. Al inicializar un
+esquema de mDL se generan con `required: true` y `disclosable: false` (always shared).
+
+| Elemento | Tipo |
+|---|---|
+| `family_name` | `string` |
+| `given_name` | `string` |
+| `birth_date` | `date` |
+| `issue_date` | `date` o `datetime` |
+| `expiry_date` | `date` o `datetime` |
+| `issuing_country` | `string` |
+| `issuing_authority` | `string` |
+| `document_number` | `string` |
+| `portrait` | `bytes` |
+| `driving_privileges` | `driving_privileges` |
+| `un_distinguishing_sign` | `string` |
+
+`issue_date` y `expiry_date` son los únicos en los que ISO deja elegir entre
+`full-date` y `tdate`.
+
+**Opcionales.** Se generan con `required: false` y `disclosable: true`: quien acredita
+ser mayor de 18 no debería tener que entregar su domicilio.
+
+| Elemento | Tipo | | Elemento | Tipo |
+|---|---|---|---|---|
+| `administrative_number` | `string` | | `nationality` | `string` |
+| `sex` | `integer` | | `resident_city` | `string` |
+| `height` | `integer` | | `resident_state` | `string` |
+| `weight` | `integer` | | `resident_postal_code` | `string` |
+| `eye_colour` | `string` | | `resident_country` | `string` |
+| `hair_colour` | `string` | | `resident_address` | `string` |
+| `birth_place` | `string` | | `family_name_national_character` | `string` |
+| `portrait_capture_date` | `datetime` | | `given_name_national_character` | `string` |
+| `age_in_years` | `integer` | | `signature_usual_mark` | `bytes` |
+| `age_birth_year` | `integer` | | `issuing_jurisdiction` | `string` |
+
+**Familias**, identificadas por patrón:
+
+| Patrón | Tipo | Observaciones |
+|---|---|---|
+| `age_over_NN` (`^age_over_\d{2}$`) | `boolean` | Al inicializar un mDL se generan `age_over_18` y `age_over_21`. |
+| `biometric_template_xx` (`^biometric_template_[a-z_]+$`) | `bytes` | |
+
+</Details>
+
+<Details title="Ejemplo completo con namespace propio: la licencia de 24 claims">
+
+Una licencia mexicana con el namespace `mx.gob.nl.icv.1` y docType generado:
+
+```bash
+curl -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "driving_licence_v2",
+    "credential_type": "DrivingLicence",
+    "name": "Driving Licence v2",
+    "format": "mso_mdoc",
+    "namespace": "mx.gob.nl.icv.1",
+    "validity_period": "4y",
+    "claims": [
+      {"key": "given_name",           "label": "Nombre",                 "type": "string",             "required": true,  "disclosable": false},
+      {"key": "family_name",          "label": "Apellido paterno",       "type": "string",             "required": true,  "disclosable": false},
+      {"key": "second_family_name",   "label": "Apellido materno",       "type": "string",             "required": false, "disclosable": false},
+      {"key": "birth_date",           "label": "Fecha de nacimiento",    "type": "date",               "required": true,  "disclosable": true},
+      {"key": "document_number",      "label": "Folio de licencia",      "type": "string",             "required": true,  "disclosable": false},
+      {"key": "issue_date",           "label": "Fecha de expedición",    "type": "date",               "required": true,  "disclosable": false},
+      {"key": "expiry_date",          "label": "Fecha de vencimiento",   "type": "date",               "required": true,  "disclosable": false},
+      {"key": "driving_privileges",   "label": "Tipo y restricciones",   "type": "driving_privileges", "required": true,  "disclosable": false},
+      {"key": "portrait",             "label": "Foto",                   "type": "bytes",              "required": true,  "disclosable": false},
+      {"key": "issuing_authority",    "label": "Autorizado por",         "type": "string",             "required": true,  "disclosable": false},
+
+      {"key": "signature_usual_mark", "label": "Firma",                  "type": "bytes",              "required": false, "disclosable": true},
+      {"key": "street",               "label": "Calle",                  "type": "string",             "required": false, "disclosable": true},
+      {"key": "exterior_number",      "label": "Número exterior",        "type": "string",             "required": false, "disclosable": true},
+      {"key": "interior_number",      "label": "Número interior",        "type": "string",             "required": false, "disclosable": true},
+      {"key": "neighborhood",         "label": "Colonia",                "type": "string",             "required": false, "disclosable": true},
+      {"key": "resident_city",        "label": "Municipio",              "type": "string",             "required": false, "disclosable": true},
+      {"key": "resident_postal_code", "label": "Código postal",          "type": "string",             "required": false, "disclosable": true},
+      {"key": "issuing_country",      "label": "País emisor",            "type": "string",             "required": false, "disclosable": true},
+      {"key": "age_over_18",          "label": "Mayor de 18",            "type": "boolean",            "required": false, "disclosable": true},
+
+      {"key": "curp",                 "label": "CURP",                   "type": "string",             "required": false, "disclosable": true},
+      {"key": "organ_donor",          "label": "Donador",                "type": "boolean",            "required": false, "disclosable": true},
+      {"key": "blood_type",           "label": "Tipo sanguíneo",         "type": "string",             "required": false, "disclosable": true},
+      {"key": "allergies",            "label": "Alergias",               "type": "string",             "required": false, "disclosable": true},
+      {"key": "emergency_phone",      "label": "Teléfono de emergencia", "type": "string",             "required": false, "disclosable": true}
+    ]
+  }'
+```
+
+El docType generado queda
+`io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1`. Son 24
+claims: 9 obligatorios (`given_name`, `family_name`, `document_number`, `issue_date`,
+`expiry_date`, `driving_privileges`, `portrait`, `issuing_authority` y `birth_date`) y
+9 always shared (los mismos, salvo `birth_date`, más `second_family_name`). Los 14
+restantes, entre ellos la CURP, el domicilio, el tipo sanguíneo y las alergias, los
+decide el ciudadano caso por caso. `second_family_name` es always shared pero opcional:
+hay personas con un solo apellido, pero si consta, es parte del nombre legal.
+
+**Los 23 atributos del documento y su clave:**
+
+| # | Atributo | Clave | Tipo | required | always shared | Origen |
+|---|---|---|---|---|---|---|
+| 1 | Nombre | `given_name` | `string` | Sí | Sí | ISO |
+| 2 | Apellido paterno | `family_name` | `string` | Sí | Sí | ISO |
+| 3 | Apellido materno | `second_family_name` | `string` | — | Sí | propio |
+| 4 | CURP | `curp` | `string` | — | — | propio |
+| 5 | Fecha de nacimiento | `birth_date` | `date` | Sí | — | ISO |
+| 6 | Calle | `street` | `string` | — | — | propio |
+| 7 | Colonia | `neighborhood` | `string` | — | — | propio |
+| 8 | Municipio | `resident_city` | `string` | — | — | ISO |
+| 9 | Número exterior | `exterior_number` | `string` | — | — | propio |
+| 10 | Número interior | `interior_number` | `string` | — | — | propio |
+| 11 | Código postal | `resident_postal_code` | `string` | — | — | ISO |
+| 12 | Fecha de expedición | `issue_date` | `date` | Sí | Sí | ISO |
+| 13 | Fecha de vencimiento | `expiry_date` | `date` | Sí | Sí | ISO |
+| 14 | Folio de licencia | `document_number` | `string` | Sí | Sí | ISO |
+| 15 | Tipo de licencia | `driving_privileges[].vehicle_category_code` | `driving_privileges` | Sí | Sí | ISO |
+| 16 | Firma | `signature_usual_mark` | `bytes` | — | — | ISO |
+| 17 | Foto | `portrait` | `bytes` | Sí | Sí | ISO |
+| 18 | Donador | `organ_donor` | `boolean` | — | — | propio |
+| 19 | Teléfono de emergencia | `emergency_phone` | `string` | — | — | propio |
+| 20 | Tipo sanguíneo | `blood_type` | `string` | — | — | propio |
+| 21 | Alergias | `allergies` | `string` | — | — | propio |
+| 22 | Restricciones | `driving_privileges[].codes[]` | `driving_privileges` | Sí | Sí | ISO |
+| 23 | Autorizado por | `issuing_authority` | `string` | Sí | Sí | ISO |
+
+Se suman dos elementos que el papel no imprime: `issuing_country` (`"MX"`, obligatorio
+en ISO y exigido por cualquier lector extranjero) y `age_over_18`, que acredita la
+mayoría de edad sin revelar la fecha de nacimiento.
+
+**Por qué se conservan los nombres de ISO.** `given_name` se llama `given_name` aunque
+viva en otro namespace: ISO no es dueña de esa cadena, sino del par
+`(org.iso.18013.5.1, given_name)`. Así la credencial sigue siendo legible para quien
+conoce la mDL, y una migración al namespace ISO se reduce a mover elementos, sin
+renombrar. Las claves van **en inglés** porque viajan firmadas y aparecen en toda
+consulta DCQL; el español va en el `label`.
+
+**Las claves propias:**
+
+| Atributo | Clave | Criterio |
+|---|---|---|
+| CURP | `curp` | **No uses `administrative_number`**: ISO lo define como número de control interno de la autoridad, no como identificador nacional. |
+| Apellido materno | `second_family_name` | ISO define un solo `family_name`. Separados, una verificación puede pedir el paterno sin el materno. Un lector conforme verá una persona con un solo apellido. |
+| Colonia | `neighborhood` | ISO no tiene nivel entre ciudad y dirección libre. |
+| Número exterior | `exterior_number` | **`string`, no `integer`**: admite `"S/N"`, `"123-A"`, `"KM 4.5"`. Como entero, el primer domicilio sin número fallaría con `422 unencodable_claims`. |
+| Número interior | `interior_number` | Lo mismo. Si no existe, no se envía. |
+| Donador | `organ_donor` | El identificador que usa AAMVA en su namespace. |
+
+El domicilio va **desglosado** (`street`, `exterior_number`, `interior_number`,
+`neighborhood`, `resident_city`, `resident_postal_code`) porque `resident_address` de
+ISO es una sola cadena libre; se omite para no duplicar el dato. El tipo de licencia y
+sus restricciones son el mismo elemento, `driving_privileges`: el tipo es
+`vehicle_category_code` y las restricciones, sus `codes`.
+
+</Details>
+
+<Details title="El namespace meta (io.sovra.meta.1)">
+
+Todo mDoc emitido por Sovra incorpora, además del propio, el namespace reservado
+**`io.sovra.meta.1`**, con elementos firmados por el emisor:
+
+| Elemento | Tipo | Finalidad |
+|---|---|---|
+| `holder_did` | string | El DID del holder. Un mDoc lo identifica solo por su `deviceKey`, y Sovra necesita el DID para resolver las llaves que la cuenta autoriza. |
+| `status_list_index` | entero ≥ 0 | El índice en la lista de estado (mDoc no tiene `credentialStatus`). Ver [Estados y revocación](/credenciales/estados-y-revocacion/). |
+| `mandatory_elements` | mapa namespace → lista | El conjunto `disclosable: false`, congelado en la emisión. |
+| `credential_type` | string | Lo que el emisor registró en el Issuer Trust Registry. |
+| `namespace` | string | Dónde viven los elementos de este documento. |
+| `issuer_address` | string `0x…` en minúsculas | La dirección EOA del workspace. |
+
+El verificador **exige los seis, completos y bien tipados**. Si falta alguno, la
+verificación falla con `missing_mandatory_element:io.sovra.meta.1`.
+
+</Details>
+
+## Antes de emitir
+
+- [ ] `format: "mso_mdoc"`, y el namespace elegido en DNS inverso.
+- [ ] El `schema_id` tiene solo minúsculas, dígitos, `-` o `_`.
+- [ ] El esquema está en **`registered`**, y anotaste `schema_id`, `doc_type` y
+      `namespace` del listado.
+- [ ] `validity_period` no es `null`, o vas a mandar `valid_until` al emitir.
+- [ ] Cada claim tiene el `type` correcto: `portrait` y `signature_usual_mark` como
+      `bytes`, los números de domicilio como `string`.
+- [ ] Los datos sensibles son divulgables, no always shared.
+- [ ] Si es una mDL ISO o declaraste un `doc_type`, tenés document signer
+      ([Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/)).
+
+Listo: seguí con [Emitir](/credenciales/mdoc/emitir/).

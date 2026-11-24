@@ -1,0 +1,539 @@
+---
+title: "Verificar credenciales mDoc"
+description: "Pedir datos de un mDoc (ISO 18013-5 o con namespace propio) con una consulta DCQL, mostrar el QR y leer el resultado, cuyas claves llevan el namespace."
+sidebar:
+  order: 1
+  label: "Verificar"
+---
+
+Verificar un mDoc funciona igual que [con SD-JWT VC](/verificadores/sd-jwt-vc/verificar/):
+**creás una sesión** diciendo qué datos querés, **mostrás un QR** y **recibís un
+webhook**. La diferencia está en cómo se nombra cada dato: en un mDoc, cada dato vive
+dentro de un **namespace** (un grupo de datos con nombre propio), así que se nombra
+con dos partes, namespace y dato.
+
+Hay dos casos: el esquema que usa el namespace ISO (`org.iso.18013.5.1`) o el que
+genera Sovra, y el esquema con un **namespace propio**. Donde difieren, vas a ver
+pestañas. Qué es cada uno está en
+[Tipos de credenciales](/conceptos/tipos-de-credenciales/).
+
+## El flujo
+
+<Steps>
+<Step title="Crear la sesión con lo que querés pedir">
+
+Le mandás a Sovra una **consulta DCQL** con `format: "mso_mdoc"`:
+
+<Tabs syncKey="namespace">
+<TabItem label="Namespace ISO">
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/verifier/verifications" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dcql_query": {
+      "credentials": [
+        {
+          "id": "licencia",
+          "format": "mso_mdoc",
+          "meta": { "doctype_value": "org.iso.18013.5.1.mDL" },
+          "claims": [
+            { "path": ["org.iso.18013.5.1", "family_name"] },
+            { "path": ["org.iso.18013.5.1", "given_name"] },
+            { "path": ["org.iso.18013.5.1", "age_over_18"] }
+          ]
+        }
+      ]
+    }
+  }'
+```
+
+Ojo: con el docType ISO, el namespace es `org.iso.18013.5.1`, **no** el docType
+(`org.iso.18013.5.1.mDL`). Con el docType que genera Sovra (`io.sovra.…`) y sin
+namespace propio, el namespace sí es la misma cadena que el docType.
+
+</TabItem>
+<TabItem label="Namespace propio">
+
+```bash
+curl -X POST "$BASE_URL/api/v1/verifier/verifications" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dcql_query": {
+      "credentials": [{
+        "id": "licencia",
+        "format": "mso_mdoc",
+        "meta": { "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1" },
+        "claims": [
+          {"path": ["mx.gob.nl.icv.1", "given_name"]},
+          {"path": ["mx.gob.nl.icv.1", "family_name"]},
+          {"path": ["mx.gob.nl.icv.1", "age_over_18"]}
+        ]
+      }]
+    }
+  }'
+```
+
+Ojo: `doctype_value` lleva el **docType** y el `path` lleva el **namespace**
+(`mx.gob.nl.icv.1`), que acá son cadenas distintas. Leelas del esquema
+([Listar esquemas](/api/list-schemas/)), no las deduzcas.
+
+</TabItem>
+</Tabs>
+
+En palabras:
+
+- `id` es una etiqueta tuya. Vuelve tal cual en el resultado.
+- `meta.doctype_value` (opcional) es el tipo de documento exacto que aceptás. Si no
+  coincide con el presentado, falla con `doctype_mismatch`.
+- Cada `path` tiene **exactamente dos partes**: `["<namespace>", "<dato>"]`.
+
+La respuesta trae el `session_id` (vuelve en el webhook como `verification_id`), la
+URI para el QR y `expires_at`. Referencia completa:
+[Crear una verificación](/api/create-verification/).
+
+</Step>
+<Step title="Mostrar el QR">
+
+Mostrá como QR la URI `authorization_request_uri_ref`: es corta (unos 250 caracteres)
+y no crece con la consulta.
+
+```bash
+jq -r '.authorization_request_uri_ref' resp.json | qrencode -o qr.png -s 8
+```
+
+La wallet busca la credencial por docType y le muestra al ciudadano cada dato pedido.
+Puede destildar los que no quiera compartir, salvo los marcados como
+`always shared`, que se comparten siempre. La sesión dura **10 minutos**.
+
+</Step>
+<Step title="Recibir el resultado">
+
+Llega `presentation.verified` o `presentation.failed`. Las claves de `claims` llevan
+**el namespace adelante**:
+
+<Tabs syncKey="namespace">
+<TabItem label="Namespace ISO">
+
+```json
+{
+  "event": "presentation.verified",
+  "data": {
+    "verification_id": "e2d16450-42e8-46a9-ae92-d72af51a7435",
+    "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+    "success": true,
+    "credentials": [
+      {
+        "id": "licencia",
+        "format": "mso_mdoc",
+        "claims": {
+          "org.iso.18013.5.1.family_name": "Lovelace",
+          "org.iso.18013.5.1.given_name": "Ada",
+          "org.iso.18013.5.1.age_over_18": true
+        }
+      }
+    ]
+  }
+}
+```
+
+</TabItem>
+<TabItem label="Namespace propio">
+
+```json
+{
+  "event": "presentation.verified",
+  "data": {
+    "verification_id": "e2d16450-42e8-46a9-ae92-d72af51a7435",
+    "holder_did": "did:sovra:0x9083…f274",
+    "success": true,
+    "credentials": [{
+      "id": "licencia",
+      "format": "mso_mdoc",
+      "claims": {
+        "mx.gob.nl.icv.1.given_name": "Sofía",
+        "mx.gob.nl.icv.1.family_name": "Demo",
+        "mx.gob.nl.icv.1.age_over_18": true
+      }
+    }]
+  }
+}
+```
+
+</TabItem>
+</Tabs>
+
+Si algo falló, `presentation.failed` trae un `error` que dice en qué paso se cortó,
+por ejemplo `missing_required_claim:org.iso.18013.5.1.first_name`. Qué significa cada
+valor está en [Errores de verificación](/errores/verificacion/).
+
+</Step>
+</Steps>
+
+<Aside type="caution" title="Las claves del resultado llevan el namespace">
+
+Si pediste `["org.iso.18013.5.1", "family_name"]`, la clave es
+`"org.iso.18013.5.1.family_name"`, no `"family_name"`. Si tu código presupone la forma
+de SD-JWT, lee `undefined` sin dar error.
+
+</Aside>
+
+## Qué pedir
+
+Pedí el mínimo necesario: cada dato es algo que el ciudadano ve en la pantalla de
+aprobación y puede rechazar, y si falta uno solo, falla toda la presentación. Si solo
+necesitás saber que es mayor de edad, pedí `age_over_18` y no `birth_date`. Para la
+primera prueba, un solo dato alcanza para comprobar que todo el circuito funciona.
+
+<Details title="Reglas finas de DCQL para mDoc">
+
+- **Dos partes, siempre.** `["<namespace>", "<dato>"]`, ni una ni tres. No uses
+  `["family_name"]` (es de SD-JWT) ni un par `namespace` / `claim_name` (de un
+  borrador viejo de la especificación). Un `path` que no sea de dos cadenas devuelve
+  `400 invalid_mdoc_claim_path` al crear la sesión.
+- **El namespace no es el docType** cuando el docType es ISO, ni cuando el esquema
+  declara un namespace propio. Confundirlos da
+  `missing_required_claim:<namespace>.<elemento>`: el dato existe, pero se lo busca
+  donde no está.
+- **Sin `meta.doctype_value`** se acepta cualquier docType.
+- **Sin `claims`**, la wallet comparte solo los datos que no se pueden retener y el
+  resultado llega con `"claims": {}`. Sirve para «acreditame que tenés una credencial
+  de este docType», no para obtener datos.
+- **No se mezclan formatos**: `mso_mdoc` con `vc+sd-jwt` en la misma consulta da
+  `400 mixed_dcql_formats`. Si necesitás los dos, usá dos sesiones.
+- Los datos `always shared` viajan aunque no los pidas. Por ejemplo, si
+  `family_name` y `second_family_name` son `always shared`, el apellido materno llega
+  igual, como clave separada.
+
+</Details>
+
+<Details title="Más ejemplos de consultas">
+
+<Tabs syncKey="namespace">
+<TabItem label="Namespace ISO">
+
+**Identificación para atención presencial:**
+
+```json
+{ "credentials": [ { "id": "identidad", "format": "mso_mdoc",
+  "claims": [
+    { "path": ["org.iso.18013.5.1", "family_name"] },
+    { "path": ["org.iso.18013.5.1", "given_name"] },
+    { "path": ["org.iso.18013.5.1", "document_number"] },
+    { "path": ["org.iso.18013.5.1", "portrait"] }
+  ] } ] }
+```
+
+**Categorías habilitadas:**
+
+```json
+{ "credentials": [ { "id": "categorias", "format": "mso_mdoc",
+  "claims": [ { "path": ["org.iso.18013.5.1", "driving_privileges"] } ] } ] }
+```
+
+**Cualquier mDoc del docType indicado, sin pedir datos:**
+
+```json
+{ "credentials": [ { "id": "cualquiera", "format": "mso_mdoc",
+  "meta": { "doctype_value": "io.sovra.0xab…ef.credencial.1" } } ] }
+```
+
+**Un esquema con docType generado**, donde el namespace es el docType completo:
+
+```json
+{ "credentials": [ { "id": "membresia", "format": "mso_mdoc",
+  "claims": [ { "path": ["io.sovra.0xab…ef.membresia.1", "nivel"] } ] } ] }
+```
+
+</TabItem>
+<TabItem label="Namespace propio">
+
+**Urgencias médicas:**
+
+```json
+"claims": [
+  {"path": ["mx.gob.nl.icv.1", "blood_type"]},
+  {"path": ["mx.gob.nl.icv.1", "allergies"]},
+  {"path": ["mx.gob.nl.icv.1", "organ_donor"]},
+  {"path": ["mx.gob.nl.icv.1", "emergency_phone"]}
+]
+```
+
+**Comprobante de domicilio**, sin fotografía, folio ni fecha de nacimiento:
+
+```json
+"claims": [
+  {"path": ["mx.gob.nl.icv.1", "street"]},
+  {"path": ["mx.gob.nl.icv.1", "exterior_number"]},
+  {"path": ["mx.gob.nl.icv.1", "interior_number"]},
+  {"path": ["mx.gob.nl.icv.1", "neighborhood"]},
+  {"path": ["mx.gob.nl.icv.1", "resident_city"]},
+  {"path": ["mx.gob.nl.icv.1", "resident_postal_code"]}
+]
+```
+
+**Zona de cobertura**: calle y código postal, nada más.
+
+```json
+"claims": [
+  {"path": ["mx.gob.nl.icv.1", "street"]},
+  {"path": ["mx.gob.nl.icv.1", "resident_postal_code"]}
+]
+```
+
+**Trámite que requiere CURP:**
+
+```json
+"claims": [
+  {"path": ["mx.gob.nl.icv.1", "curp"]},
+  {"path": ["mx.gob.nl.icv.1", "given_name"]},
+  {"path": ["mx.gob.nl.icv.1", "family_name"]},
+  {"path": ["mx.gob.nl.icv.1", "second_family_name"]}
+]
+```
+
+</TabItem>
+</Tabs>
+
+</Details>
+
+<Details title="Cómo vuelve cada tipo de dato (y las imágenes)">
+
+| Tipo | Se envía como | Vuelve como |
+|---|---|---|
+| `string`, `uri` | `"Sofía"` | Igual |
+| `integer`, `number` | `170` | `170` |
+| `boolean` | `true` | `true` |
+| `date` | `"2030-10-22"` | `"2030-10-22"` |
+| `datetime` | `"2026-10-22T14:30:00Z"` | `"2026-10-22T14:30:00Z"` |
+| `bytes` | base64 **estándar con padding** | base64url **sin padding** (ojo) |
+| `driving_privileges` | Array de objetos | Array de objetos; las fechas, `"YYYY-MM-DD"` |
+
+Las fechas llegan como cadenas ISO, no como objetos.
+
+Las imágenes (`bytes`) se envían en base64 estándar pero vuelven en base64url sin
+padding: es la causa más frecuente de una imagen ilegible del lado del verificador.
+Para mostrarlas, convertilas:
+
+```js
+const b64url = claims["mx.gob.nl.icv.1.signature_usual_mark"];
+
+// base64url → base64 estándar, reponiendo el padding
+const b64 = b64url
+  .replace(/-/g, "+")
+  .replace(/_/g, "/")
+  .padEnd(Math.ceil(b64url.length / 4) * 4, "=");
+
+img.src = `data:image/png;base64,${b64}`;
+```
+
+</Details>
+
+<Details title="Las dos URIs del QR y los campos de la sesión">
+
+La respuesta de crear la sesión:
+
+```json
+{
+  "session_id": "e2d16450-42e8-46a9-ae92-d72af51a7435",
+  "authorization_request_uri": "openid4vp://?client_id=…&request=eyJ…",
+  "authorization_request_uri_ref": "openid4vp://?client_id=…&request_uri=https%3A%2F%2F…",
+  "status": "pending",
+  "expires_at": "2026-09-28T13:12:34Z"
+}
+```
+
+- `authorization_request_uri_ref` lleva un **enlace** a la solicitud firmada: unos 250
+  caracteres, constante. Es la recomendada para el QR.
+- `authorization_request_uri` lleva la solicitud firmada **entera**: 2000 a 3000
+  caracteres con un DCQL completo. El máximo absoluto de un QR en modo byte son 2953
+  caracteres, así que con varios datos y un `doctype_value` largo el QR queda muy
+  denso. Queda como recurso para una wallet que no implemente pass-by-reference, y
+  en ese caso reducir la consulta es un requisito.
+
+Cuidado con los generadores de QR en línea: varios cortan a 1000 caracteres casi sin
+avisar. La wallet recibe una URI mutilada y responde
+`Missing required OpenID4VP parameters`, un error que parece de la wallet y es del
+generador. Generalo en local, como en el paso 2.
+
+En el resultado, `holder_did` sale de un namespace interno de la credencial
+(`io.sovra.meta.1`), porque un mDoc no lleva DID. Viene `null` cuando la falla ocurre
+antes de identificar al holder, como en `malformed_vp_token`, `unknown_issuer` o
+`session_expired`.
+
+Para consultar y listar sesiones por API, ver
+[Consultar sesiones](/verificadores/sd-jwt-vc/verificar/#consultar-sesiones): es
+igual para los dos formatos.
+
+</Details>
+
+## Tres fallos que parecen el mismo
+
+Los tres se ven como «no funciona la verificación», pero ocurren en etapas distintas.
+El mensaje dice en cuál:
+
+| Mensaje | Etapa | Causa |
+|---|---|---|
+| `422 unencodable_claims: portrait, signature_usual_mark` | Emisión | Los `bytes` llevan el prefijo `data:image/jpeg;base64,`. Van sin prefijo. Ver [Emitir mDoc](/credenciales/mdoc/emitir/). |
+| `Missing required OpenID4VP parameters` | La wallet lee el QR | La URI llegó truncada. Casi siempre, un generador de QR con tope de caracteres. |
+| `DID … publishes no P-256 assertion key #key-assert` | La wallet resuelve el DID | La wallet consulta una cadena donde ese workspace no está registrado. |
+
+El segundo ocurre antes que el tercero: mientras el QR llegue cortado, nunca vas a
+saber si la cadena está bien.
+
+### Comprobar en qué cadena vive el DID
+
+Los dos primeros fallos se arreglan del lado del emisor. El tercero depende de a qué
+cadena apunta la wallet que usa el ciudadano. Antes de pedirle nada a nadie, comprobá
+en qué cadena está registrado el DID de tu workspace: es una consulta de solo lectura,
+sin API key.
+
+<Details title="Cómo hacer la consulta a la cadena">
+
+```bash
+curl -s -X POST https://rpc.testnet.sovra.io \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_call","id":1,"params":[{
+        "to":"0xB9A2c855376ED79966e5f4956D3BfD21ef80d96E",
+        "data":"0x55ea6c470000000000000000000000005de0df12cce712ddaaa23feb359920ae4f3230d4"
+      },"latest"]}'
+```
+
+El `data` es `resolve(address)` seguido de la dirección del workspace rellenada a 32
+bytes. En la respuesta:
+
+- **Todo ceros**: el DID no está en esa cadena. Una wallet que resuelva ahí va a dar
+  el error de la llave.
+- **Aparece `9b37b628c726e77e17c0c89d093ef9a80df1cf7cdc4d658dd9a29953ff3105f8`**: la
+  llave está publicada. Ese hash es `keccak256("key-assert")` y es constante, así que
+  sirve de marcador visual.
+
+| Entorno | RPC | DID Registry |
+|---|---|---|
+| Test | `https://rpc.testnet.sovra.io` | `0xB9A2c855376ED79966e5f4956D3BfD21ef80d96E` |
+| Producción | `https://rpc.sovra.io` | `0x3829184dB00Ae8C7a6c72104A2Ede879F6F25e78` |
+
+Emitir funciona igual aunque esto falle, y es lo que más confunde: la emisión no
+resuelve ningún DID. La verificación es el único flujo en que la wallet consulta la
+cadena.
+
+</Details>
+
+<Details title="Qué valida Sovra, paso a paso">
+
+La cascada corre en orden y **se corta en el primer fallo**:
+
+| # | Comprobación | Fallo asociado |
+|---|---|---|
+| 1 | El `DeviceResponse` se analiza correctamente | `malformed_vp_token` |
+| 2 | Se resuelve el emisor, por la dirección del docType o por el `x5chain` | `unknown_issuer` |
+| 3 | La firma del `issuerAuth` valida contra la llave resuelta | `credential_signature_invalid` |
+| 4 | El `docType` del MSO firmado coincide con el del documento | `credential_signature_invalid` |
+| 5 | Los digests de los elementos divulgados coinciden con `valueDigests` | `invalid_disclosure` |
+| 6 | El namespace `io.sovra.meta.1` está completo y correctamente tipado | `missing_mandatory_element:io.sovra.meta.1` |
+| 7 | La dirección del emisor del namespace meta coincide con la resuelta | `unknown_issuer` |
+| 8 | Están presentes todos los elementos obligatorios congelados en la emisión | `missing_mandatory_element:<ns>.<elemento>` |
+| 9 | `validFrom <= ahora < validUntil`, y la firma no tiene fecha futura | `credential_expired` |
+| 10 | La `deviceKey` del MSO está entre las llaves que el holder autoriza actualmente | `holder_key_mismatch` |
+| 11 | La firma de device authentication valida contra el session transcript | `holder_key_mismatch`, `device_mac_unsupported`, `unsupported_device_auth_alg` |
+| 12 | El estado on-chain no figura como revocado ni suspendido | `credential_revoked`, `credential_suspended`, `status_check_failed` |
+| 13 | La consulta DCQL se satisface: docType y cada elemento solicitado | `doctype_mismatch`, `missing_required_claim:<ns>.<el>`, `format_mismatch:<formato>` |
+
+Dos comprobaciones no existen en SD-JWT:
+
+- **Paso 4**: el docType firmado tiene que coincidir con el del documento. Impide,
+  por ejemplo, presentar como licencia de conducir una credencial emitida como
+  atestación de edad.
+- **Paso 7**: la dirección del emisor guardada en la credencial tiene que coincidir
+  con la resuelta. Impide que un workspace con certificado emita credenciales a
+  nombre de otro.
+
+La ruta del certificado (`x5chain`) es la de los mDL con docType ISO; habilitarla
+requiere un trámite, descrito en [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/).
+
+</Details>
+
+<Details title="Errores al crear la sesión">
+
+| HTTP | `error` | Causa |
+|---|---|---|
+| 400 | `invalid_dcql_query` | Falta `credentials`, o está vacío. |
+| 400 | `unsupported_dcql_format` | Un `format` distinto de `mso_mdoc`, `vc+sd-jwt` o `dc+sd-jwt`. |
+| 400 | `invalid_mdoc_claim_path` | Un `path` de `mso_mdoc` que no es exactamente de dos cadenas. |
+| 400 | `mixed_dcql_formats` | La consulta combina mDoc con SD-JWT. Usá dos sesiones. |
+| 401 | `invalid_api_key` | API key ausente o inválida. |
+| 403 | `workspace_inactive` | Workspace u organización inactivos. |
+| 409 | `workspace_not_provisioned` | El aprovisionamiento todavía no terminó. |
+
+La tabla completa y los errores de presentación están en
+[Errores de verificación](/errores/verificacion/).
+
+</Details>
+
+<Details title="Ejemplo completo en Node.js">
+
+```js
+const BASE_URL = process.env.BASE_URL;
+const API_KEY = process.env.SOVRA_API_KEY;
+
+const MDL_DOCTYPE = "org.iso.18013.5.1.mDL";
+const MDL_NS = "org.iso.18013.5.1"; // atención: el namespace NO es el docType
+
+/** Pide únicamente la atestación de edad: ni nombre ni fecha de nacimiento. */
+async function pedirControlDeEdad() {
+  const res = await fetch(`${BASE_URL}/api/v1/verifier/verifications`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dcql_query: {
+        credentials: [
+          {
+            id: "edad",
+            format: "mso_mdoc",
+            meta: { doctype_value: MDL_DOCTYPE },
+            claims: [{ path: [MDL_NS, "age_over_18"] }],
+          },
+        ],
+      },
+    }),
+  });
+
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error);
+
+  // La variante `_ref` mantiene el QR compacto sin importar el tamaño del DCQL.
+  return { sessionId: body.session_id, qr: body.authorization_request_uri_ref };
+}
+
+/** Las claves del resultado vienen cualificadas por namespace. */
+function leerClaim(credencial, namespace, elemento) {
+  return credencial.claims[`${namespace}.${elemento}`];
+}
+
+app.post("/webhooks/sovra", verificarFirmaHmac, (req, res) => {
+  const { event, data } = req.body;
+
+  if (event === "presentation.verified") {
+    const lic = data.credentials.find((c) => c.id === "edad");
+    const mayor = leerClaim(lic, MDL_NS, "age_over_18");
+    resolverSesion(data.verification_id, { mayor });
+  }
+
+  if (event === "presentation.failed") {
+    // `error` identifica con precisión la comprobación que se cortó.
+    rechazarSesion(data.verification_id, data.error);
+  }
+
+  res.sendStatus(200);
+});
+```
+
+Con un namespace propio, cambiá `MDL_DOCTYPE` por el docType del esquema y `MDL_NS`
+por su namespace (por ejemplo `mx.gob.nl.icv.1`), leyendo ambos del esquema.
+
+</Details>

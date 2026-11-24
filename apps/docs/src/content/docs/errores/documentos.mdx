@@ -1,0 +1,227 @@
+---
+title: "Errores de documentos"
+description: "Errores de la API de documentos firmados, qué pasó y qué hacer, y los síntomas que parecen errores pero no lo son."
+sidebar:
+  order: 3
+  label: "Documentos"
+---
+
+Errores de los [documentos firmados](/documentos/): los que devuelve la API al emitir,
+consultar o cambiar la visibilidad de un documento, y los síntomas que parecen errores
+pero no lo son. El formato del error y los errores comunes a toda la API están en el
+[resumen](/errores/).
+
+## Tabla completa
+
+Los endpoints son [`POST /api/v1/issuer/documents`](/api/issue-document/) (emitir),
+`PUT /api/v1/issuer/documents/{id}/visibility/{visibility}`
+([publicar](/api/make-document-public/) o [hacer privado](/api/make-document-private/)),
+[`GET /api/v1/issuer/documents`](/api/list-documents/) (listar) y
+[`GET /documents/{id}`](/api/documents/retrieve/) (zona pública).
+
+| Respuesta | Endpoints | Qué pasó | Qué hacer |
+|---|---|---|---|
+| `401 invalid_api_key` | `POST`, `PUT`, `GET /issuer` | Falta la API key, está mal o fue revocada. | Revisá que el header diga `Bearer`, con **B** mayúscula. Ver [`invalid_api_key`](/errores/#invalid_api_key). |
+| [`401 authentication_required`](#401-authentication_required) | `GET /documents/{id}` | El documento es privado. Pasa **aunque mandes la API key**. | Publicalo, o abrilo desde el dashboard. |
+| [`404 document_not_found`](#404-document_not_found) | `PUT`, `GET /documents/{id}` | El documento no existe, el id está mal formado o es de otro workspace. | Revisá el id y a qué workspace pertenece tu key. |
+| `404 schema_not_found` | `POST` | No hay un esquema con ese `schema_id` en este workspace. | Revisá el slug y a qué workspace pertenece tu key. |
+| `409 workspace_not_provisioned` | `POST`, `GET /issuer` | El workspace todavía se está preparando. | Esperá unos minutos. Ver [`workspace_not_provisioned`](/errores/#workspace_not_provisioned). |
+| `409 schema_registration_pending` | `POST` | El esquema todavía se está registrando en la cadena. | Consultá `registration_status` en [`GET /api/v1/issuer/schemas`](/api/list-schemas/). **No hay webhook para esto.** |
+| `409 schema_registration_failed` | `POST` | El registro del esquema falló. | Mirá `registration_error` y creá el esquema de nuevo. |
+| [`422 wrong_schema_kind`](#422-wrong_schema_kind) | `POST` | El esquema es de credenciales (para wallets), no de documentos. | Usá un esquema de kind `document`. |
+| [`422 missing_claims`](#422-missing_claims) | `POST` | Faltan claims obligatorios; la respuesta dice cuáles. | Completalos. |
+| [`422 invalid_visibility`](#422-invalid_visibility) | `POST`, `PUT` | La visibilidad no es `public` ni `private`. | Revisá el último segmento del path, o el campo del body. |
+| `422 invalid_valid_until` | `POST` | `valid_until` es `null`, está mal formado o ya pasó. | Corregilo, u omitilo. |
+| [`503 chain_not_configured`](#503-chain_not_configured) | `POST` | El entorno no tiene registro de firmas, y Sovra se niega a emitir algo que no podría anclar. | No reintentes en loop: contactá al equipo de Sovra. |
+
+## Cada error en detalle
+
+### `401 authentication_required`
+
+**No es una falla de tu integración.** Todo documento nace privado, y la zona pública
+de un documento privado responde así, **aunque mandes la API key**: una key no
+reemplaza una sesión del dashboard. Tenés tres salidas:
+
+- Publicar el documento con
+  [`PUT /api/v1/issuer/documents/{id}/visibility/public`](/api/make-document-public/).
+- Abrirlo desde el dashboard, con sesión.
+- Si lo que necesitás es que el destinatario lo tenga sin publicarlo, **mandale el
+  string `credential`**, que no depende de la visibilidad. Ver
+  [Visibilidad y entrega](/documentos/visibilidad-y-entrega/).
+
+### `404 document_not_found`
+
+Tres casos responden lo mismo, **a propósito**, para no revelar qué ids existen en
+otros workspaces:
+
+| Caso | Cómo distinguirlo |
+|---|---|
+| El id no existe | Buscalo en [`GET /api/v1/issuer/documents`](/api/list-documents/). |
+| El id está mal formado | Tiene que ser un UUID v4. |
+| El documento es de otro workspace | La API key define el workspace. Si tenés varios, probá con la key que corresponde. |
+
+### `422 wrong_schema_kind`
+
+Usaste un esquema de kind **`credential`** (para emitir a una wallet) donde va uno de
+kind **`document`**. No son intercambiables, y el error también pasa al revés, si
+emitís una credencial con un esquema de documentos.
+
+El kind se elige al crear el esquema (**Type: Credential / Document**) y **no se
+puede cambiar**: si quedó mal, creá uno nuevo. Ver
+[Crear un esquema](/documentos/crear-un-esquema/).
+
+### `422 missing_claims`
+
+```json
+{ "error": "missing_claims", "details": ["content", "idDocument"] }
+```
+
+`details` lista los claims obligatorios que faltaron. Suele ser una de estas tres:
+
+- **Una errata en el `key`.** Se compara letra por letra: `id_document` no es
+  `idDocument`.
+- **Un valor `null` o `""`.** Presente pero vacío puede no contar.
+- **El esquema cambió de versión.** La emisión usa siempre la última, y puede haber
+  sumado un campo obligatorio.
+
+Los `key` y los obligatorios vigentes están en `schema.claims[]` de cualquier
+respuesta y en el listado de esquemas del dashboard.
+
+### `422 invalid_visibility`
+
+`visibility` solo acepta `public` o `private`, en minúscula. Los errores típicos:
+`"Public"`, `"PUBLIC"`, `"publico"`, `true`/`false`, o en el `PUT` poner el valor en un
+query param (`…/visibility?value=public`) en lugar de en el path
+(`…/visibility/public`).
+
+### `503 chain_not_configured`
+
+El servicio **se niega a firmar** porque no hay registro de firmas configurado en el
+entorno. Es a propósito: un documento sin anclaje no es verificable y un verificador
+lo rechazaría (`NOT_ANCHORED`). No es un fallo transitorio, así que no lo reintentes
+en loop. Contactá al equipo de Sovra.
+
+## Síntomas que no son errores de la API
+
+### El documento se queda en `signed` y nunca pasa a `anchored`
+
+**Es normal mientras el anclaje está en cola.** La emisión responde al instante con
+`status: "signed"`; anclarlo en la cadena tarda uno o dos bloques, y un lote grande
+puede tardar varios minutos. Nada lo marca `failed` por tardar.
+
+Solo hay un problema si llega
+[`document.status-changed`](/webhooks/#documentstatus-changed) con `status: "failed"`:
+ahí hay que **volver a emitirlo**. Los estados están en
+[Estados y revocación](/documentos/estados-y-revocacion/).
+
+<Aside type="caution" title="No reemitas por impaciencia ni por un timeout">
+
+Un `signed` que todavía no ancló y un `failed` se ven parecido, pero solo el segundo
+hay que repetir. Y un timeout de red no significa que el documento no se emitió:
+antes de reintentar, buscalo en [`GET /api/v1/issuer/documents`](/api/list-documents/).
+Si ya está, reemitir crea un duplicado.
+
+</Aside>
+
+<Details title="Por qué tarda: throughput e intentos">
+
+El anclaje corre aparte de la emisión, y la respuesta inicial trae `tx_hash: null`.
+El throughput tiene un techo —del orden de 5 documentos por bloque y por nodo—, así
+que un lote grande puede tardar varios minutos. Un documento en cola sigue en `signed`
+hasta que le toca. `failed` llega recién cuando el anclaje agotó sus **5 intentos**,
+y un documento `failed` no se puede reanclar.
+
+</Details>
+
+### No llega el webhook `document.status-changed`
+
+Casi siempre es la **suscripción**: cada endpoint recibe solo los eventos que tiene
+marcados, sin comodín. Un endpoint creado antes de que existiera este evento no lo
+recibe hasta que lo sumes en **Settings → Workspaces → Webhooks**. Ver
+[Endpoints y suscripciones](/webhooks/#endpoints-y-suscripciones).
+
+Si está suscrito, revisá que esté habilitado, que responda `2xx` en menos de 5
+segundos y que **no devuelva `4xx`** (descarta el evento). Más causas en
+[Webhooks: si algo no funciona](/webhooks/#si-algo-no-funciona).
+
+### La hoja se dibuja vacía
+
+`schema.claims[]` trae solo la definición de los campos, no los valores. **Los
+valores están dentro del `credential`.** Ver [Renderizado](/documentos/renderizado/).
+
+### El navegador bloquea la llamada (CORS)
+
+Estás llamando a la zona emisor (`/api/v1/issuer/…`) desde el navegador, y no lo
+permite: la API key no puede vivir en el navegador. Poné un proxy en tu servidor, con
+una lista explícita de rutas permitidas (hay un ejemplo en
+[Renderizado](/documentos/renderizado/)). La **zona pública** sí se puede llamar
+directo desde el navegador.
+
+<Details title="Qué responde exactamente el preflight">
+
+El preflight `OPTIONS /api/v1/issuer/documents` responde `204` con
+`Access-Control-Allow-Headers` y `-Methods`, pero **sin
+`Access-Control-Allow-Origin`**. No es configurable de tu lado. La zona pública
+responde `Access-Control-Allow-Origin: *`.
+
+</Details>
+
+### El `digest` que calculo no coincide
+
+Casi siempre estás calculando sobre los bytes equivocados. Tiene que ser sobre el
+_signing input_, sin la firma:
+
+```text
+header_b64 . payload_b64        ← sí
+header_b64 . payload_b64 . firma ← no
+header_b64 . payload_b64 . firma ~ ← no
+```
+
+Compará en minúsculas e ignorando un eventual prefijo `0x`. Ver
+[Renderizado](/documentos/renderizado/).
+
+### El QR no se genera
+
+El `credential` es demasiado largo para un QR (el máximo ronda los 2953 bytes con
+corrección nivel L). Pasa con esquemas de muchos claims o valores largos. Ver
+[Renderizado](/documentos/renderizado/).
+
+### El documento verifica pero el verificador lo rechaza
+
+Mirá el `status`. **Solo `anchored` se puede entregar:**
+
+| `status` | Qué pasa al verificar |
+|---|---|
+| `signed` | Todavía no ancló → `NOT_ANCHORED`. |
+| `failed` | La firma es válida, pero no está en la cadena → `NOT_ANCHORED`. **Reemitilo.** |
+| `revoked` | Rechazado → `CREDENTIAL_REVOKED`. |
+
+Si el error es `ISSUER_NOT_TRUSTED`, el problema no es el documento: tu workspace no
+está autorizado como emisor para ese tipo de documento (`vct`). Ver
+[Verificación](/documentos/verificacion/).
+
+### Volví el documento a privado y sigue circulando
+
+Es lo esperado. **`visibility` restringe los endpoints, no el documento.** Un
+`credential` ya entregado sigue siendo legible y verificable por quien lo tenga. Para
+invalidarlo, revocalo. Ver [Visibilidad y entrega](/documentos/visibilidad-y-entrega/).
+
+## Checklist de diagnóstico
+
+<Details title="Checklist completo, cuando no está claro qué falla">
+
+- [ ] ¿El header dice `Bearer` con **B** mayúscula?
+- [ ] ¿La API key es del entorno al que estás llamando?
+- [ ] ¿El workspace muestra un DID en **Settings → Workspace**?
+- [ ] ¿El esquema es de kind **`document`**?
+- [ ] ¿El `schema_id` es el **slug legible**, no el UUID?
+- [ ] ¿Los `key` del objeto `claims` coinciden letra por letra con los del esquema?
+- [ ] ¿El esquema está **`registered`** en `GET /api/v1/issuer/schemas`?
+- [ ] ¿El `status` del documento es **`anchored`**? Un `signed` todavía no se entrega.
+- [ ] Si quedó en `signed` hace rato: ¿esperaste el webhook en vez de reemitir?
+- [ ] Si dio timeout de red: ¿buscaste el documento en `GET /api/v1/issuer/documents` antes de reintentar?
+- [ ] ¿Hay un endpoint suscrito a **`document.status-changed`** y habilitado?
+- [ ] Si es un `401` en la zona pública: ¿el documento está `public`?
+- [ ] Si la hoja sale vacía: ¿los valores los estás leyendo del `credential`?
+
+</Details>

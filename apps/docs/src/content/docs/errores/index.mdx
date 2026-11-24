@@ -1,0 +1,186 @@
+---
+title: "Errores y diagnóstico"
+description: "Cómo se ven los errores de la API de Sovra ID, los errores que comparten todos los productos y qué revisar cuando algo falla."
+sidebar:
+  order: 0
+  label: "Resumen"
+---
+
+Acá buscás un error y encontrás qué pasó y qué hacer. Algunos errores llegan como
+respuesta a tu llamada; otros llegan después, en un [webhook](/webhooks/). Esta página
+tiene los que comparten todos los productos; los específicos están en cada sección.
+
+<CardGrid>
+<Card title="Credenciales" icon="ph:certificate" href="/errores/credenciales/">
+Errores al guardar un esquema, al crear una oferta y al cambiar el estado de una credencial. SD-JWT VC y mDoc.
+</Card>
+<Card title="Verificación" icon="ph:seal-check" href="/errores/verificacion/">
+Errores al crear una sesión, errores de presentación, `missing_required_claim` y certificados.
+</Card>
+<Card title="Documentos" icon="ph:file-text" href="/errores/documentos/">
+Errores de emisión y consulta de documentos firmados, y síntomas que no son errores de la API.
+</Card>
+</CardGrid>
+
+## El sobre de error
+
+Los errores de la API tienen siempre esta forma:
+
+```json
+{ "error": "missing_claims", "details": ["birth_date", "document_number"] }
+```
+
+`error` es un código estable: bifurcá tu código sobre él. `details` es opcional y
+agrega contexto (en este caso, qué claims faltaron).
+
+<Details title="Las dos excepciones a esta forma">
+
+**Los errores del framework usan otro sobre**, porque se producen antes de que el
+endpoint corra:
+
+```json
+{ "errors": { "detail": "Bad Request" } }
+```
+
+**Los errores de certificado** al habilitar un verificador mDL ISO traen un campo
+`reason` en lugar de `details` (ver
+[Errores de certificado](/errores/verificacion/#errores-de-certificado)).
+
+`details`, cuando viene, puede ser un string, una lista de strings o un objeto
+campo → mensajes, según el error.
+
+</Details>
+
+## Errores HTTP de la API
+
+Pueden aparecer en cualquier endpoint, sea de credenciales, verificaciones o
+documentos.
+
+| HTTP | Qué pasó | Qué hacer |
+|---|---|---|
+| 400 | El JSON está mal formado, o mandaste un id que no es un UUID (por ejemplo en `GET /verifier/verifications/{id}`). | Revisá el JSON y el id. |
+| 404 | La ruta no existe. | Revisá el path. |
+| 406 | Tu `Accept` no admite `application/json`. **Pasa incluso en `GET /api/v1/status/…` con `Accept: application/jwt`.** | Mandá `Accept: */*` o `application/json`. |
+| 413 | El cuerpo pasa los 8 MB. | Suele ser un `attachment` demasiado grande: el máximo son 560.000 bytes. |
+| 500 | Error inesperado. **También pasa si omitís `schema_id` o si `claims` no es un objeto.** | Revisá el body; si sigue, reportalo citando el `x-request-id`. |
+
+### Autenticación
+
+| HTTP | `error` | Qué pasó | Qué hacer |
+|---|---|---|---|
+| 401 | `invalid_api_key` | Falta la API key, está mal escrita o fue revocada. | Revisá `Authorization: Bearer sovra_sk_...`, con `Bearer` en mayúscula. [Más abajo](#invalid_api_key). |
+| 403 | `workspace_inactive` | El workspace está desactivado. La clave sigue siendo válida. | Reactivalo desde el dashboard. |
+| 403 | `organization_inactive` | La organización está desactivada. | Contactá a Sovra. |
+
+### Workspace
+
+| HTTP | `error` | Qué pasó | Qué hacer |
+|---|---|---|---|
+| 404 | `workspace_not_found` | La API key no corresponde a ningún workspace. | Generá una clave nueva. |
+| 409 | `workspace_not_provisioned` | El workspace todavía se está preparando: no tiene DID ni claves de firma. | Esperá unos minutos. [Más abajo](#workspace_not_provisioned). |
+
+### `invalid_api_key`
+
+Cuatro causas, de la más común a la menos:
+
+1. **`bearer` en minúscula.** Tiene que ser `Bearer`, con **B** mayúscula.
+2. **La key está mal copiada.** Alcanza con un espacio o un salto de línea al final.
+3. **La key fue revocada.** Revisá **Settings → API keys** en el dashboard.
+4. **La key es de otro entorno.** Una key de test no funciona contra `api.sovra.io`.
+
+```bash
+# Mirá el header tal como sale
+curl -sv "$BASE_URL/api/v1/issuer/documents" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" 2>&1 | grep -i authorization
+```
+
+### `workspace_not_provisioned`
+
+Es normal en los primeros minutos después de crear un workspace. Está listo cuando
+ves el DID `did:sovra:0x…` en **Settings → Workspace**; también te avisa el webhook
+[`identity.did-generated`](/webhooks/#identitydid-generated).
+
+Si el DID no aparece después de un rato, usá el **retry de aprovisionamiento** en
+**Settings → Workspaces**. Si sigue igual, contactá a Sovra.
+
+## Errores que llegan por webhook
+
+Lo que es asincrónico no falla en la respuesta HTTP, sino después:
+
+| Evento | Qué pasó | Dónde está el detalle |
+|---|---|---|
+| `presentation.failed` | Una presentación no pasó alguna validación. El código va en `data.error`. | [Errores de presentación](/errores/verificacion/#errores-de-presentación) |
+| `credential.status-change-failed` | Un cambio de estado que pediste no llegó a la cadena después de 5 intentos. | [Errores de transición de estado](/errores/credenciales/#errores-de-transición-de-estado) |
+| `document.status-changed` con `status: "failed"` | El anclaje de un documento falló después de 5 intentos. | [El documento se queda en `signed`](/errores/documentos/#el-documento-se-queda-en-signed-y-nunca-pasa-a-anchored) |
+
+Si los webhooks no llegan o la firma no valida, mirá
+[Webhooks: si algo no funciona](/webhooks/#si-algo-no-funciona).
+
+<Aside type="caution" title="Un 202 o un 201 no es el final">
+
+Revocar o suspender responde `202`, y emitir un documento responde `201` con el
+documento en `signed`: los dos solo confirman que el pedido se aceptó. El resultado
+llega por webhook. Suscribite a los eventos de falla.
+
+</Aside>
+
+## Cómo diagnosticar
+
+Si algo falla y no está claro dónde, empezá por el código de error y buscalo en la
+página de [credenciales](/errores/credenciales/),
+[verificación](/errores/verificacion/) o [documentos](/errores/documentos/).
+
+<Details title="Procedimiento de diagnóstico, paso a paso">
+
+<Steps>
+<Step title="Leé el código de error">
+
+En la respuesta HTTP es `error`; en un `presentation.failed` es `data.error`. La
+validación de una presentación se detiene en el primer fallo, así que el código dice
+**exactamente** en qué paso se cortó.
+
+</Step>
+<Step title="Revisá la autenticación y el entorno">
+
+¿El header dice `Bearer` con **B** mayúscula? ¿La API key es del entorno al que estás
+llamando (test o producción)?
+
+</Step>
+<Step title="Revisá el workspace">
+
+¿El workspace muestra un DID en **Settings → Workspace**? Sin DID, todo devuelve
+`409 workspace_not_provisioned`.
+
+</Step>
+<Step title="Revisá el esquema">
+
+¿El `schema_id` es el **slug legible**, no el UUID ni el nombre visible? ¿Es del kind
+correcto (`credential` para wallets, `document` para documentos)? ¿Está
+**`registered`** en [`GET /api/v1/issuer/schemas`](/api/list-schemas/)? ¿Los `key`
+del objeto `claims` coinciden letra por letra con los del esquema?
+
+</Step>
+<Step title="Revisá los webhooks">
+
+¿Hay un endpoint habilitado y **suscrito** al evento que esperás? No hay comodín. Ver
+[Webhooks: si algo no funciona](/webhooks/#si-algo-no-funciona).
+
+</Step>
+<Step title="Consultá el estado real antes de reintentar">
+
+Un timeout de red no significa que la operación no se hizo. Antes de reintentar,
+consultá el recurso ([credenciales](/api/list-credentials/),
+[documentos](/api/list-documents/), [verificaciones](/api/list-verifications/)):
+reintentar algo que sí se hizo crea un duplicado, y las transiciones de estado no son
+idempotentes.
+
+</Step>
+<Step title="Reportalo con el x-request-id">
+
+Si nada de lo anterior lo explica —sobre todo ante un `500`— reportalo a Sovra citando
+el `x-request-id` de la respuesta.
+
+</Step>
+</Steps>
+
+</Details>

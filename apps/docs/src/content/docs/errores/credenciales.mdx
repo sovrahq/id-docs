@@ -1,0 +1,298 @@
+---
+title: "Errores de credenciales"
+description: "Errores al guardar un esquema, al crear una oferta y al cambiar el estado de una credencial, en SD-JWT VC y mDoc: qué pasó y qué hacer."
+sidebar:
+  order: 1
+  label: "Credenciales"
+---
+
+Errores del lado del emisor: al guardar el esquema, al crear la oferta y al revocar,
+suspender o reactivar una credencial. Los errores de autenticación y de workspace,
+comunes a toda la API, están en el [resumen](/errores/#errores-http-de-la-api).
+
+## Errores al guardar el esquema
+
+### Comunes a los dos formatos
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `422 validation_error` en `issuer_id` | Ya existe un esquema con ese `schema_id`. El error aparece sobre `issuer_id` (`has already been taken`), no sobre `schema_id`. | Elegí otro `schema_id`. |
+| `422 validation_error` | Algún campo del body no es válido; `details` dice cuál. **Omitir `validity_period` al crear un esquema cae acá.** | Corregí el body. `validity_period` tiene que estar, aunque sea en `null`. |
+| `409 schema_in_use` | Quisiste borrar un esquema que ya tiene ofertas o credenciales, en cualquier estado. | No se puede borrar. Creá una versión nueva. |
+| `409 schema_revision_conflict` | Alguien guardó una versión más nueva mientras vos editabas. | Releé con [`GET /schemas`](/api/list-schemas/), aplicá tus cambios encima y reintentá. |
+| `404 schema_not_found` en `DELETE` | Para borrar se usa el **UUID** del esquema, no el slug (al revés que al emitir). | Usá el UUID. |
+| `409 document_signer_required` | Declaraste un `doc_type` propio y tu workspace no tiene document signer registrado. | Registralo desde el dashboard, o dejá que el docType se genere solo. Ver [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/). |
+
+### Solo mDoc
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `undefined_iso_elements` | Usaste un `key` que el namespace ISO `org.iso.18013.5.1` no define. | Ese namespace es cerrado: poné tus campos propios en **un namespace adicional**. Ver [Crear un esquema mDoc](/credenciales/mdoc/esquema/). |
+| `wrong_iso_element_type` | El elemento ISO existe, pero con otro tipo. Lo más común: `portrait` como `string` en lugar de `bytes`. | Usá el tipo del catálogo ISO en [Crear un esquema mDoc](/credenciales/mdoc/esquema/). |
+| `schema_id must be lowercase alphanumeric, - or _` | El `schema_id` tiene caracteres no permitidos (mayúsculas, puntos…). Debe cumplir `^[a-z0-9][a-z0-9_-]*$`. | Usá solo minúsculas, números, `-` y `_`: el `schema_id` pasa a formar parte del docType. |
+| `doc_type must be a reverse-DNS identifier` | El docType no tiene forma de DNS inverso. | Por ejemplo, `org.iso.18013.5.1.mDL`. |
+| `mdoc is only available for credential schemas` | Elegiste `format: mso_mdoc` para un esquema de documento. | Un documento se firma directo a un PDF, sin wallet ni holder, y mDoc no puede expresar eso. Usá `vc+sd-jwt` para documentos. |
+| `attachments are only available for vc+sd-jwt schemas` | Pusiste un claim `attachment` en un esquema mDoc. | Usá el tipo `bytes`. |
+| `doc_type is only meaningful for mso_mdoc schemas` | Le pusiste docType o namespace a un esquema `vc+sd-jwt`. | Sacá los dos campos. |
+
+<Aside type="tip" title="Revisá la ortografía de los keys antes de emitir">
+
+Un `key` mal escrito en el esquema queda **dentro de cada credencial firmada**, y los
+verificadores tienen que pedirlo con la errata. Ver
+[`missing_required_claim`](/errores/verificacion/#missing_required_claim).
+
+</Aside>
+
+<Details title="Por qué no podés cambiar el format de un esquema">
+
+Si revisás un esquema mandando un `format` distinto, se ignora en silencio y la
+versión se incrementa igual. No es un defecto: el docType se deriva del esquema y va
+firmado dentro de cada credencial que ya está en la wallet de un ciudadano.
+
+</Details>
+
+## Errores al crear la oferta
+
+Corresponden a [`POST /api/v1/issuer/credential-offer`](/api/create-credential-offer/).
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `401 invalid_api_key` | Falta la API key, está mal o fue revocada. | Revisá `Authorization: Bearer sovra_sk_...`. Ver [`invalid_api_key`](/errores/#invalid_api_key). |
+| `403 workspace_inactive` / `organization_inactive` | El workspace o la organización están desactivados. La clave sigue siendo válida. | Reactivalo desde el dashboard. |
+| `404 schema_not_found` | No hay un esquema con ese `schema_id` en este workspace. | Usá el **slug** del esquema, no el UUID ni el nombre visible. |
+| `404 workspace_not_found` | La API key no corresponde a ningún workspace. | Generá una clave nueva. |
+| `409 workspace_not_provisioned` | El workspace todavía se está preparando. | Esperá unos minutos y reintentá. Ver [`workspace_not_provisioned`](/errores/#workspace_not_provisioned). |
+| `409 schema_registration_pending` | El esquema todavía se está registrando en la cadena. | Esperá unos segundos. [Más abajo](#schema_registration_pending). |
+| `409 schema_registration_failed` | El registro del esquema falló y con él no se puede emitir. | Mirá `registration_error` para saber por qué, y creá el esquema de nuevo. |
+| `422 missing_claims` | Faltan claims obligatorios; `details` los lista. | Completalos. [Más abajo](#missing_claims). |
+| `422 validation_error` | Algún campo del body no es válido; `details` dice cuál. | Corregí el body. |
+| `422 invalid_valid_until` | `valid_until` es `null`, está mal formado o ya pasó. | Mandá una fecha futura, u omitilo para usar el `validity_period` del esquema. |
+| `422 wrong_schema_kind` | El esquema es de documentos, no de credenciales. | Usá un esquema de kind `credential`: los documentos no se emiten a una wallet. |
+| `422 invalid_claim_values` | **Solo SD-JWT:** un adjunto no es un PDF válido en data URI, o pasa los 560.000 bytes. | `details` dice qué claim y por qué (`"<key>: <motivo>"`). |
+| `422 unencodable_claims` | **Solo mDoc:** algún valor no tiene el formato que exige ISO. `details` dice cuáles. | [Más abajo](#unencodable_claims). |
+| `422 document_signer_required` | El esquema usa un docType propio (en mDoc, uno ISO) y tu workspace no tiene document signer. | Registralo desde el dashboard. Ver [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/). |
+| `422 bitmap_exhausted` | La lista de estado del workspace se quedó sin lugares libres. | Es raro. Reportalo a Sovra. |
+| `429 too_many_requests` | Pasaste las **120 ofertas por minuto desde tu IP**. No viene `Retry-After`. | Esperá y reintentá con backoff. |
+| `500` | Omitiste `schema_id`, o `claims` no es un objeto. | Revisá el body; si sigue, reportalo citando el `x-request-id`. |
+
+### `missing_claims`
+
+```json
+{ "error": "missing_claims", "details": ["birth_date", "document_number"] }
+```
+
+`details` lista los claims obligatorios que faltaron. Los nombres se comparan letra
+por letra con los `key` del esquema; los vigentes están en el dashboard y en
+[`GET /schemas`](/api/list-schemas/). Ojo: la emisión usa siempre la última versión
+del esquema, y una versión nueva puede haber agregado un campo obligatorio.
+
+### `schema_registration_pending`
+
+Cada vez que creás o revisás un esquema, se registra en la cadena, y hasta que termina
+no podés emitir con él. **No hay webhook para esto:** consultá
+[`GET /api/v1/issuer/schemas`](/api/list-schemas/) hasta que `registration_status` sea
+`registered`. Si el registro falla, vas a ver `schema_registration_failed`.
+
+### `unencodable_claims`
+
+**Solo mDoc.** Algún valor no tiene el formato exacto que exige ISO 18013-5. Lo más
+común: un `bytes` con el prefijo `data:image/jpeg;base64,` (tiene que ir el base64
+solo), o una fecha que no es `AAAA-MM-DD`.
+
+<Details title="Valores incorrectos y correctos, por tipo">
+
+| Tipo | Valor incorrecto | Valor esperado |
+|---|---|---|
+| `number` | `4.5`, o cualquier decimal no entero | Un entero. Un float no tiene forma CBOR determinista. |
+| `integer` | `"170"` (string) | `170` |
+| `boolean` | `"true"` (string) | `true` |
+| `date` | `"10/12/1815"`, `"1815-12-10T00:00:00Z"` | `"1815-12-10"` — exactamente diez caracteres |
+| `datetime` | Sin offset de zona horaria | ISO 8601 completo, por ejemplo `"2026-01-15T10:30:00Z"` |
+| `bytes` | base64 URL-safe, sin padding o con saltos de línea | **base64 estándar con padding**, sin espacios en blanco |
+| `bytes` | Con el prefijo `data:image/jpeg;base64,` (p. ej. `unencodable_claims: portrait, signature_usual_mark`) | El base64 **pelado**, sin prefijo |
+| `driving_privileges` | `[]`, o una entrada sin `vehicle_category_code` | Al menos una entrada con su categoría |
+| `driving_privileges` | `"sign": 70` (número) | `"sign": "<="`, `"value": "70"` — son de tipo **texto** |
+
+La codificación de cada tipo está en [Emitir mDoc](/credenciales/mdoc/emitir/).
+
+La comprobación corre **al crear la oferta**, no al entregar la credencial, para que
+el error no aparezca en mitad del flujo de la wallet. Y un tipo mal formado es un
+error, no una conversión: aceptar un string para un claim `integer` produciría una
+credencial que verifica bien y afirma algo falso.
+
+</Details>
+
+## Errores de transición de estado
+
+Corresponden a `PUT /api/v1/issuer/credentials/{id}/status/{status}`
+([suspender](/api/suspend-credential/), [reactivar](/api/reactivate-credential/),
+[revocar](/api/revoke-credential/)). Son iguales para SD-JWT VC y mDoc.
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `400 unknown_status` | El estado al final de la URL no es `revoked`, `suspended` ni `issued`. | Corregí la URL. |
+| `401 invalid_api_key` | Falta la API key o no es válida. | Ver [`invalid_api_key`](/errores/#invalid_api_key). |
+| `404 credential_not_found` | No hay una credencial con ese id en tu workspace, o el id no es un UUID. | Revisá el `credential_id`. |
+| `409 workspace_not_provisioned` | El workspace todavía se está preparando. | Ver [`workspace_not_provisioned`](/errores/#workspace_not_provisioned). |
+| `409 status_change_pending` | Ya hay otro cambio de esta credencial en curso. Se admite uno a la vez. | Esperá el webhook `credential.revoked` / `.suspended` / `.unsuspended`, o el [`credential.status-change-failed`](/webhooks/#credentialstatus-change-failed). |
+| `422 credential_not_yet_issued` | La oferta todavía no se canjeó. | No hay credencial que revocar todavía. |
+| `422 invalid_status_transition` | Ese cambio no está permitido; por ejemplo, revocar algo ya revocado. | Ver las [transiciones permitidas](/credenciales/estados-y-revocacion/). |
+
+<Aside type="caution" title="Un 202 no es prueba de que se revocó">
+
+`PUT …/status/…` responde `202`: el pedido se aceptó y el cambio se escribe en la
+cadena en segundo plano. Si falla después de 5 intentos, llega
+[`credential.status-change-failed`](/webhooks/#credentialstatus-change-failed) y el
+estado **queda como estaba**.
+
+</Aside>
+
+**Pedir dos veces el mismo cambio no devuelve `202` otra vez.** Da
+`409 status_change_pending` mientras el primero se está escribiendo, y
+`422 invalid_status_transition` cuando ya se aplicó. Si reintentás, tratá los dos como
+"ya está en camino o ya está" y consultá el estado antes de darlo por fallido.
+
+## Problemas frecuentes
+
+### El QR de la oferta se escanea pero no pasa nada
+
+- **La oferta ya se usó.** Es de un solo uso. Consultá
+  [`GET /credentials/{id}`](/api/get-credential/): si está `issued`, ya funcionó.
+- **La oferta venció.** Dura 24 horas. Mirá `expires_at`.
+
+### Perdí la credencial firmada
+
+No se puede recuperar: se entrega **una sola vez**, en el webhook
+[`credential.issued`](/webhooks/#credentialissued), y Sovra no la guarda.
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+La credencial sigue siendo válida en la wallet del ciudadano: lo que perdiste es tu
+copia. Para el futuro, guardá `data.credential` al procesar el evento.
+
+</TabItem>
+<TabItem label="mDoc">
+
+La única alternativa es revocar la credencial y emitir una nueva. Para el futuro,
+guardá `data.credential` al procesar el evento.
+
+</TabItem>
+</Tabs>
+
+### El retrato se ve como texto base64 en la wallet
+
+**Solo mDoc.** `portrait` está declarado `string` en lugar de `bytes`. La credencial
+verifica, pero ningún lector la muestra como imagen. Hoy eso lo frena
+[`wrong_iso_element_type`](#solo-mdoc) al guardar el esquema; si llegó a emitirse, el
+esquema es anterior a esa validación.
+
+### Funciona en test y en producción falla con `document_signer_required`
+
+El document signer se registra **por workspace**. Repetí los pasos de
+[Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/) en el workspace de
+producción, con una raíz que ese entorno acepte.
+
+### `workspace_not_provisioned` que no se va
+
+Usá el retry de aprovisionamiento en **Settings → Workspaces**. Ver
+[`workspace_not_provisioned`](/errores/#workspace_not_provisioned).
+
+## Cómo inspeccionar una credencial
+
+Ante un [`missing_required_claim`](/errores/verificacion/#missing_required_claim), lo
+primero es ver qué lleva realmente la credencial firmada. Partí del valor de
+`credential` del webhook `credential.issued`.
+
+<Aside type="caution" title="Decodificar no verifica nada">
+
+Cualquiera puede fabricar una credencial con el contenido que quiera. Para verificarla
+de verdad usá la [API de verificación](/verificadores/) o el
+[SDK on-chain](/verificadores/verificar-sin-sovra/).
+
+</Aside>
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+Un SD-JWT es texto: lo podés decodificar sin herramientas especiales. Lo que más
+importa son los `key` de las disclosures: son los nombres exactos que tenés que pedir
+en la consulta, y ahí se ve al instante un `fist_name` con errata.
+
+<Details title="Script para decodificarlo y qué mirar">
+
+```bash
+# Guardá el SD-JWT del webhook credential.issued en cred.txt
+python3 - <<'PY'
+import base64, json
+
+def b64(s):
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+sd_jwt = open("cred.txt").read().strip()
+partes = sd_jwt.split("~")
+
+cabecera, payload, _ = partes[0].split(".")
+print("=== HEADER ===")
+print(json.dumps(json.loads(b64(cabecera)), indent=2))
+print("=== PAYLOAD ===")
+print(json.dumps(json.loads(b64(payload)), indent=2, ensure_ascii=False))
+print("=== DISCLOSURES (salt, key, valor) ===")
+for d in partes[1:]:
+    if d:
+        print(json.loads(b64(d)))
+PY
+```
+
+Qué mirar:
+
+- **Los `key` de las disclosures.** Son los `path` exactos que tenés que pedir en el
+  DCQL.
+- **`vct`.** El tipo de credencial. Debe coincidir con el `credential_type` del
+  esquema.
+- **`exp`.** Segundos Unix. Si ya pasó, vas a recibir `credential_expired`.
+- **`credentialStatus[].statusListIndex`.** El índice de esta credencial en los mapas
+  de revocación y suspensión.
+- **`iss`.** El emisor: `https://<api>/did:sovra:0x…`.
+
+</Details>
+
+</TabItem>
+<TabItem label="mDoc">
+
+Un mDoc viene en CBOR codificado en base64url. Lo que más importa es
+`io.sovra.meta.1/namespace`: dice, con la firma del emisor, en qué namespace están los
+elementos, y es el valor que va en el `path` de la consulta.
+
+<Details title="Procedimiento de diagnóstico de un mDoc">
+
+Con el valor de `credential` en `$CREDENTIAL`:
+
+```bash
+# 1. base64url sin padding → bytes CBOR
+node -e '
+  const b64 = process.argv[1].replace(/-/g, "+").replace(/_/g, "/");
+  process.stdout.write(Buffer.from(b64, "base64"));
+' "$CREDENTIAL" > mdoc.cbor
+
+# 2. Inspección de la estructura. Sirve cualquier decodificador CBOR.
+#    Buscá: nameSpaces (los namespaces y sus elementos) e issuerAuth.
+npx cbor-cli decode < mdoc.cbor | head -50
+```
+
+Qué mirar, en orden:
+
+1. **Las claves de `nameSpaces`.** Tienen que ser dos: el namespace del esquema y
+   `io.sovra.meta.1`. Si el primero es el docType completo, el esquema usa el docType
+   generado, y entonces el DCQL tiene que pedir con esa misma cadena.
+2. **`io.sovra.meta.1/namespace`.** La respuesta definitiva a qué valor va en el
+   `path`.
+3. **`io.sovra.meta.1/mandatory_elements`.** Qué está obligado a divulgar el holder,
+   congelado en el momento de la emisión.
+4. **El `docType` del MSO.** Tiene que coincidir con el del documento, y es el valor
+   que va en `meta.doctype_value`.
+
+</Details>
+
+</TabItem>
+</Tabs>

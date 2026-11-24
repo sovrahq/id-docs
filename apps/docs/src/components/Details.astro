@@ -1,0 +1,39 @@
+---
+/* Bloque plegable para detalles técnicos: la página se lee simple y quien
+   necesita la profundidad la abre.
+
+     <Details title="Detalles técnicos">…</Details>
+*/
+import Icon from "@cloudflare/nimbus-docs/components/Icon.astro";
+
+interface Props {
+  title?: string;
+  open?: boolean;
+}
+
+const { title = "Detalles técnicos", open = false } = Astro.props;
+---
+
+<details class="details-card my-6 rounded-lg" open={open}>
+  <summary class="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-semibold">
+    <Icon name="ph:caret-right" class="details-caret size-4 shrink-0" />
+    {title}
+  </summary>
+  <div class="details-body px-4 pb-4 text-[0.9375rem]">
+    <slot />
+  </div>
+</details>
+
+<style>
+  .details-card {
+    border: 1px solid var(--nb-border);
+    background: var(--nb-card);
+  }
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  .details-caret { color: var(--nb-muted-foreground); transition: transform 150ms ease; }
+  details[open] .details-caret { transform: rotate(90deg); }
+  details[open] summary { border-bottom: 1px solid var(--nb-border); margin-bottom: 0.75rem; }
+  .details-body > :global(:first-child) { margin-top: 0; }
+  .details-body > :global(:last-child) { margin-bottom: 0; }
+</style>

@@ -1,0 +1,16 @@
+# Lo que no sube a Cloud Build (el Dockerfile solo usa apps/docs y packages).
+.git
+.gitignore
+**/node_modules
+**/dist
+**/.astro
+**/.turbo
+**/.wrangler
+**/.nimbus
+/.claude
+/.agents
+/docs
+/templates
+/openspec
+/tools
+.DS_Store

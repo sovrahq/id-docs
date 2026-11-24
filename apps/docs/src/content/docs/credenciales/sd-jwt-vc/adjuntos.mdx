@@ -1,0 +1,131 @@
+---
+title: "Adjuntar un PDF a una credencial SD-JWT VC"
+description: "Declarar un claim attachment en el esquema, mandar el PDF al emitir y saber qué llega a la wallet y qué al webhook."
+sidebar:
+  order: 3
+  label: "Adjuntos"
+---
+
+Una credencial SD-JWT VC puede llevar un **PDF adjunto**: un título, un certificado,
+una constancia. El PDF viaja dentro de la credencial y queda en la wallet del ciudadano.
+
+Se hace en dos pasos: **declarás un claim de tipo `attachment` en el esquema** y
+**mandás el PDF como valor de ese claim al emitir**.
+
+## Las reglas
+
+| Regla | Detalle |
+|---|---|
+| Formato | Solo esquemas `vc+sd-jwt` de kind `credential`. En mDoc no existe: ISO no define un elemento equivalente. |
+| Cantidad | **Uno solo por esquema.** |
+| Divulgación | El claim **tiene que ser `disclosable`**. |
+| Contenido | Un PDF como data URI: `data:application/pdf;base64,…`. |
+| Tamaño | **Hasta 560.000 bytes** del PDF decodificado. |
+
+## Paso 1: declarar el claim en el esquema
+
+Agregás un claim con `type: "attachment"` y `disclosable: true` a la lista de
+`claims` del esquema:
+
+```json
+{
+  "schema_id": "titulo_universitario",
+  "credential_type": "UniversityDegree",
+  "name": "Título universitario",
+  "validity_period": null,
+  "claims": [
+    { "key": "full_name",  "type": "string",     "required": true, "disclosable": true },
+    { "key": "degree",     "type": "string",     "required": true, "disclosable": true },
+    { "key": "titulo_pdf", "type": "attachment", "required": true, "disclosable": true }
+  ]
+}
+```
+
+En `vc+sd-jwt` el `type` de un claim es indicativo y no se valida, **salvo
+`attachment`**: ese sí se controla al emitir. El resto de los campos del esquema está
+en [Crear el esquema](/credenciales/sd-jwt-vc/esquema/).
+
+<Aside type="caution" title="En un esquema mDoc da error">
+
+Un claim `attachment` en un esquema `mso_mdoc` se rechaza con
+`attachments are only available for vc+sd-jwt schemas`. Si necesitás bytes en un
+mDoc, usá el tipo `bytes`.
+
+</Aside>
+
+## Paso 2: mandar el PDF al emitir
+
+En la oferta, el valor del claim es el PDF codificado en base64 con el prefijo
+`data:application/pdf;base64,`:
+
+```bash
+PDF=$(base64 < titulo.pdf | tr -d '\n')
+
+curl -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "schema_id": "titulo_universitario",
+  "claims": {
+    "full_name": "Ada Lovelace",
+    "degree": "Licenciatura en Matemática",
+    "titulo_pdf": "data:application/pdf;base64,$PDF"
+  }
+}
+EOF
+```
+
+En Node.js:
+
+```js
+import { readFile } from "node:fs/promises";
+
+const pdf = await readFile("titulo.pdf");
+const claims = {
+  full_name: "Ada Lovelace",
+  degree: "Licenciatura en Matemática",
+  titulo_pdf: `data:application/pdf;base64,${pdf.toString("base64")}`,
+};
+```
+
+El resto del flujo es igual que cualquier emisión: mostrás el QR y esperás el webhook
+(ver [Emitir](/credenciales/sd-jwt-vc/emitir/)). La vista previa `credential` de la
+respuesta **describe el adjunto pero no lo devuelve**.
+
+## Qué llega a la wallet y qué al webhook
+
+- **La wallet recibe la credencial completa, con el PDF.**
+- **El webhook `credential.issued` no trae el PDF.** La disclosure del adjunto se saca
+  del `credential`, pero su digest queda en el array `_sd` firmado: la firma sigue
+  verificando y el claim se lee como retenido. En su lugar llega un campo
+  `attachment` que describe lo que se sacó:
+
+```json
+"attachment": {
+  "claim": "titulo_pdf",
+  "type": "attachment",
+  "media_type": "application/pdf",
+  "bytes": 184213
+}
+```
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `claim` | string | La clave del claim que se sacó. |
+| `type` | string | Siempre `attachment`. |
+| `media_type` | string | El tipo de medio del archivo, p. ej. `application/pdf`. |
+| `bytes` | integer | El tamaño del archivo decodificado, en bytes. |
+
+Si necesitás conservar el PDF, guardalo de tu lado antes de emitir: Sovra no te lo
+devuelve. El evento completo está en [Webhooks](/webhooks/).
+
+## Errores
+
+| Código | Qué pasó | Qué hacer |
+|---|---|---|
+| `422 invalid_claim_values` | El valor no es un data URI de PDF válido, o el PDF pasa los 560.000 bytes. | `details` dice qué claim y por qué (`"<key>: <motivo>"`). Revisá el prefijo `data:application/pdf;base64,` y el tamaño. |
+| `413` | El cuerpo del request pasa los 8 MB. | Casi siempre es un adjunto demasiado grande: el máximo son 560.000 bytes. |
+| `attachments are only available for vc+sd-jwt schemas` | Pusiste un claim `attachment` en un esquema mDoc. | Usá el tipo `bytes`, o un esquema `vc+sd-jwt`. |
+
+El resto de los errores está en [Errores de credenciales](/errores/credenciales/).

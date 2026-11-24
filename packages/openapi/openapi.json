@@ -1,0 +1,1132 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sovra ID API",
+    "version": "v1",
+    "description": "API servidor-a-servidor de Sovra ID. Las zonas `issuer` y `verifier` se autentican con una API key de workspace (`Authorization: Bearer sovra_sk_...`).\n\nEsta referencia se generó a partir de las colecciones de Postman del repositorio `sovrahq/id-docs`. La especificación completa se publica en `GET {baseUrl}/openapi/api`."
+  },
+  "servers": [
+    {
+      "url": "https://test-api-sovra.flagonsa.com",
+      "description": "Test"
+    },
+    {
+      "url": "https://api.sovra.io",
+      "description": "Producción"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Credenciales",
+      "description": "Ciclo de vida de emisión de credenciales, acotado al workspace de la API key."
+    },
+    {
+      "name": "Esquemas",
+      "description": "Creación y consulta de esquemas de credenciales."
+    },
+    {
+      "name": "Verificaciones",
+      "description": "Sesiones de verificación OID4VP, acotadas al workspace de la API key."
+    },
+    {
+      "name": "Documentos firmados",
+      "description": "Emisión, visibilidad, listado y lectura pública de documentos firmados."
+    },
+    {
+      "name": "Listas de estado",
+      "description": "Listas de estado de revocación y suspensión. No requieren autenticación."
+    }
+  ],
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "paths": {
+    "/api/v1/issuer/credential-offer": {
+      "post": {
+        "operationId": "createCredentialOffer",
+        "summary": "Crear oferta de credencial",
+        "description": "Crea una oferta OID4VCI pre-autorizada.\n\n`schema_id` es el slug del esquema (no su UUID); se usa siempre su última versión. `claims` se preasocian a la oferta y se copian en la credencial cuando el holder la canjea.\n\nLa respuesta trae `credential_id` (identificador estable de todo el ciclo de vida), `offer_uri` (para el QR), `expires_at` (24 h) y `credential` (vista previa **sin firmar**).\n\nEl SD-JWT firmado llega después, en el webhook `credential.issued`.\n\nRate limit: 120 req/min por API key.",
+        "tags": [
+          "Credenciales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schema_id": {
+                    "type": "string"
+                  },
+                  "claims": {
+                    "type": "object",
+                    "properties": {
+                      "full_name": {
+                        "type": "string"
+                      },
+                      "age_over_18": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "ejemplo1": {
+                  "summary": "Crear oferta de credencial",
+                  "value": {
+                    "schema_id": "<schemaId>",
+                    "claims": {
+                      "full_name": "Ada Lovelace",
+                      "age_over_18": true
+                    }
+                  }
+                },
+                "ejemplo2": {
+                  "summary": "Crear oferta (24 claims)",
+                  "value": {
+                    "schema_id": "driving_licence_v2",
+                    "valid_until": "2030-10-22T23:59:59Z",
+                    "claims": {
+                      "given_name": "Sofía",
+                      "family_name": "Demo",
+                      "second_family_name": "Lambda",
+                      "birth_date": "1990-01-01",
+                      "document_number": "NL-2026-0001",
+                      "issue_date": "2026-10-22",
+                      "expiry_date": "2030-10-22",
+                      "driving_privileges": [
+                        {
+                          "vehicle_category_code": "B",
+                          "issue_date": "2026-10-22",
+                          "expiry_date": "2030-10-22",
+                          "codes": [
+                            {
+                              "code": "01",
+                              "sign": "<=",
+                              "value": "70"
+                            }
+                          ]
+                        }
+                      ],
+                      "portrait": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+                      "signature_usual_mark": "iVBORw0KGgoAAAANSUhEUgAAA...",
+                      "issuing_authority": "Secretaría de Movilidad y Planeación Urbana",
+                      "street": "Av. Constitución",
+                      "exterior_number": "1234",
+                      "interior_number": "5B",
+                      "neighborhood": "Centro",
+                      "resident_city": "Monterrey",
+                      "resident_postal_code": "64000",
+                      "issuing_country": "MX",
+                      "age_over_18": true,
+                      "curp": "DELS900101MNLXXX01",
+                      "organ_donor": true,
+                      "blood_type": "O+",
+                      "allergies": "Penicilina",
+                      "emergency_phone": "8181234567"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/credentials": {
+      "get": {
+        "operationId": "listCredentials",
+        "summary": "Listar credenciales emitidas",
+        "description": "Todas las credenciales efectivamente emitidas por el workspace. Las ofertas pendientes no aparecen acá; se consultan de a una por su `credential_id`.",
+        "tags": [
+          "Credenciales"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/credentials/{credentialId}": {
+      "get": {
+        "operationId": "getCredential",
+        "summary": "Consultar una credencial",
+        "description": "Metadatos de una credencial. El mismo id cubre todo el ciclo de vida: mientras el holder no la canjeó, `status` es `pending` (o `expired` si venció la ventana de la oferta) con `holder_did` e `issued_at` en null; después de la emisión, `status` refleja el estado real (`issued`, `suspended`, `revoked`).\n\nEl SD-JWT firmado **no** se devuelve acá.",
+        "tags": [
+          "Credenciales"
+        ],
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/credentials/{credentialId}/status/revoked": {
+      "put": {
+        "operationId": "revokeCredential",
+        "summary": "Revocar credencial",
+        "description": "Revocación permanente. El bit correspondiente se marca on-chain y dispara el webhook `credential.revoked`.\n\nNo es idempotente: revocar algo ya revocado devuelve 422 `invalid_status_transition`.",
+        "tags": [
+          "Credenciales"
+        ],
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/credentials/{credentialId}/status/suspended": {
+      "put": {
+        "operationId": "suspendCredential",
+        "summary": "Suspender credencial",
+        "description": "Suspensión reversible. Solo se permite desde `issued`. Dispara `credential.suspended`.",
+        "tags": [
+          "Credenciales"
+        ],
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/credentials/{credentialId}/status/issued": {
+      "put": {
+        "operationId": "reactivateCredential",
+        "summary": "Reactivar credencial suspendida",
+        "description": "Devuelve a `issued` una credencial suspendida. Solo se permite desde `suspended`. Dispara `credential.unsuspended`.",
+        "tags": [
+          "Credenciales"
+        ],
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/verifier/verifications": {
+      "post": {
+        "operationId": "createVerification",
+        "summary": "Crear sesión de verificación",
+        "description": "Inicia una sesión de verificación OID4VP. `dcql_query` sigue la especificación DCQL de OID4VP.\n\nTres reglas que evitan casi todos los fallos:\n1. Cada `path` debe coincidir carácter por carácter con el `key` del esquema.\n2. Todos los claims pedidos son obligatorios: si el holder omite uno, falla toda la presentación.\n3. `id` es una etiqueta libre tuya, devuelta tal cual en el resultado; no filtra por tipo de credencial.\n\nLa respuesta trae `session_id`, `authorization_request_uri` (autocontenida) y `authorization_request_uri_ref` (corta, para DCQL grandes). La sesión vive 10 minutos.",
+        "tags": [
+          "Verificaciones"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dcql_query": {
+                    "type": "object",
+                    "properties": {
+                      "credentials": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "format": {
+                              "type": "string"
+                            },
+                            "claims": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "path": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "ejemplo1": {
+                  "summary": "Crear sesión de verificación",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "identidad",
+                          "format": "vc+sd-jwt",
+                          "claims": [
+                            {
+                              "path": [
+                                "email"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo2": {
+                  "summary": "Control de tránsito (licencia completa)",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "licencia",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "given_name"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "family_name"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "second_family_name"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "document_number"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "expiry_date"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "driving_privileges"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "portrait"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo3": {
+                  "summary": "Verificación de edad (sin fecha de nacimiento)",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "edad",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "age_over_18"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo4": {
+                  "summary": "Urgencias médicas",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "urgencias",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "blood_type"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "allergies"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "organ_donor"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "emergency_phone"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo5": {
+                  "summary": "Comprobante de domicilio",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "domicilio",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "street"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "exterior_number"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "interior_number"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "neighborhood"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "resident_city"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "resident_postal_code"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo6": {
+                  "summary": "Zona de cobertura (calle y CP)",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "cobertura",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "street"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "resident_postal_code"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "ejemplo7": {
+                  "summary": "Trámite que requiere CURP",
+                  "value": {
+                    "dcql_query": {
+                      "credentials": [
+                        {
+                          "id": "tramite",
+                          "format": "mso_mdoc",
+                          "meta": {
+                            "doctype_value": "io.sovra.0x5de0df12cce712ddaaa23feb359920ae4f3230d4.driving_licence_v2.1"
+                          },
+                          "claims": [
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "curp"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "given_name"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "family_name"
+                              ]
+                            },
+                            {
+                              "path": [
+                                "mx.gob.nl.icv.1",
+                                "second_family_name"
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listVerifications",
+        "summary": "Listar sesiones de verificación",
+        "description": "Sesiones del workspace autenticado, de la más nueva a la más vieja.",
+        "tags": [
+          "Verificaciones"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Filtro opcional: pending, completed, failed, expired.",
+            "schema": {
+              "type": "string"
+            },
+            "example": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Default 50, máximo 200.",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 50
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/verifier/verifications/{verificationId}": {
+      "get": {
+        "operationId": "getVerification",
+        "summary": "Consultar una sesión de verificación",
+        "description": "Estado actual de una sesión. Si `status` es `completed`, `presentation_data.credentials[].claims` trae los valores divulgados. Si es `failed`, `error` identifica el paso exacto que falló.",
+        "tags": [
+          "Verificaciones"
+        ],
+        "parameters": [
+          {
+            "name": "verificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/status/{issuerDid}/revocation": {
+      "get": {
+        "operationId": "getRevocationStatusList",
+        "summary": "Lista de estado (revocación)",
+        "description": "La W3C Bitstring Status List firmada (VC-JWT, ES256) del emisor. Sin autenticación.\n\nResponde `application/jwt` con ETag y Cache-Control; mandá `If-None-Match` para recibir 304 cuando no cambió nada.\n\nEs la URL que las credenciales llevan embebida en su claim `credentialStatus`. La ruta es inmutable por diseño.",
+        "tags": [
+          "Listas de estado"
+        ],
+        "parameters": [
+          {
+            "name": "issuerDid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/status/{issuerDid}/suspension": {
+      "get": {
+        "operationId": "getSuspensionStatusList",
+        "summary": "Lista de estado (suspensión)",
+        "description": "Igual que la anterior, para el mapa de suspensión.",
+        "tags": [
+          "Listas de estado"
+        ],
+        "parameters": [
+          {
+            "name": "issuerDid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/issuer/documents": {
+      "post": {
+        "operationId": "issueDocument",
+        "summary": "Emitir documento",
+        "description": "Emite un documento con un schema previamente diseñado. Una sola llamada valida, firma y ancla: esperar hasta ~90 segundos.\n\n→ 201 si se creó exitosamente. **Conservar el `credential`**: ese string es el documento, autocontenido y verificable.\n\nErrores: 409 workspace_not_provisioned, 422 wrong_schema_kind / missing_claims / invalid_visibility, 503 chain_not_configured.",
+        "tags": [
+          "Documentos firmados"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schema_id": {
+                    "type": "string"
+                  },
+                  "claims": {
+                    "type": "object",
+                    "properties": {
+                      "claim_key": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "visibility": {
+                    "type": "string"
+                  }
+                }
+              },
+              "examples": {
+                "ejemplo1": {
+                  "summary": "Emitir documento",
+                  "value": {
+                    "schema_id": "<schema_id>",
+                    "claims": {
+                      "claim_key": "valor"
+                    },
+                    "visibility": "private"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listDocuments",
+        "summary": "Listar documentos del workspace",
+        "description": "Lista todos los documentos del workspace, del más reciente al más antiguo. Sin paginación. Cada entrada tiene la misma forma que la respuesta de emisión, `credential` y `claims` decodificados incluidos.",
+        "tags": [
+          "Documentos firmados"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/documents/{documentId}/visibility/public": {
+      "put": {
+        "operationId": "makeDocumentPublic",
+        "summary": "Cambiar visibilidad → public",
+        "description": "Publica el documento. El valor viaja como último segmento del path, no en un body.\n\nEsto restringe los endpoints de la API, no el artefacto: una credencial ya entregada sigue siendo verificable por quien la tenga. La visibilidad no está cubierta por la firma.",
+        "tags": [
+          "Documentos firmados"
+        ],
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/issuer/documents/{documentId}/visibility/private": {
+      "put": {
+        "operationId": "makeDocumentPrivate",
+        "summary": "Cambiar visibilidad → private",
+        "description": "Vuelve el documento a privado. Cierra el enlace, no las copias ya entregadas.",
+        "tags": [
+          "Documentos firmados"
+        ],
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}": {
+      "get": {
+        "operationId": "getPublicDocument",
+        "summary": "Obtener documento (JSON)",
+        "description": "El documento, para quien recibió el enlace. Sin `/issuer` en el path y sin API key: si el documento es público, tener el id es toda la autorización. Uno privado necesita sesión del dashboard (una API key no sirve → 401 authentication_required).\n\nSolo `credential` es verificable; el resto es para renderizar. Responde con `Access-Control-Allow-Origin: *`.",
+        "tags": [
+          "Documentos firmados"
+        ],
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/issuer/schemas": {
+      "post": {
+        "operationId": "createSchema",
+        "summary": "Crear esquema mDoc con namespace propio",
+        "description": "Crea el esquema. **`format`, `doc_type` y `namespace` son inmutables de por vida**: quedan firmados dentro de cada credencial emitida.\n\n`namespace` propio ⇒ no corre la validación del catálogo ISO, de modo que los claims propios (`curp`, `neighborhood`, `organ_donor`, `blood_type`, `allergies`, `emergency_phone`, `second_family_name`, `street`, `exterior_number`, `interior_number`) son admitidos.\n\n`disclosable: false` es lo que el dashboard rotula **always shared**: el claim viaja en toda presentación y el ciudadano no puede retenerlo.\n\n🔴 `validity_period: null` **no** significa «sin vencimiento» en mDoc: ISO hace obligatorio `validUntil` y la emisión recaería en un año por defecto. De ahí `\"4y\"`.\n\nRespuesta `201`. El esquema queda `pending` hasta que su credential type se inscriba on-chain; nada se emite antes.",
+        "tags": [
+          "Esquemas"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schema_id": {
+                    "type": "string"
+                  },
+                  "credential_type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "format": {
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "validity_period": {
+                    "type": "string"
+                  },
+                  "claims": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "disclosable": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "ejemplo1": {
+                  "summary": "Crear esquema mDoc con namespace propio",
+                  "value": {
+                    "schema_id": "driving_licence_v2",
+                    "credential_type": "DrivingLicence",
+                    "name": "Driving Licence v2",
+                    "format": "mso_mdoc",
+                    "namespace": "mx.gob.nl.icv.1",
+                    "validity_period": "4y",
+                    "claims": [
+                      {
+                        "key": "given_name",
+                        "label": "Nombre",
+                        "type": "string",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "family_name",
+                        "label": "Apellido paterno",
+                        "type": "string",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "second_family_name",
+                        "label": "Apellido materno",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "birth_date",
+                        "label": "Fecha de nacimiento",
+                        "type": "date",
+                        "required": true,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "document_number",
+                        "label": "Folio de licencia",
+                        "type": "string",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "issue_date",
+                        "label": "Fecha de expedición",
+                        "type": "date",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "expiry_date",
+                        "label": "Fecha de vencimiento",
+                        "type": "date",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "driving_privileges",
+                        "label": "Tipo y restricciones",
+                        "type": "driving_privileges",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "portrait",
+                        "label": "Foto",
+                        "type": "bytes",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "issuing_authority",
+                        "label": "Autorizado por",
+                        "type": "string",
+                        "required": true,
+                        "disclosable": false
+                      },
+                      {
+                        "key": "signature_usual_mark",
+                        "label": "Firma",
+                        "type": "bytes",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "street",
+                        "label": "Calle",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "exterior_number",
+                        "label": "Número exterior",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "interior_number",
+                        "label": "Número interior",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "neighborhood",
+                        "label": "Colonia",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "resident_city",
+                        "label": "Municipio",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "resident_postal_code",
+                        "label": "Código postal",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "issuing_country",
+                        "label": "País emisor",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "age_over_18",
+                        "label": "Mayor de 18",
+                        "type": "boolean",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "curp",
+                        "label": "CURP",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "organ_donor",
+                        "label": "Donador",
+                        "type": "boolean",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "blood_type",
+                        "label": "Tipo sanguíneo",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "allergies",
+                        "label": "Alergias",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      },
+                      {
+                        "key": "emergency_phone",
+                        "label": "Teléfono de emergencia",
+                        "type": "string",
+                        "required": false,
+                        "disclosable": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listSchemas",
+        "summary": "Consultar esquemas (leer docType y namespace)",
+        "description": "Devuelve todas las versiones. De aquí se leen las dos cadenas que gobiernan el resto: `doc_type` y `namespace`. **No deben deducirse**: la regla «namespace = docType» rige únicamente cuando el esquema no declara namespace propio.\n\nTambién confirma `registration_status: \"registered\"`, sin el cual la emisión responde `409 schema_registration_pending`.",
+        "tags": [
+          "Esquemas"
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta exitosa. La colección de Postman de origen no incluye el cuerpo de la respuesta; ver la guía de referencia."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key de workspace con prefijo `sovra_sk_`. Se crea en el dashboard (Settings → API keys)."
+      }
+    }
+  }
+}

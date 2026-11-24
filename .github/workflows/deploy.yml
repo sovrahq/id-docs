@@ -1,0 +1,80 @@
+name: Deploy docs
+
+# Construye la imagen del sitio y la despliega en Cloud Run.
+# Configuración de un solo uso: infra/gcp/setup.sh (ver infra/gcp/README.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/docs/**
+      - packages/**
+      - infra/gcp/**
+      - Dockerfile
+      - .dockerignore
+      - package-lock.json
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+env:
+  SERVICE: sovra-id-docs
+  AR_REPO: docs
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    permissions:
+      contents: read
+      id-token: write # para la federación de identidad con Google Cloud
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build y push de la imagen
+        id: image
+        run: |
+          IMAGE="${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/$AR_REPO/$SERVICE:${{ github.sha }}"
+          gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+          docker build --build-arg SITE_URL="${{ vars.SITE_URL }}" -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy a Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ vars.GCP_REGION }}
+          image: ${{ steps.image.outputs.image }}
+          flags: >-
+            --service-account=${{ vars.GCP_RUNTIME_SA }}
+            --allow-unauthenticated
+            --port=8080
+            --cpu=1
+            --memory=256Mi
+            --min-instances=0
+            --max-instances=3
+            --concurrency=200
+
+      - name: Smoke test
+        run: |
+          for path in / /conceptos/ /api/; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.deploy.outputs.url }}$path")
+            echo "$code $path"
+            test "$code" = 200
+          done
+          echo "Desplegado en ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,166 @@
+---
+title: "Verificar un documento firmado"
+description: "Cómo comprobar un documento firmado contra la cadena: por qué no hay endpoint, los nueve checks, el SDK y qué no prueba un resultado válido."
+sidebar:
+  order: 6
+  label: "Verificación"
+---
+
+Verificar un documento es comprobar, contra la cadena, que **ese contenido exacto lo firmó un emisor autorizado y que la firma quedó anclada**. Para hacerlo alcanza con el string `credential`: lo sacás de la [emisión](/documentos/emitir/), del [listado](/documentos/emitir/#listar-los-documentos-del-workspace), de la [lectura pública](/documentos/visibilidad-y-entrega/#leer-un-documento-la-zona-pública) o del QR de la hoja.
+
+## Por qué no hay un endpoint de verificación
+
+**No existe un endpoint que responda "válido" o "inválido", y es a propósito.** Un veredicto habría que creerlo; una firma se puede comprobar. Si la API dijera `valid: true`, estarías confiando en el mismo servicio que emitió el documento.
+
+Por eso la verificación corre entera de tu lado, contra la cadena. El servicio puede caerse o dejar de existir, y el documento sigue siendo verificable. (Para credenciales sí hay [verificación hospedada](/verificadores/); para documentos, el camino on-chain es el único.)
+
+## Los nueve checks
+
+Cuatro corren en local y cinco leen la cadena:
+
+**Locales**
+
+- **`parse`**: el `credential` tiene la estructura correcta, usa `ES256` y no tiene holder.
+- **`digest`**: se calcula la huella SHA-256 de lo firmado.
+- **`issuer`**: se extrae la dirección del emisor del claim `iss`.
+- **`expiry`**: el documento no venció.
+
+**Contra SovraChain**
+
+- **`key`**: se obtiene la clave pública del emisor del DID Registry.
+- **`signature`**: la firma valida con esa clave.
+- **`trust`**: el emisor está autorizado para ese tipo de documento en el Issuer Registry.
+- **`anchor`**: la firma está registrada on-chain.
+- **`anchor-match`**: lo anclado corresponde a *este* documento.
+
+<Aside type="danger" title="Los checks locales no prueban autenticidad">
+
+Un documento adulterado pasa los cuatro locales si el atacante recalculó el digest. Lo que distingue uno legítimo de uno fabricado son los cinco contra la cadena. Si corrés solo los locales, **estás mostrando, no verificando**.
+
+</Aside>
+
+## El SDK
+
+El SDK de verificación de Sovra encapsula la lectura de la cadena (resolver DIDs, decodificar claves, consultar los contratos) y distingue un documento de una credencial con holder:
+
+```bash
+npm install @sovrahq/verification-sdk
+```
+
+<Aside type="caution" title="Confirmá el punto de entrada para documentos">
+
+Antes de diseñar la integración, confirmá con el equipo de Sovra el punto de entrada del SDK para documentos y su disponibilidad en tu entorno. Un documento no tiene holder, así que no lleva `expectedNonce`, `expectedAudience` ni KB-JWT como la verificación de [presentaciones](/verificadores/verificar-sin-sovra/).
+
+</Aside>
+
+<Details title="Cada check en detalle, para implementarlo por tu cuenta">
+
+Si lo implementás vos, el orden importa: **`parse` → `key` → `signature` → `trust` → `anchor` → `anchor-match` → `expiry`**. Comprobar la expiración antes de la firma hace que un documento fabricado parezca "casi válido", y comprobar `trust` después de la firma evita gastar lecturas de cadena en firmas que ya fallaron.
+
+**`parse`: la estructura**
+
+```js
+const [jwt, ...disclosures] = credential.split("~");
+const parts = jwt.split(".");
+if (parts.length !== 3) throw new Error("no tiene tres partes");
+
+const [headerB64, payloadB64, signatureB64] = parts;
+const header  = decodeSegment(headerB64);
+const payload = decodeSegment(payloadB64);
+```
+
+`decodeSegment` está en [Renderizado](/documentos/renderizado/#los-valores-salen-del-credential). Comprobá que `header.alg === "ES256"` (aceptar otro abre la puerta a un `alg: "none"`), que `header.typ === "vc+sd-jwt"`, y que **`payload.cnf` no exista**: si existe, es una credencial con holder → `NOT_A_DOCUMENT`. La lista de disclosures tiene que estar vacía: la `~` final sola es lo esperado.
+
+**`digest`: la huella**
+
+```js
+const signingInput = `${headerB64}.${payloadB64}`;
+const bytes = new TextEncoder().encode(signingInput);
+const hash  = await crypto.subtle.digest("SHA-256", bytes);
+const digest = [...new Uint8Array(hash)]
+  .map((b) => b.toString(16).padStart(2, "0")).join("");
+```
+
+Sobre `header.payload`, no sobre el `credential` completo: incluir la firma o la `~` da otro hash.
+
+**`issuer`: la dirección**
+
+El claim `iss` es una URL HTTPS cuyo path es el DID del emisor:
+
+```text
+https://api.sovra.io/did:sovra:0xb516d2f945db504198d726bda2a01d19ecd3cc23
+                                └──────────── la dirección ────────────┘
+```
+
+Sacá la dirección del `iss` firmado, no del campo `issuer.did` de la respuesta, que no está firmado. Y no uses el host del `iss` como fuente de confianza: la confianza sale del registry, no del dominio.
+
+**`expiry`: la vigencia**
+
+```js
+const now = Math.floor(Date.now() / 1000);
+if (payload.exp && now > payload.exp) throw new Error("expirado");
+if (payload.iat && payload.iat > now + 60) throw new Error("iat en el futuro");
+```
+
+Dejá una tolerancia de reloj (60 s es razonable).
+
+**Los cinco checks contra la cadena**
+
+| Check | Qué hace |
+|---|---|
+| `key` | Resuelve el DID del emisor en el **DID Registry** y obtiene la clave pública de su `assertionMethod`. |
+| `signature` | Verifica los 64 bytes de firma ES256 sobre `header.payload` con esa clave. Es el check que hace verificable al documento. |
+| `trust` | Consulta el **Issuer Registry**: ¿ese emisor está autorizado para este `vct`? Sin este check, cualquiera con una cuenta en la cadena puede firmar algo que valida. Si falla con `ISSUER_NOT_TRUSTED`, es un tema de aprovisionamiento del workspace, no del documento. |
+| `anchor` | Comprueba que la firma esté registrada on-chain. Un documento `failed` falla acá → `NOT_ANCHORED`. |
+| `anchor-match` | Compara el `digest` recalculado con el registrado. Impide reusar un anclaje legítimo para otro contenido. |
+
+Para leer la cadena necesitás acceso RPC y las direcciones de los registries:
+
+| | Test | Producción |
+|---|---|---|
+| RPC | `https://rpc.testnet.sovra.io` | `https://rpc.sovra.io` |
+| Chain ID | `65536101` | `65536001` |
+| DID Registry | `0xB9A2c855376ED79966e5f4956D3BfD21ef80d96E` | `0x3829184dB00Ae8C7a6c72104A2Ede879F6F25e78` |
+| Issuer Registry | `0x9723B2586332b973AA18a8b82E6675DA73490Bd0` | `0x290eAc1114B66D14a4b911CEE6D571ddC0f254C8` |
+
+Confirmá estas direcciones con el equipo de Sovra antes de desplegar: un redeploy de contratos las cambia. La dirección del registry de firmas ancladas (el que usan `anchor` y `anchor-match`) no está publicada acá: pedila junto con las otras.
+
+De la respuesta de la API, solo el `credential` es imprescindible: `issuer.did` sale del `iss`, el `digest` se calcula, y `tx_hash` es un atajo para ubicar el anclaje. Ninguno de esos tres es fuente de verdad.
+
+</Details>
+
+## Códigos de error
+
+Los que aplican a un documento son `PARSE_ERROR`, `NOT_A_DOCUMENT`, `NOT_ANCHORED`, los `ISSUER_*`, `CREDENTIAL_EXPIRED`, `CREDENTIAL_REVOKED`, `IAT_INVALID` e `INVALID_ADDRESS`.
+
+<Details title="Qué significa cada código">
+
+| Código | Significado |
+|---|---|
+| `PARSE_ERROR` | El `credential` no parsea: no tiene tres partes, o un segmento no es base64url válido. |
+| `NOT_A_DOCUMENT` | No es un documento firmado (por ejemplo, trae `cnf`: es una credencial con holder). |
+| `NOT_ANCHORED` | La firma no está anclada on-chain. Típicamente un `failed`, o un `signed` que todavía no ancló. |
+| `ISSUER_SIG_INVALID` | La firma no valida contra la clave pública del emisor. |
+| `ISSUER_NOT_FOUND` | El DID del emisor no resuelve en el DID Registry. |
+| `ISSUER_NOT_TRUSTED` | El emisor no está autorizado para ese `vct` en el Issuer Registry. |
+| `ISSUER_DEACTIVATED` | El emisor fue desactivado. |
+| `CREDENTIAL_EXPIRED` | Pasó el `exp`. |
+| `CREDENTIAL_REVOKED` | El documento fue revocado. |
+| `IAT_INVALID` | `iat` fuera de la tolerancia horaria. |
+| `INVALID_ADDRESS` | Una dirección de contrato no es válida. |
+
+Los códigos `KB_*`, `HOLDER_*`, `DISCLOSURE_MISMATCH` y `SUBJECT_KEY_MISMATCH` son de presentaciones de credenciales y no aplican a documentos. La tabla completa del SDK está en [Verificar sin Sovra](/verificadores/verificar-sin-sovra/).
+
+</Details>
+
+## Qué no prueba una verificación exitosa
+
+Los nueve checks en verde prueban que **este contenido exacto lo firmó ese emisor, autorizado para ese tipo, y la firma quedó en la cadena**. No prueban:
+
+- **Que el contenido sea verdadero.** La firma cubre lo que el emisor afirmó, no la realidad.
+- **Que sea confidencial.** Cualquiera con el string lo puede leer.
+- **Que la copia sea única.** El mismo string verifica infinitas veces; si necesitás "usado una sola vez", lo lleva tu sistema.
+- **Que quien lo presenta sea su titular.** Un documento no tiene holder. Si necesitás atar el dato a una persona presente, usá una [credencial](/credenciales/).
+- **Que `issuer.name`, `visibility` o `layout` sean lo que dicen.** Nada de eso está firmado.
+
+En una frase: **un documento prueba autoría, no titularidad.**

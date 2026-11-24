@@ -15,9 +15,10 @@ jobs:
           node-version: 22.23.4
           cache: npm
       - run: npm ci
+      # El lint lee las reglas de .nimbus/lint.json, que escribe el build.
+      - run: npm run build
       - run: npm run lint:docs
       - run: npm run typecheck
-      - run: npm run build
 
   docker:
     runs-on: ubuntu-latest

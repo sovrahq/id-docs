@@ -49,6 +49,12 @@ Sobre `claims`:
   falla con `422 missing_claims`.
 - Los valores viajan tal cual se envían. Fechas como texto ISO (`"1815-12-10"`),
   booleanos como booleanos.
+- Un claim de tipo `attachment` lleva un PDF como `data:application/pdf;base64,…`,
+  de **hasta 560.000 bytes** una vez decodificado. Si no es un data URI de PDF válido
+  o pasa ese tamaño, la llamada falla con `422 invalid_claim_values`. El PDF llega a
+  la wallet, pero **no viaja en el webhook**: ahí llega solo su tamaño y tipo. Ver
+  [3. Crear un esquema](03-crear-un-esquema.md#adjuntar-un-pdf) y
+  [6. Webhooks](06-webhooks.md#credentialissued).
 
 **Rate limit:** 120 solicitudes por minuto **por IP de origen** —no por API key—, y se
 cuentan por separado en cada nodo de la API. Por encima, `429 too_many_requests`, **sin

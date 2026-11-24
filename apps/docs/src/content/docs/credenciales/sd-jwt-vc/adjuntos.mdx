@@ -89,6 +89,8 @@ const claims = {
 };
 ```
 
+y mandás esos `claims` en la oferta como en [Emitir](/credenciales/sd-jwt-vc/emitir/).
+
 El resto del flujo es igual que cualquier emisión: mostrás el QR y esperás el webhook
 (ver [Emitir](/credenciales/sd-jwt-vc/emitir/)). La vista previa `credential` de la
 respuesta **describe el adjunto pero no lo devuelve**.
@@ -98,8 +100,8 @@ respuesta **describe el adjunto pero no lo devuelve**.
 - **La wallet recibe la credencial completa, con el PDF.**
 - **El webhook `credential.issued` no trae el PDF.** La disclosure del adjunto se saca
   del `credential`, pero su digest queda en el array `_sd` firmado: la firma sigue
-  verificando y el claim se lee como retenido. En su lugar llega un campo
-  `attachment` que describe lo que se sacó:
+  verificando y el claim se lee como retenido. En su lugar, y solo cuando la
+  credencial lleva un adjunto, llega un campo `attachment` que describe lo que se sacó:
 
 ```json
 "attachment": {
@@ -117,15 +119,15 @@ respuesta **describe el adjunto pero no lo devuelve**.
 | `media_type` | string | El tipo de medio del archivo, p. ej. `application/pdf`. |
 | `bytes` | integer | El tamaño del archivo decodificado, en bytes. |
 
-Si necesitás conservar el PDF, guardalo de tu lado antes de emitir: Sovra no te lo
-devuelve. El evento completo está en [Webhooks](/webhooks/).
+Ni la respuesta de la oferta ni el webhook traen el PDF: si lo necesitás, guardalo de
+tu lado. El evento completo está en [Webhooks](/webhooks/).
 
 ## Errores
 
 | Código | Qué pasó | Qué hacer |
 |---|---|---|
 | `422 invalid_claim_values` | El valor no es un data URI de PDF válido, o el PDF pasa los 560.000 bytes. | `details` dice qué claim y por qué (`"<key>: <motivo>"`). Revisá el prefijo `data:application/pdf;base64,` y el tamaño. |
-| `413` | El cuerpo del request pasa los 8 MB. | Casi siempre es un adjunto demasiado grande: el máximo son 560.000 bytes. |
-| `attachments are only available for vc+sd-jwt schemas` | Pusiste un claim `attachment` en un esquema mDoc. | Usá el tipo `bytes`, o un esquema `vc+sd-jwt`. |
+| `413` | El cuerpo del request pasa los 8 MB. Con un adjunto, eso es un PDF de unos 6 MB o más. | Achicá el PDF: el máximo son 560.000 bytes (≈750 KB en base64). |
+| Al crear el esquema: `attachments are only available for vc+sd-jwt schemas` | Pusiste un claim `attachment` en un esquema mDoc. | Usá el tipo `bytes`, o un esquema `vc+sd-jwt`. |
 
 El resto de los errores está en [Errores de credenciales](/errores/credenciales/).

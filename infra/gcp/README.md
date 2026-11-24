@@ -21,12 +21,12 @@ bash infra/gcp/setup.sh
 
 El script habilita las APIs, crea el repositorio de Artifact
 Registry (con limpieza de imágenes viejas), dos cuentas de servicio y la
-federación de identidad para que **solo** GitHub Actions de `sovrahq/id-docs`
-pueda desplegar, sin claves guardadas en GitHub:
+federación de identidad para que **solo** GitHub Actions de `sovrahq/id-docs`,
+y solo desde `main`, pueda desplegar, sin claves guardadas en GitHub:
 
 | Cuenta de servicio | Permisos |
 |---|---|
-| `github-deployer` | `run.admin`, `artifactregistry.writer`, y actuar como `docs-runtime` |
+| `github-deployer` | `run.admin` solo sobre el servicio `sovra-id-docs`, `artifactregistry.writer` solo sobre el repositorio `docs`, y actuar como `docs-runtime` |
 | `docs-runtime` | Ninguno: es la identidad del servicio, que solo sirve archivos |
 
 Al final imprime los `gh variable set …` para cargar las variables del repo:
@@ -37,6 +37,14 @@ Al final imprime los `gh variable set …` para cargar las variables del repo:
 
 Push a `main`, o **Actions → Deploy docs → Run workflow**. El job construye la
 imagen, la sube, despliega y hace un smoke test de `/`, `/conceptos/` y `/api/`.
+
+Antes de desplegar, el job `check` corre build, lint y typecheck. Aunque alguien
+dispare el workflow desde otra rama, Google Cloud rechaza el token: la federación solo
+acepta `refs/heads/main`.
+
+El deploy usa el environment `production` de GitHub. Para pedir aprobación antes de
+cada deploy, un admin del repo lo configura en **Settings → Environments →
+production**: *Required reviewers* y *Deployment branches* = `main`.
 
 ## Desplegar a mano (sin GitHub)
 

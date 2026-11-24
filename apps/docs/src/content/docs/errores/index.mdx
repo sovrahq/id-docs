@@ -61,7 +61,7 @@ documentos.
 | 400 | El JSON está mal formado, o mandaste un id que no es un UUID (por ejemplo en `GET /verifier/verifications/{id}`). | Revisá el JSON y el id. |
 | 404 | La ruta no existe. | Revisá el path. |
 | 406 | Tu `Accept` no admite `application/json`. **Pasa incluso en `GET /api/v1/status/…` con `Accept: application/jwt`.** | Mandá `Accept: */*` o `application/json`. |
-| 413 | El cuerpo pasa los 8 MB. | Suele ser un `attachment` demasiado grande: el máximo son 560.000 bytes. |
+| 413 | El cuerpo pasa los 8 MB. | Con un `attachment`, es un PDF de unos 6 MB o más: achicalo. El máximo del adjunto son 560.000 bytes (≈750 KB en base64). |
 | 500 | Error inesperado. **También pasa si omitís `schema_id` o si `claims` no es un objeto.** | Revisá el body; si sigue, reportalo citando el `x-request-id`. |
 
 ### Autenticación

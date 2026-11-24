@@ -14,3 +14,9 @@
 /openspec
 /tools
 .DS_Store
+
+# Variables de entorno locales: nunca entran a la imagen ni a Cloud Build.
+**/.env
+**/.env.*
+**/.dev.vars
+**/.dev.vars.*

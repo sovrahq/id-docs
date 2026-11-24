@@ -15,3 +15,9 @@ tools
 *.md
 !apps/docs/src/**/*.md
 !apps/docs/src/**/*.mdx
+
+# Variables de entorno locales: nunca entran a la imagen ni a Cloud Build.
+**/.env
+**/.env.*
+**/.dev.vars
+**/.dev.vars.*

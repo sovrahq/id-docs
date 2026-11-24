@@ -52,14 +52,16 @@ if ! exists gcloud artifacts repositories describe "$AR_REPO" --project="$PROJEC
     --description="Imágenes del sitio de documentación"
 fi
 # Conserva las últimas 10 imágenes y borra el resto.
-cat > /tmp/sovra-docs-cleanup.json <<'JSON'
+CLEANUP_POLICY="$(mktemp)"
+trap 'rm -f "$CLEANUP_POLICY"' EXIT
+cat > "$CLEANUP_POLICY" <<'JSON'
 [
   {"name": "conservar-ultimas-10", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 10}},
   {"name": "borrar-viejas", "action": {"type": "Delete"}, "condition": {"olderThan": "30d"}}
 ]
 JSON
 gcloud artifacts repositories set-cleanup-policies "$AR_REPO" --project="$PROJECT_ID" \
-  --location="$REGION" --policy=/tmp/sovra-docs-cleanup.json --no-dry-run
+  --location="$REGION" --policy="$CLEANUP_POLICY" --no-dry-run
 
 step "Cuentas de servicio"
 for sa in "$DEPLOYER_SA" "$RUNTIME_SA"; do
@@ -70,10 +72,22 @@ done
 DEPLOYER="$DEPLOYER_SA@$PROJECT_ID.iam.gserviceaccount.com"
 RUNTIME="$RUNTIME_SA@$PROJECT_ID.iam.gserviceaccount.com"
 
-# El deployer sube imágenes y despliega el servicio, y nada más.
+# El deployer sube imágenes al repositorio $AR_REPO y despliega el servicio $SERVICE,
+# y nada más: el proyecto aloja otros servicios (sovra-docs) que no debe poder tocar.
+gcloud artifacts repositories add-iam-policy-binding "$AR_REPO" --project="$PROJECT_ID" \
+  --location="$REGION" --member="serviceAccount:$DEPLOYER" \
+  --role=roles/artifactregistry.writer >/dev/null
+if exists gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION"; then
+  gcloud run services add-iam-policy-binding "$SERVICE" --project="$PROJECT_ID" \
+    --region="$REGION" --member="serviceAccount:$DEPLOYER" --role=roles/run.admin >/dev/null
+else
+  echo "El servicio $SERVICE todavía no existe: hacé el primer deploy a mano (ver README)" >&2
+  echo "y volvé a correr este script para darle run.admin al deployer sobre el servicio." >&2
+fi
+# Versiones anteriores del script daban estos roles sobre todo el proyecto: se sacan.
 for role in roles/run.admin roles/artifactregistry.writer; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:$DEPLOYER" --role="$role" --condition=None >/dev/null
+  gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$DEPLOYER" --role="$role" --condition=None >/dev/null 2>&1 || true
 done
 # Puede desplegar el servicio "como" la cuenta de runtime.
 gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" --project="$PROJECT_ID" \
@@ -84,14 +98,22 @@ if ! exists gcloud iam workload-identity-pools describe "$POOL" --project="$PROJ
   gcloud iam workload-identity-pools create "$POOL" --project="$PROJECT_ID" \
     --location=global --display-name="GitHub Actions"
 fi
-if ! exists gcloud iam workload-identity-pools providers describe "$PROVIDER" \
+# Solo los workflows de main de este repo: una rama cualquiera no puede desplegar.
+ATTRIBUTE_MAPPING="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref"
+ATTRIBUTE_CONDITION="assertion.repository == '$GITHUB_REPO' && assertion.ref == 'refs/heads/main'"
+if exists gcloud iam workload-identity-pools providers describe "$PROVIDER" \
     --project="$PROJECT_ID" --location=global --workload-identity-pool="$POOL"; then
+  gcloud iam workload-identity-pools providers update-oidc "$PROVIDER" --project="$PROJECT_ID" \
+    --location=global --workload-identity-pool="$POOL" \
+    --attribute-mapping="$ATTRIBUTE_MAPPING" \
+    --attribute-condition="$ATTRIBUTE_CONDITION"
+else
   gcloud iam workload-identity-pools providers create-oidc "$PROVIDER" --project="$PROJECT_ID" \
     --location=global --workload-identity-pool="$POOL" \
     --display-name="GitHub" \
     --issuer-uri="https://token.actions.githubusercontent.com" \
-    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-    --attribute-condition="assertion.repository == '$GITHUB_REPO'"
+    --attribute-mapping="$ATTRIBUTE_MAPPING" \
+    --attribute-condition="$ATTRIBUTE_CONDITION"
 fi
 # Solo los workflows de este repo pueden usar la cuenta del deployer.
 gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER" --project="$PROJECT_ID" \

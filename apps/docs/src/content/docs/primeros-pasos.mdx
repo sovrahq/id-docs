@@ -1,0 +1,338 @@
+---
+title: "Primeros pasos"
+description: "De cero a la primera llamada: acceso al dashboard, workspace con su DID, API key, webhook y una llamada de prueba. Al final, las convenciones de la API."
+sidebar:
+  order: 1
+---
+
+Esta página te lleva de cero a la primera llamada exitosa. Son cinco pasos y valen igual para credenciales y documentos; donde cambia algo, está separado en pestañas.
+
+Después de esto, el paso siguiente es crear el esquema, según lo que vayas a emitir: [Esquema SD-JWT](/credenciales/sd-jwt-vc/esquema/), [Esquema mDoc](/credenciales/mdoc/esquema/) o [Esquema de documento](/documentos/crear-un-esquema/).
+
+## Entornos
+
+| | Test | Producción |
+|---|---|---|
+| **API** | `https://test-api-sovra.flagonsa.com` | `https://api.sovra.io` |
+| **Dashboard** | `https://test-issuer-sovra.flagonsa.com` | `https://issuer.sovra.io` |
+
+En los ejemplos, `$BASE_URL` es la URL de la API del entorno que uses:
+
+```bash
+export BASE_URL="https://test-api-sovra.flagonsa.com"
+export SOVRA_API_KEY="sovra_sk_..."
+```
+
+<Details title="RPC y Chain ID de SovraChain, y la especificación OpenAPI">
+
+| | Test | Producción |
+|---|---|---|
+| **RPC de SovraChain** | `https://rpc.testnet.sovra.io` | `https://rpc.sovra.io` |
+| **Chain ID** | `65536101` | `65536001` |
+
+La especificación OpenAPI del entorno está siempre disponible en `GET $BASE_URL/openapi/api`: es la fuente de verdad si algo en esta documentación queda desactualizado. La versión navegable está en la [Referencia de API](/api/).
+
+</Details>
+
+## Configuración
+
+<Steps>
+<Step title="Acceder al dashboard">
+
+El acceso es **por invitación**: el equipo de Sovra te manda un correo con el enlace de alta. Al aceptarlo se crean tu usuario, una organización y un primer **workspace**.
+
+El workspace es tu espacio de trabajo: tiene su propia identidad (DID), sus esquemas, sus API keys y sus webhooks, aislados de los demás. Podés crear más desde **Settings → Workspaces** (por ejemplo, uno por dependencia).
+
+</Step>
+<Step title="Esperar el DID del workspace">
+
+Al crearse, el workspace registra su identidad en SovraChain. El resultado es un **DID**, el identificador público de tu organización:
+
+```text
+did:sovra:0xcda79e1ee5612c230a6faf68236e3679b0579bae
+```
+
+**Tarda algunos minutos.** Cuando el DID aparece en **Settings → Workspace**, está listo. Mientras tanto, la API responde `workspace_not_provisioned`.
+
+<Details title="Más sobre el aprovisionamiento">
+
+Mientras el aprovisionamiento no termine, crear un esquema o una oferta, emitir un documento o listar documentos responde:
+
+```json
+{ "error": "workspace_not_provisioned" }
+```
+
+Si ya tenías un webhook configurado, al terminar recibís el evento `identity.did-generated` (ver [Webhooks](/webhooks/)).
+
+**mDoc necesita además la dirección EOA.** De la dirección EOA del workspace se deriva el docType generado (`io.sovra.<dirección>.<schema_id>.1`), y es la clave de indexación de los mapas de revocación. Mientras el aprovisionamiento no concluya, el docType se muestra vacío en el dashboard.
+
+</Details>
+
+</Step>
+<Step title="Crear una API key">
+
+**Settings → API keys → New API key** (necesitás rol de administrador). La clave `sovra_sk_...` se muestra **una sola vez**: guardala en tu gestor de secretos. Si la perdés, revocás esa y creás otra.
+
+Todas las llamadas la usan así:
+
+```http
+Authorization: Bearer sovra_sk_...
+```
+
+La key está atada al workspace, así que nunca mandás un `workspace_id`. Podés tener varias activas (una por sistema) y revocar cualquiera sin tocar las demás.
+
+<Aside type="danger" title="La API key es un secreto de servidor">
+
+**Nunca** la pongas en una app móvil, en JavaScript servido al navegador, en un repositorio ni en una colección de Postman exportada.
+
+</Aside>
+
+</Step>
+<Step title="Configurar el webhook">
+
+Casi todo lo que hace Sovra termina después de la llamada, y el resultado te llega por **webhook**: un aviso que Sovra le manda a tu servidor. Sin webhook, tenés que consultar el `GET` correspondiente cada tanto.
+
+En **Settings → Webhooks**:
+
+1. Cargá la **URL** de tu servidor (`https://tu-servidor.com/webhooks/sovra`).
+2. **Elegí los eventos.** No hay comodín: un evento que no suscribís no llega nunca.
+3. Guardá el **secreto** `whsec_…`. Se muestra **una sola vez** y sirve para comprobar que cada aviso viene de Sovra.
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+Suscribí `credential.issued`, `presentation.verified` y `presentation.failed`. Si vas a revocar por API, agregá `credential.revoked`, `credential.suspended`, `credential.unsuspended` y **`credential.status-change-failed`**.
+
+</TabItem>
+<TabItem label="mDoc">
+
+Los mismos que SD-JWT VC: `credential.issued`, `presentation.verified` y `presentation.failed`, y los de cambio de estado si revocás por API. `credential.issued` llega con `format: "mso_mdoc"` y el `doc_type`.
+
+</TabItem>
+<TabItem label="Documentos">
+
+Suscribí **`document.status-changed`**: avisa cuando el documento quedó `anchored` y ya se puede entregar. Si no podés recibir webhooks, consultá `GET /api/v1/issuer/documents` hasta ver `anchored`.
+
+</TabItem>
+</Tabs>
+
+Hasta 10 endpoints por workspace. Los payloads, la firma HMAC y los reintentos están en [Webhooks](/webhooks/).
+
+</Step>
+<Step title="Hacer la primera llamada">
+
+Con el DID listo y la API key en mano, listá lo emitido. Al principio, la lista viene vacía:
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/credentials" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+```json
+{ "credentials": [] }
+```
+
+</TabItem>
+<TabItem label="mDoc">
+
+La misma llamada que SD-JWT VC sirve para probar la conexión:
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/credentials" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+<Details title="Probar de una vez el esquema mDoc">
+
+Con un esquema `mso_mdoc` ya creado y `registered` (ver [Esquema mDoc](/credenciales/mdoc/esquema/)), crear una oferta confirma de una vez el esquema, la API key y el aprovisionamiento:
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "claims": {
+      "family_name": "Lovelace",
+      "given_name": "Ada",
+      "birth_date": "1815-12-10",
+      "issue_date": "2026-01-15",
+      "expiry_date": "2036-01-15",
+      "issuing_country": "MX",
+      "issuing_authority": "Nuevo León",
+      "document_number": "NL-0001",
+      "un_distinguishing_sign": "MEX",
+      "portrait": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "driving_privileges": [{ "vehicle_category_code": "B" }],
+      "age_over_18": true
+    }
+  }'
+```
+
+Una respuesta `201` con `offer_uri` confirma que todo está en orden.
+
+</Details>
+
+</TabItem>
+<TabItem label="Documentos">
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/documents" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+```json
+{ "documents": [] }
+```
+
+</TabItem>
+</Tabs>
+
+Si algo falla:
+
+- `{ "error": "invalid_api_key" }`: la clave está mal copiada, revocada, o falta el prefijo `Bearer ` (con **B** mayúscula).
+- `{ "error": "workspace_not_provisioned" }`: el workspace todavía no tiene DID. Esperá unos minutos.
+
+</Step>
+</Steps>
+
+## Checklist
+
+- [ ] El workspace muestra su DID `did:sovra:0x…` (y, para mDoc, su dirección EOA) en **Settings → Workspace**.
+- [ ] Tenés una API key `sovra_sk_…` guardada fuera del código fuente.
+- [ ] Tu webhook responde `2xx` por HTTPS, valida la firma y tiene suscritos los eventos que necesitás. Guardaste el secreto `whsec_…`.
+- [ ] `GET /api/v1/issuer/credentials` (o `GET /api/v1/issuer/documents`) responde `200`.
+
+Lo siguiente es crear un esquema del tipo correcto y esperar a que quede `registered`. Ver [Esquemas](/conceptos/esquemas/).
+
+## Recursos
+
+- Colecciones de Postman (importalas y configurá la URL base y la API key): [Credenciales](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-credenciales.postman_collection.json), [mDoc](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-mdoc.postman_collection.json), [mDoc con namespace propio](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-mdoc-custom.postman_collection.json) y [Documentos firmados](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-documentos-firmados.postman_collection.json).
+- Especificación OpenAPI en vivo: `GET $BASE_URL/openapi/api`.
+
+## Convenciones de la API
+
+Reglas que valen para toda la API servidor-a-servidor (`/api/v1`). Los endpoints, uno por uno, están en la [Referencia de API](/api/).
+
+<Details title="Formato: JSON, cabeceras, fechas e identificadores">
+
+| | |
+|---|---|
+| **Cuerpo** | JSON (`Content-Type: application/json`), salvo la lista de estado, que responde `application/jwt`. Techo de **8 MB**; por encima, `413`. |
+| **Cabecera `Accept`** | Toda ruta JSON exige un `Accept` que admita `application/json` (`*/*`, el default de curl, lo admite). Cualquier otra cosa es un `406` **antes de llegar al endpoint**. Eso incluye `GET /api/v1/status/…` con `Accept: application/jwt`, aunque esa ruta responda con un JWT. |
+| **Nomenclatura** | `snake_case` en toda la API. |
+| **Fechas** | ISO 8601 en UTC (`2026-08-26T04:41:32Z`). Dentro de un SD-JWT, `iat` y `exp` son segundos Unix. |
+| **Identificadores** | UUID, salvo `schema_id`, que es el slug del esquema. |
+| **`x-request-id`** | Toda respuesta la trae. Citala cuando reportes un problema. |
+
+**No hay endpoints específicos de mDoc.** La creación del esquema, la emisión y la verificación usan los mismos endpoints que una credencial SD-JWT; el formato lo determina el `format` del esquema. Lo que reside únicamente en el **dashboard** es el registro del document signer, la admisión de una raíz IACA, las API keys, los webhooks y el layout de los documentos. La API del dashboard (`/dashboard/*`) y la de la wallet (`/wallet/*`) quedan fuera de estas convenciones.
+
+</Details>
+
+<Details title="Autenticación y zonas de la API (incluye CORS)">
+
+Todos los endpoints, salvo los públicos, requieren la API key de workspace (`Authorization: Bearer sovra_sk_...`).
+
+- El esquema `Bearer` es **sensible a mayúsculas**: `bearer` en minúsculas devuelve `401 invalid_api_key`.
+- El workspace se deduce de la clave: **no se envía `workspace_id`** en ningún request.
+- **Un recurso de otro workspace responde `404`, como si no existiera**, nunca `403`. Vale para credenciales, documentos, esquemas y verificaciones.
+- El request se rechaza si su workspace, o la organización de ese workspace, están desactivados. **Desactivar un tenant no revoca sus claves**: este control es lo que las detiene.
+
+| Código | `error` | Cuándo |
+|---|---|---|
+| `401` | `invalid_api_key` | Sin cabecera `Authorization`, malformada, o clave desconocida o revocada. |
+| `403` | `workspace_inactive` | El workspace de la clave está desactivado. |
+| `403` | `organization_inactive` | La organización del workspace está desactivada. |
+
+La API tiene **dos zonas**, y la diferencia está en el path:
+
+| Zona | Path | Autenticación |
+|---|---|---|
+| **Emisor** (y verificador) | `/api/v1/issuer/…`, `/api/v1/verifier/…` | `Authorization: Bearer sovra_sk_...` |
+| **Pública** | `/api/v1/documents/…`, `/api/v1/status/…` | Ninguna. Para documentos públicos, tener el `id` es toda la autorización. |
+
+- **Una API key no sustituye una sesión.** Un documento privado leído por la zona pública devuelve `401 authentication_required` **incluso si mandás la key en el header**. Los documentos privados solo se abren con sesión del dashboard.
+- **CORS.** La zona pública responde `Access-Control-Allow-Origin: *`. La zona emisor **no**, así que el navegador la bloquea: hace falta un proxy del lado servidor (que es, además, donde tiene que vivir la API key).
+
+</Details>
+
+<Details title="Errores: los dos formatos de respuesta">
+
+Los errores del endpoint comparten un sobre:
+
+```json
+{ "error": "schema_not_found", "details": "…" }
+```
+
+`error` es un código estable, pensado para que lo lea tu código. `details` es opcional, y según el error es un string, una lista de strings o un objeto campo → mensajes. Las fallas de validación usan `validation_error` con mensajes por campo:
+
+```json
+{ "error": "validation_error", "details": { "validity_period": ["has invalid format"] } }
+```
+
+**Los errores del framework usan otro sobre**, porque se producen antes de que el endpoint corra:
+
+```json
+{ "errors": { "detail": "Bad Request" } }
+```
+
+| Código | Causa |
+|---|---|
+| `400` | Cuerpo JSON malformado, o un id malformado. |
+| `404` | Ninguna ruta coincide. |
+| `406` | `Accept` no admite el formato de la ruta. |
+| `413` | Cuerpo de más de 8 MB. |
+| `500` | Error no manejado (`Internal Server Error`). |
+
+Cada código de error, con su causa y su solución, está en [Errores](/errores/).
+
+</Details>
+
+<Details title="Paginación y rate limit">
+
+Solo pagina `GET /api/v1/verifier/verifications`, con `limit` (1–200, default 50) y `offset` (≥ 0, default 0). **Los demás listados devuelven todo**, sin paginación ni filtros. En particular, `GET /api/v1/issuer/documents` ignora los query params y crece con el workspace.
+
+Solo `POST /api/v1/issuer/credential-offer` tiene rate limit: **120 solicitudes por minuto por IP de origen**, contadas por separado en cada nodo de la API. Por encima responde `429` con `{"error": "too_many_requests"}`. **No se envía `Retry-After` ni cabeceras `X-RateLimit-*`**: esperá y reintentá.
+
+</Details>
+
+<Details title="Operaciones asincrónicas">
+
+Cuatro escrituras devuelven antes de que su desenlace sea definitivo. La respuesta confirma que la solicitud se aceptó; el webhook, o el `GET` correspondiente, dice cómo terminó.
+
+| Operación | Respuesta inmediata | El estado final llega como |
+|---|---|---|
+| Emitir un documento | `201`, `status: "signed"` | `document.status-changed` → `anchored` o `failed` |
+| Cambiar el estado de una credencial | `202`, el destino en `pending_status` | `credential.revoked` / `.suspended` / `.unsuspended`, o `credential.status-change-failed` |
+| Crear una oferta de credencial | `201` con la oferta | `credential.issued` cuando el holder la canjea |
+| Crear una verificación | `201` con la URI de la solicitud | `presentation.verified` o `presentation.failed` |
+
+Los estados de cada elemento están en [Ciclo de vida](/conceptos/ciclo-de-vida/).
+
+</Details>
+
+<Details title="Límites y cuotas">
+
+| Recurso | Límite |
+|---|---|
+| `POST /api/v1/issuer/credential-offer` | 120 req/min por IP de origen, contadas por nodo |
+| Cuerpo de un request | 8 MB |
+| Vigencia de una oferta | 24 horas |
+| Vigencia de una sesión de verificación | 10 minutos |
+| `limit` en el listado de verificaciones | 200 (y es el único listado que pagina) |
+| Adjunto de un claim `attachment` | 560.000 bytes, y uno solo por esquema |
+| Imágenes del diseño (`thumbnail.uri`, `hero.uri`) | 256 KB |
+| Intentos de un cambio de estado on-chain | 5 |
+| Intentos de anclaje de un documento | 5 |
+| Throughput del anclaje | Del orden de 5 documentos por bloque y por nodo |
+| Layout de un documento | 3 MB |
+| Techo de un QR con el `credential` de un documento (nivel L) | ~2953 bytes |
+| Timeout de entrega de webhook | 5 segundos |
+| Reintentos de webhook | 8 intentos, con backoff: ~1,5 horas en total |
+| Endpoints de webhook por workspace | 10 |
+| Desfasaje horario tolerado en el KB-JWT | ±5 minutos |
+
+</Details>

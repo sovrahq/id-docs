@@ -1,0 +1,314 @@
+---
+title: "Emitir credenciales SD-JWT VC"
+description: "Crear una oferta, mostrarla como QR y recibir la credencial SD-JWT VC firmada en el webhook credential.issued."
+sidebar:
+  order: 2
+  label: "Emitir"
+---
+
+Emitir una credencial son tres movimientos: **creás una oferta**, **mostrás un QR** y
+**recibís un webhook** cuando el ciudadano la acepta.
+
+Antes necesitás un esquema SD-JWT VC en `registered` (ver
+[Crear el esquema](/credenciales/sd-jwt-vc/esquema/)) y un endpoint de webhook
+suscripto a `credential.issued` (ver [Primeros pasos](/primeros-pasos/)).
+
+## Paso 1: crear la oferta
+
+Mandás el `schema_id` del esquema y los valores de la credencial:
+
+```bash
+curl -X POST "$BASE_URL/api/v1/issuer/credential-offer" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "claims": {
+      "full_name": "Ada Lovelace",
+      "birth_date": "1815-12-10",
+      "age_over_18": true
+    }
+  }'
+```
+
+- **`schema_id`** es el slug del esquema, no su UUID. Se usa siempre su última versión.
+- **`claims`** lleva los valores, con las mismas `key` del esquema. Los `required` no
+  pueden faltar (si no, `422 missing_claims`). Las fechas van como texto ISO
+  (`"1815-12-10"`) y los booleanos como booleanos.
+- **`valid_until`** (opcional) fija un vencimiento distinto del que define el esquema,
+  en ISO 8601 y a futuro.
+
+<Aside type="caution" title="Una key mal escrita no da error">
+
+Una key que el esquema no declara **se descarta en silencio**: la credencial sale, pero
+sin ese dato. Revisá que coincidan letra por letra.
+
+</Aside>
+
+La respuesta (`201`) trae, entre otros:
+
+- **`credential_id`**: el identificador de la credencial para toda su vida. **Guardalo**:
+  es el que llega en el webhook y el que usás para consultarla o revocarla.
+- **`offer_uri`**: lo que vas a mostrar como QR.
+- **`expires_at`**: la oferta vence **24 horas** después de creada.
+
+También trae `credential`, una **vista previa sin firmar** que sirve para mostrarle al
+ciudadano qué va a recibir. No es una credencial y no prueba nada. La lista completa de
+campos está en la [referencia de API](/api/create-credential-offer/).
+
+<Details title="Detalles del request: límites y casos raros">
+
+- **Omitir `schema_id` no es un `422`, es un `500`.** Lo mismo si `claims` no es un
+  objeto (un string o un array). Si `claims` se omite, equivale a `{}`.
+- El esquema tiene que ser de kind `credential` y estar `registered`.
+- `valid_until` en `null` se rechaza con `422 invalid_valid_until`: si querés el
+  vencimiento del esquema, omitilo.
+- Un claim `attachment` lleva un PDF como `data:application/pdf;base64,…`, de hasta
+  560.000 bytes decodificado (ver [Adjuntos](/credenciales/sd-jwt-vc/adjuntos/)).
+- **Rate limit:** 120 solicitudes por minuto **por IP de origen** (no por API key),
+  contadas por separado en cada nodo de la API. Por encima, `429 too_many_requests`,
+  **sin cabecera `Retry-After`**: esperá y reintentá.
+
+La respuesta completa:
+
+```json
+{
+  "credential_id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+  "offer_uri": "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22...",
+  "pre_authorized_code": "a3f1…",
+  "expires_at": "2026-08-27T04:41:32Z",
+  "credential": {
+    "iss": "https://api.sovra.io/did:sovra:0xcda79e1ee5612c230a6faf68236e3679b0579bae",
+    "iat": 1787719292,
+    "exp": 1819255292,
+    "vct": "VerifiableCredential",
+    "full_name": "Ada Lovelace",
+    "age_over_18": true,
+    "credentialStatus": [ "…" ]
+  }
+}
+```
+
+`pre_authorized_code` es el código de un solo uso que ya viene dentro de `offer_uri`;
+solo lo necesitás si armás tu propio deep link. La vista previa `credential` no tiene
+`sub`, `cnf`, digests `_sd` ni firma, y los adjuntos se describen, no se devuelven.
+
+</Details>
+
+## Paso 2: mostrar el QR
+
+Codificá el `offer_uri` **completo, sin modificarlo**, en un QR. Cualquier librería
+sirve:
+
+```js
+import QRCode from "qrcode";
+const dataUrl = await QRCode.toDataURL(offer.offer_uri, { errorCorrectionLevel: "M" });
+```
+
+En el celular también podés abrir el `offer_uri` directamente como deep link, sin QR.
+
+Cuando el ciudadano escanea, la wallet y Sovra se encargan del resto: la wallet prueba
+que tiene su llave, Sovra firma la credencial con la llave de tu workspace y la
+credencial queda guardada en el teléfono. **La oferta es de un solo uso**: una vez
+canjeada, ese QR ya no sirve.
+
+<Details title="Qué pasa por dentro cuando el ciudadano escanea">
+
+La wallet sigue el protocolo OID4VCI:
+
+1. Lee `credential_issuer` del `offer_uri` y descarga los metadatos del emisor.
+2. Canjea el `pre-authorized_code` por un access token.
+3. Envía una **prueba de posesión** de su llave: un JWT `openid4vci-proof+jwt` firmado
+   con su passkey.
+4. Sovra construye el SD-JWT, lo firma con la llave del workspace y se lo entrega.
+5. La credencial queda en el teléfono y se dispara tu webhook.
+
+El `offer_uri` tiene esta forma:
+
+```text
+openid-credential-offer://?credential_offer={"credential_issuer":"https://api.sovra.io/did:sovra:0x…",
+"credential_configuration_ids":["LicenciaDeConducir"],
+"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"a3f1…"}}}
+```
+
+</Details>
+
+## Paso 3: recibir credential.issued
+
+Cuando la credencial queda en la wallet, tu servidor recibe:
+
+```json
+{
+  "event": "credential.issued",
+  "id": "4f3379d8-0fab-4631-975c-c36a68528bd4",
+  "timestamp": "2026-08-26T04:41:33.108371Z",
+  "workspace_id": "bfe85e0d-c2da-4ccd-bd99-d26827f7e45e",
+  "data": {
+    "credential_id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+    "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+    "schema_type": "VerifiableCredential",
+    "format": "vc+sd-jwt",
+    "issued_at": "2026-08-26T04:41:32Z",
+    "expires_at": "2027-08-26T04:41:32Z",
+    "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3NkLWp3dCJ9.eyJfc2QiOls…~WyJONFpy…~"
+  }
+}
+```
+
+Con `credential_id` lo asociás a tu oferta. `holder_did` es el identificador del
+ciudadano que la aceptó, y `credential` es **la credencial firmada completa**: lleva
+todos los datos, así que tratala como dato personal. `expires_at` es `null` si la
+credencial no vence.
+
+<Aside type="danger" title="Es la única vez que recibís la credencial firmada">
+
+Sovra no la guarda y no hay forma de volver a pedirla. Si tu sistema la necesita (para
+auditar, reimprimir o verificar por tu cuenta), **guardala al recibir este evento**.
+
+</Aside>
+
+Si el esquema tiene un PDF adjunto, el PDF **no viaja en el webhook** (llega solo su
+tamaño y tipo), pero la wallet sí lo tiene. Cómo validar la firma del webhook y la
+política de reintentos están en [Webhooks](/webhooks/).
+
+## Consultar una emisión
+
+Con el `credential_id` podés consultar en qué está una emisión en cualquier momento,
+incluso antes de que el ciudadano escanee:
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/credentials/b662aaad-d940-48fb-be9e-7194c76210ff" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+El campo que más vas a mirar es `status`: `pending` (todavía no la escanearon),
+`expired` (la oferta venció sin canjearse), `issued`, `suspended` o `revoked`. Ver
+[Estados y revocación](/credenciales/estados-y-revocacion/). Esta consulta **no**
+devuelve la credencial firmada.
+
+Para listar todo lo emitido por el workspace, usá
+[`GET /api/v1/issuer/credentials`](/api/list-credentials/). Ese listado muestra solo
+credenciales ya emitidas: las ofertas pendientes se consultan de a una.
+
+<Details title="Ejemplos de respuesta de la consulta">
+
+Todavía sin canjear:
+
+```json
+{
+  "id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+  "holder_did": null,
+  "status": "pending",
+  "issued_at": null,
+  "expires_at": "2026-08-27T04:41:32Z",
+  "schema": { "id": "…", "credential_type": "VerifiableCredential", "name": "Licencia de Conducir" }
+}
+```
+
+En una oferta sin canjear, `expires_at` es el plazo para retirarla y `schema` no trae
+`schema_id`.
+
+Ya emitida:
+
+```json
+{
+  "id": "b662aaad-d940-48fb-be9e-7194c76210ff",
+  "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+  "status": "issued",
+  "pending_status": null,
+  "status_change_error": null,
+  "issued_at": "2026-08-26T04:41:32Z",
+  "expires_at": "2027-08-26T04:41:32Z",
+  "schema": { "id": "…", "schema_id": "licencia_de_conducir", "credential_type": "VerifiableCredential", "name": "Licencia de Conducir" }
+}
+```
+
+`pending_status` y `status_change_error` muestran un cambio de estado en curso o el
+motivo por el que no se aplicó el último. Una id inexistente, de otro workspace o que
+no es un UUID da `404 credential_not_found`. Todos los campos están en la
+[referencia de API](/api/get-credential/).
+
+</Details>
+
+## Errores frecuentes
+
+- **`404 schema_not_found`**: usaste el UUID o el nombre visible en vez del slug.
+- **`409 schema_registration_pending`**: el esquema todavía se está registrando.
+  Esperá unos segundos y reintentá.
+- **`422 missing_claims`**: falta algún claim `required`. `details` dice cuáles:
+  `{ "error": "missing_claims", "details": ["birth_date", "document_number"] }`.
+
+<Details title="Más errores al crear la oferta">
+
+| HTTP | `error` | Causa | Solución |
+|---|---|---|---|
+| 401 | `invalid_api_key` | Falta el header, la clave está mal o fue revocada. | Revisá `Authorization: Bearer sovra_sk_...`. |
+| 409 | `schema_registration_failed` | El tipo no pudo registrarse: con ese esquema no se puede emitir nada. | Creá el esquema de nuevo. |
+| 422 | `invalid_valid_until` | `valid_until` es `null`, está malformado o quedó en el pasado. | Mandá una fecha futura, u omitilo. |
+| 422 | `invalid_claim_values` | Un adjunto no es un data URI de PDF válido, o pasa los 560.000 bytes. | `details` lista `"<key>: <motivo>"`. |
+| 429 | `too_many_requests` | Pasaste las 120 req/min de tu IP. | Esperá y reintentá. |
+
+La tabla completa (incluidos `workspace_inactive`, `workspace_not_provisioned`,
+`wrong_schema_kind`, `document_signer_required` y `bitmap_exhausted`) está en
+[Errores de credenciales](/errores/credenciales/).
+
+</Details>
+
+<Details title="Ejemplo completo en Node.js">
+
+```js
+const BASE_URL = process.env.SOVRA_BASE_URL;
+const API_KEY = process.env.SOVRA_API_KEY;
+
+async function emitirCredencial(schemaId, claims) {
+  const res = await fetch(`${BASE_URL}/api/v1/issuer/credential-offer`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ schema_id: schemaId, claims }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(`Sovra ${res.status}: ${err.error} ${JSON.stringify(err.details ?? "")}`);
+  }
+
+  const offer = await res.json();
+
+  // Guardá credential_id antes de mostrar el QR: es la única forma de
+  // correlacionar el webhook con este trámite.
+  await db.tramites.update(tramiteId, {
+    sovra_credential_id: offer.credential_id,
+    estado: "esperando_escaneo",
+    oferta_expira: offer.expires_at,
+  });
+
+  return offer; // renderizá offer.offer_uri como QR
+}
+```
+
+Y del lado del webhook:
+
+```js
+app.post("/webhooks/sovra", verificarFirmaSovra, async (req, res) => {
+  const { event, data } = req.body;
+
+  if (event === "credential.issued") {
+    await db.tramites.updateBySovraId(data.credential_id, {
+      estado: "emitida",
+      holder_did: data.holder_did,
+      sd_jwt: data.credential,      // ← la única copia que vas a tener
+      expira: data.expires_at,
+    });
+  }
+
+  res.sendStatus(200);
+});
+```
+
+`verificarFirmaSovra` valida la firma HMAC del webhook; la implementación está en
+[Webhooks](/webhooks/).
+
+</Details>

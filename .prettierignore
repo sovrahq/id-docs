@@ -1,0 +1,14 @@
+node_modules
+dist
+.astro
+.turbo
+.wrangler
+.nimbus
+package-lock.json
+
+# Contenido: las guías se escriben a mano y las páginas del sitio se generan.
+docs
+openspec
+templates
+apps/docs/src/content
+packages/openapi/openapi.json

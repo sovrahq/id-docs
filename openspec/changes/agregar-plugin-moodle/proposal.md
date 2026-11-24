@@ -4,7 +4,7 @@ Las instituciones que forman con Moodle —la Agencia Atenea en Bogotá es la pr
 
 ## What Changes
 
-- Nuevo boilerplate `boilerplate/templates/moodle-local-plugin/`: un **plugin local de Moodle** (`local_sovracred`, PHP) compatible con Moodle 4.5 LTS y 5.x, que emite una credencial SD-JWT VC por curso completado contra la plataforma actual (`Authorization: Bearer sovra_sk_…`, OID4VCI).
+- Nuevo boilerplate `templates/moodle-local-plugin/`: un **plugin local de Moodle** (`local_sovracred`, PHP) compatible con Moodle 4.5 LTS y 5.x, que emite una credencial SD-JWT VC por curso completado contra la plataforma actual (`Authorization: Bearer sovra_sk_…`, OID4VCI).
 - Al completarse un curso, el plugin registra el **derecho** del estudiante y le avisa con una notificación de Moodle. **La oferta OID4VCI se crea recién cuando el estudiante la pide** desde «Mis credenciales», porque vence a las 24 h y es de un solo uso.
 - Un endpoint de webhook propio (firma HMAC sobre el cuerpo crudo, idempotente) y una **tarea programada de reconciliación** que hace al webhook opcional (el firewall de Atenea restringe por país).
 - Un reporte para el administrador con pendientes, diagnóstico de conexión y reintento.
@@ -23,7 +23,7 @@ Stack: el estándar de Sovra para aplicaciones con escala (Elixir/Phoenix) **no 
 
 ## Impact
 
-- Código nuevo, aislado en `boilerplate/templates/moodle-local-plugin/`; no toca los otros boilerplates ni la API.
+- Código nuevo, aislado en `templates/moodle-local-plugin/`; no toca los otros boilerplates ni la API.
 - Consume tres endpoints existentes de la API: `POST /api/v1/issuer/credential-offer`, `GET /api/v1/issuer/credentials/{id}` y el webhook `credential.*` del workspace.
 - Dependencias: ninguna fuera del núcleo de Moodle (`\core\http_client`, TCPDF para el QR). Sin CDN.
 - Fuera de esta versión: ingresar a Moodle con la SuperApp (plugin de autenticación), credencial al registrarse y disparo por insignia — quedan como «próximos pasos» en el README.

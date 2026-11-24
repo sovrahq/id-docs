@@ -1,0 +1,29 @@
+{
+  "name": "sovra-id-docs",
+  "private": true,
+  "packageManager": "npm@11.9.0",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint:docs": "turbo run lint:docs",
+    "openapi": "npm run generate -w @sovra-id/openapi",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "docker:build": "docker build -t sovra-id-docs:local .",
+    "docker:run": "docker run --rm -p 8080:8080 sovra-id-docs:local",
+    "deploy:cloudflare": "turbo run deploy --filter=@sovra-id/docs"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "prettier-plugin-astro": "^0.14.1",
+    "turbo": "^2.5.8"
+  }
+}

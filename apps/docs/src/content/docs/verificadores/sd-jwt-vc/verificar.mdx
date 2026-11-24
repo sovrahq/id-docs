@@ -1,0 +1,327 @@
+---
+title: "Verificar credenciales SD-JWT VC"
+description: "Pedir datos de una credencial SD-JWT VC con una consulta DCQL, mostrar el QR y recibir el veredicto de Sovra por webhook."
+sidebar:
+  order: 1
+  label: "Verificar"
+---
+
+Verificar una credencial SD-JWT VC son tres movimientos: **creás una sesión** diciendo
+qué datos querés, **mostrás un QR**, y **recibís un webhook** con el veredicto.
+
+Antes necesitás una API key y un workspace aprovisionado (ver
+[Primeros pasos](/primeros-pasos/)), y un endpoint suscrito a los eventos
+`presentation.verified` y `presentation.failed` (ver [Webhooks](/webhooks/)).
+
+## El flujo
+
+<Steps>
+<Step title="Crear la sesión con lo que querés pedir">
+
+Le mandás a Sovra una **consulta DCQL**: un JSON que dice qué credencial y qué datos
+le pedís al ciudadano. Esta pide el nombre y si es mayor de edad:
+
+```bash
+curl -X POST "$BASE_URL/api/v1/verifier/verifications" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dcql_query": {
+      "credentials": [{
+        "id": "licencia",
+        "format": "vc+sd-jwt",
+        "claims": [
+          { "path": ["full_name"] },
+          { "path": ["age_over_18"] }
+        ]
+      }]
+    }
+  }'
+```
+
+En palabras:
+
+- `id` es una etiqueta tuya, libre. Vuelve tal cual en el resultado.
+- `format` es `vc+sd-jwt` (o `dc+sd-jwt`).
+- Cada `path` es el nombre de un dato, **escrito exactamente igual que el `key` del
+  esquema**. Para un dato anidado usás varios elementos: `["direccion", "ciudad"]`.
+
+La respuesta trae el `session_id` (guardalo: vuelve en el webhook como
+`verification_id`), la URI para el QR y `expires_at`. Referencia completa:
+[Crear una verificación](/api/create-verification/).
+
+</Step>
+<Step title="Mostrar el QR">
+
+Mostrá como QR la URI `authorization_request_uri_ref`: es corta y no crece con la
+consulta.
+
+```js
+import QRCode from "qrcode";
+const dataUrl = await QRCode.toDataURL(session.authorization_request_uri_ref);
+```
+
+Al escanear, el ciudadano ve **exactamente qué datos le pedís** y los aprueba uno por
+uno. La sesión dura **10 minutos**: mostrá una cuenta regresiva y ofrecé generar un
+QR nuevo cuando venza.
+
+</Step>
+<Step title="Recibir el resultado">
+
+Llega uno de dos webhooks. Si salió bien, `presentation.verified` trae los datos:
+
+```json
+{
+  "event": "presentation.verified",
+  "data": {
+    "verification_id": "e2d16450-42e8-46a9-ae92-d72af51a7435",
+    "holder_did": "did:sovra:0x90833e201da2dd3c146619217f18a85bbd12f274",
+    "success": true,
+    "credentials": [
+      {
+        "id": "licencia",
+        "format": "vc+sd-jwt",
+        "claims": { "full_name": "Ada Lovelace", "age_over_18": true }
+      }
+    ]
+  }
+}
+```
+
+Recibir este evento significa que Sovra ya validó **todo**: firma del emisor, que
+quien presenta es el titular, vigencia, revocación y suspensión. Los valores de
+`claims` son confiables. Un dato anidado llega con el `path` unido con puntos:
+`["direccion","ciudad"]` → `"direccion.ciudad"`.
+
+Si algo falló, llega `presentation.failed` con un `error` que dice **en qué paso** se
+cortó, por ejemplo `missing_required_claim:first_name`. Qué significa cada valor está
+en [Errores de verificación](/errores/verificacion/).
+
+</Step>
+</Steps>
+
+## Escribir la consulta DCQL
+
+<Aside type="caution" title="Todos los datos que pedís son obligatorios">
+
+Si el ciudadano no comparte uno solo de los `path` que pediste, o si el `path` no
+coincide letra por letra con el `key` del esquema, **toda la presentación falla**.
+Pedí el mínimo indispensable: es mejor para la privacidad y para la tasa de éxito.
+
+</Aside>
+
+Algunas consultas típicas:
+
+- **Solo mayoría de edad**: `claims: [{ "path": ["age_over_18"] }]`. Confirmás que es
+  mayor sin enterarte de su nombre ni de su fecha de nacimiento.
+- **Identificación**: `full_name`, `document_number` y `birth_date`.
+- **Solo que tiene la credencial**: `claims: []`. Igual se valida la firma del
+  emisor, el titular, la vigencia y la revocación.
+
+<Details title="Reglas finas de DCQL">
+
+- **`path` distingue mayúsculas y no tiene sinónimos.** Si el esquema declaró
+  `fist_name` (con errata), pedir `first_name` falla con
+  `missing_required_claim:first_name`, aunque el nombre esté en la credencial.
+  Consultá los keys reales en **Schemas** del dashboard, o decodificando un SD-JWT
+  emitido.
+- **El `id` no selecciona la credencial.** Sovra valida el `format` y la presencia de
+  los `path`; no compara el `id` contra el `vct` ni contra el esquema. Si necesitás
+  asegurarte de que sea de un tipo determinado, pedí un claim que solo ese tipo
+  tenga y comprobá los valores en tu servidor.
+- **`credentials` no puede faltar ni estar vacío** (`400 invalid_dcql_query`).
+- **No se mezclan formatos**: SD-JWT y mDoc en la misma consulta da
+  `400 mixed_dcql_formats`. Si necesitás los dos, creá dos sesiones.
+- Si la credencial presentada no está en el formato pedido, la presentación falla
+  con `format_mismatch`.
+
+</Details>
+
+<Details title="Las dos URIs de la respuesta y sus campos">
+
+`201 Created`:
+
+```json
+{
+  "session_id": "e2d16450-42e8-46a9-ae92-d72af51a7435",
+  "authorization_request_uri": "openid4vp://?client_id=verifier%3Abfe85e0d…&response_type=vp_token&…",
+  "authorization_request_uri_ref": "openid4vp://?client_id=verifier%3Abfe85e0d…&request_uri=https%3A%2F%2Fapi.sovra.io%2Fwallet%2Fverifier%2Frequest%2Fe2d16450…",
+  "status": "pending",
+  "expires_at": "2026-08-26T04:57:31Z"
+}
+```
+
+- `authorization_request_uri` va **por valor**: lleva toda la solicitud firmada
+  (incluido el DCQL) adentro. Con una consulta grande produce un QR muy denso,
+  difícil de escanear.
+- `authorization_request_uri_ref` va **por referencia**: es corta y constante, y la
+  wallet descarga la solicitud completa. Es la que recomienda la
+  [referencia de la API](/api/create-verification/) para el QR.
+- `status` siempre es `pending` al crearse.
+
+En el webhook, `credentials[]` trae una entrada por cada credencial pedida, con tu
+`id`, el `format` pedido y **solo los valores divulgados que la consulta pidió**.
+`holder_did` puede venir `null` cuando la falla ocurre antes de identificar al holder
+(por ejemplo `malformed_vp_token` o `session_expired`). El formato completo de los
+eventos (sobre, cabeceras, firma HMAC, reintentos) está en [Webhooks](/webhooks/).
+
+</Details>
+
+<Details title="Qué valida Sovra, paso a paso">
+
+La validación corre en cascada y **se detiene en el primer fallo**:
+
+| # | Comprobación | Error si falla |
+|---|---|---|
+| 1 | El `vp_token` tiene la forma que exige OID4VP para DCQL | `malformed_vp_token` |
+| 2 | El SD-JWT parsea correctamente | `malformed_vp_token` |
+| 3 | El emisor existe y la firma ES256 es válida | `unknown_issuer`, `credential_signature_invalid` |
+| 4 | La credencial declara un holder (`sub`) | `holder_did_missing` |
+| 5 | El DID del holder resuelve a llaves on-chain | `holder_did_unresolvable` |
+| 6 | El KB-JWT está firmado por una llave del holder | `holder_key_mismatch` |
+| 7 | El `iss` del KB-JWT coincide con el `sub` de la credencial | `holder_did_mismatch` |
+| 8 | `nonce`, `aud`, `iat` (±5 min) y `sd_hash` del KB-JWT | `holder_nonce_mismatch`, `holder_audience_mismatch`, `holder_iat_out_of_range`, `sd_hash_mismatch` |
+| 9 | Cada disclosure corresponde a un digest `_sd` del JWT | `invalid_disclosure` |
+| 10 | La credencial no expiró (`exp`) | `credential_expired` |
+| 11 | El bit de revocación / suspensión on-chain | `credential_revoked`, `credential_suspended`, `status_check_failed` |
+| 12 | Todos los `path` del DCQL están presentes | `missing_required_claim:<path>` |
+
+Los pasos 6 a 8 hacen que **una credencial robada no sirva**: cada presentación se
+firma en vivo con la passkey del ciudadano (el **KB-JWT**), contra un `nonce` y una
+`aud` que Sovra generó para esa sesión. No se puede reproducir ni reutilizar.
+
+El estado de revocación y suspensión se consulta on-chain en cada verificación. Qué
+pasa con una credencial suspendida o revocada está en
+[Estados de la sesión](/verificadores/estados-de-la-sesion/#credenciales-suspendidas-o-revocadas).
+
+</Details>
+
+## Consultar sesiones
+
+Los webhooks son el camino recomendado, pero también podés consultar una sesión por
+API: sirve para una pantalla de estado o para recuperar resultados si tu endpoint
+estuvo caído.
+
+```bash
+curl -s "$BASE_URL/api/v1/verifier/verifications/$SESSION_ID" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+Lo que más vas a mirar: `status` (`pending`, `completed`, `failed` o `expired`, ver
+[Estados de la sesión](/verificadores/estados-de-la-sesion/)), `presentation_data`
+con los datos si quedó `completed`, y `error` si quedó `failed`. La lista completa de
+campos está en [Obtener una verificación](/api/get-verification/).
+
+<Details title="Listar sesiones y detalles de la consulta">
+
+Un `{id}` que no es un UUID devuelve `400`; uno inexistente o de otro workspace,
+`404 session_not_found` (no `403`: la API no revela su existencia). Una vez que la
+sesión se resolvió o pasó su `expires_at`, las dos URIs vuelven `null`.
+
+Para listar, con filtros y paginación ([Listar verificaciones](/api/list-verifications/)):
+
+```bash
+curl -s "$BASE_URL/api/v1/verifier/verifications?status=completed&limit=50&offset=0" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+- `status`: `pending`, `completed`, `failed` o `expired`. Cualquier otro valor se
+  ignora y se devuelven todas.
+- `limit`: se acota a 1–200; por defecto, 50. Un valor no entero se ignora.
+- `offset`: 0 o más; un negativo cuenta como 0.
+
+Ordena de más nuevo a más viejo. Ojo: `limit` y `offset` en la respuesta devuelven lo
+que mandaste **antes de acotarlo** (si pediste `limit=5000`, leés `5000` y recibís
+200 sesiones).
+
+</Details>
+
+<Details title="Errores al crear la sesión">
+
+| HTTP | `error` | Causa |
+|---|---|---|
+| 400 | `missing_dcql_query` | No mandaste `dcql_query`. |
+| 400 | `invalid_dcql_query` | `dcql_query` no es un objeto, o `credentials` falta / está vacío. |
+| 400 | `unsupported_dcql_format` | El `format` de una entrada falta o no está soportado. |
+| 400 | `mixed_dcql_formats` | SD-JWT y mDoc en la misma consulta. Consultalos por separado. |
+| 401 | `invalid_api_key` | Header de autorización ausente o inválido. |
+| 403 | `workspace_inactive` / `organization_inactive` | El workspace o la organización están desactivados. |
+| 404 | `workspace_not_found` | La API key no resuelve a un workspace. |
+| 409 | `workspace_not_provisioned` | El DID del workspace todavía no está listo. |
+
+La tabla completa (incluidos `422 validation_error` y `502 signer_unavailable`) está
+en [Errores de verificación](/errores/verificacion/).
+
+</Details>
+
+<Details title="Ejemplo completo en Node.js">
+
+Crear la sesión y guardar el `session_id` antes de mostrar el QR:
+
+```js
+async function pedirVerificacion(claims) {
+  const res = await fetch(`${BASE_URL}/api/v1/verifier/verifications`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dcql_query: {
+        credentials: [
+          {
+            id: "identidad",
+            format: "vc+sd-jwt",
+            claims: claims.map((path) => ({ path: [path] })),
+          },
+        ],
+      },
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Sovra ${res.status}: ${(await res.json()).error}`);
+
+  const session = await res.json();
+
+  await db.verificaciones.create({
+    sovra_session_id: session.session_id,
+    estado: "pendiente",
+    expira: session.expires_at,
+  });
+
+  return session; // renderizá session.authorization_request_uri_ref como QR
+}
+```
+
+Recibir el webhook:
+
+```js
+app.post("/webhooks/sovra", verificarFirmaSovra, async (req, res) => {
+  const { event, data } = req.body;
+
+  switch (event) {
+    case "presentation.verified": {
+      const datos = data.credentials[0].claims; // { full_name: "…", age_over_18: true }
+      await db.verificaciones.updateBySovraId(data.verification_id, {
+        estado: "aprobada",
+        holder_did: data.holder_did,
+        datos,
+      });
+      break;
+    }
+
+    case "presentation.failed":
+      await db.verificaciones.updateBySovraId(data.verification_id, {
+        estado: "rechazada",
+        motivo: data.error,
+      });
+      break;
+  }
+
+  res.sendStatus(200);
+});
+```
+
+`verificarFirmaSovra` valida la firma HMAC del webhook; ver [Webhooks](/webhooks/).
+
+</Details>

@@ -1,0 +1,33 @@
+---
+title: "mDoc"
+description: "Credenciales en el formato ISO 18013-5, el estándar internacional de la licencia de conducir móvil."
+sidebar:
+  order: 2
+  label: "Introducción"
+  group:
+    label: "mDoc"
+---
+
+**mDoc** es el formato del estándar internacional **ISO 18013-5**, el de la licencia de
+conducir móvil (mDL). Como SD-JWT VC, vive en la wallet del ciudadano y permite mostrar
+solo los datos necesarios, pero está pensado para que lo acepten verificadores de
+cualquier país o sistema que siga el estándar.
+
+Usalo cuando necesites esa interoperabilidad: licencias de conducir o documentos de
+identidad oficiales. Hay dos variantes:
+
+- **Namespace ISO:** usa exactamente los campos que define el estándar (los de una
+  licencia de conducir). Es la opción para una mDL oficial.
+- **Namespace propio:** mismo formato, pero con los campos que tu institución necesite
+  (por ejemplo, CURP o tipo de sangre).
+
+Emitir un mDoc lleva dos pasos:
+
+<CardGrid>
+  <Card title="1. Crear el esquema" icon="ph:list-checks" href="/credenciales/mdoc/esquema/">
+    Elegí la variante y definí los datos. Algunas decisiones no se pueden cambiar después.
+  </Card>
+  <Card title="2. Emitir" icon="ph:qr-code" href="/credenciales/mdoc/emitir/">
+    Por cada persona: creás una oferta, le mostrás un QR y la guarda en su wallet.
+  </Card>
+</CardGrid>

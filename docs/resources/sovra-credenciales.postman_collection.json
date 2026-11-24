@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Sovra ID — Credenciales",
-    "description": "API servidor-a-servidor de Sovra ID, autenticada con una API key de workspace.\n\nTodas las solicitudes bajo `Issuer` y `Verifier` requieren:\n\n```\nAuthorization: Bearer {{apiKey}}\n```\n\nLa clave se crea desde el dashboard (Settings → API keys) y tiene el prefijo `sovra_sk_`. Configurá `baseUrl` y `apiKey` en las variables de la colección (o sobreescribilas por entorno).\n\nEntornos:\n- Test: `https://test-api-sovra.flagonsa.com`\n- Producción: `https://api.sovra.io`\n\nDocumentación: https://github.com/sovrahq/id-docs/tree/main/docs/guides",
+    "description": "API servidor-a-servidor de Sovra ID, autenticada con una API key de workspace.\n\nTodas las solicitudes bajo `Issuer` y `Verifier` requieren:\n\n```\nAuthorization: Bearer {{apiKey}}\n```\n\nLa clave se crea desde el dashboard (Settings → API keys) y tiene el prefijo `sovra_sk_`. Configurá `baseUrl` y `apiKey` en las variables de la colección (o sobreescribilas por entorno).\n\nEntornos:\n- Test: `https://test-api-sovra.flagonsa.com`\n- Producción: `https://api.sovra.io`\n\nDocumentación: https://github.com/sovrahq/id-docs/tree/main/apps/docs/src/content/docs",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [

@@ -1,0 +1,55 @@
+---
+title: "Glosario"
+description: "Los términos de Sovra ID y de los estándares que usa (SD-JWT VC, mDoc, OID4VCI, OID4VP, DCQL, DID), explicados en lenguaje llano y en orden alfabético."
+sidebar:
+  order: 6
+---
+
+Los términos de la plataforma y de los estándares que usa, en orden alfabético y en lenguaje llano. Cada uno se explica en contexto en [Conceptos](/conceptos/).
+
+| Término | Qué es |
+|---|---|
+| **Always shared** | Un campo de un mDoc que el ciudadano no puede ocultar: se comparte siempre que presenta la credencial. En el esquema se marca con `disclosable: false`. |
+| **Anclaje** (*anchor*) | Registrar en SovraChain la firma de un documento firmado, para que cualquiera pueda verificarlo. Un documento anclado tiene `status: "anchored"`. |
+| **API key** | La clave secreta (`sovra_sk_...`) con la que tu servidor se identifica ante la API. Está atada a un workspace. |
+| **Bitstring Status List** | Una lista pública donde cada credencial ocupa una posición que dice si está revocada o suspendida. Cada workspace tiene dos en SovraChain: una de revocación y otra de suspensión. |
+| **CBOR** | Un formato binario y compacto para representar datos, parecido a JSON pero en bytes. Es el que usa mDoc. |
+| **COSE_Sign1** | La forma de firmar datos CBOR. Cumple en mDoc el mismo papel que la firma de un JWT. |
+| **`credential`** | El texto que *es* un documento firmado. Contiene todo lo necesario para verificarlo por sí solo. |
+| **DCQL** | *Digital Credentials Query Language*. El lenguaje con el que un verificador dice qué credencial y qué campos pide. |
+| **Device authentication** | La firma que el teléfono del ciudadano agrega al presentar un mDoc, para probar que la presenta su dueño. Es el equivalente mDoc del KB-JWT. |
+| **`DeviceResponse`** | Lo que la wallet envía al presentar un mDoc: los campos elegidos y la firma del teléfono. |
+| **DID** | *Decentralized Identifier*. Un identificador público registrado en la cadena, como un número de documento para organizaciones y personas. En Sovra tiene la forma `did:sovra:0x…`. |
+| **`digest`** | La huella digital (un hash SHA-256) de un documento firmado. Sirve para compararlo con lo registrado en la cadena. |
+| **Disclosure** | Un campo de una credencial SD-JWT que el ciudadano puede elegir mostrar u ocultar. Un documento firmado no tiene disclosures: todo va a la vista. |
+| **docType** | El tipo de documento de un mDoc (por ejemplo, una licencia de conducir). Es lo que un verificador nombra para pedirlo. |
+| **Documento firmado** | Un certificado, constancia o comprobante firmado por la institución y anclado en la cadena, sin wallet de por medio. |
+| **DSC** | *Document Signer Certificate*. El certificado con el que se firman los mDocs que usan el tipo oficial de ISO. Lo emite tu autoridad emisora. |
+| **Elemento de datos** | Un campo de un mDoc. Se nombra con su namespace y su identificador. |
+| **Emisor** (*issuer*) | Tu organización: firma credenciales y documentos, y puede revocarlos. |
+| **Esquema** | El molde de lo que se emite: qué campos lleva, cuánto vale y en qué formato se firma. Ver [Esquemas](/conceptos/esquemas/). |
+| **Holder** (*portador*) | El ciudadano: guarda la credencial en su wallet y decide qué campos comparte. |
+| **IACA** | *Issuing Authority Certificate Authority*. El certificado raíz de una autoridad que emite licencias de conducir móviles. De ella cuelga el DSC. |
+| **`IssuerSigned`** | Lo que la wallet recibe al emitirse un mDoc: los campos y la firma del emisor. |
+| **`IssuerSignedItem`** | Un campo individual de un mDoc, tal como lo firma el emisor. |
+| **`jti`** | El id de un documento firmado, guardado dentro de su firma. Coincide con el `id` de la API. |
+| **KB-JWT** | *Key Binding JWT*. La firma que el teléfono del ciudadano agrega al presentar una credencial SD-JWT, para probar que la presenta su dueño. |
+| **Layout** | El diseño de cómo se ve la hoja de un documento. Es solo presentación: no está firmado. |
+| **mDL** | *Mobile Driving Licence*. La licencia de conducir móvil según ISO: un mDoc de tipo `org.iso.18013.5.1.mDL`. |
+| **mDoc** | Un formato de credencial definido por la norma ISO 18013-5, el de la licencia de conducir móvil. Lo leen lectores de terceros que siguen la norma. |
+| **MSO** | *Mobile Security Object*. La parte firmada de un mDoc: contiene las huellas de cada campo, el tipo de documento, la llave del ciudadano y la vigencia. |
+| **Namespace** | El catálogo del que salen los campos de un mDoc. El de ISO es `org.iso.18013.5.1`; también podés usar uno propio. |
+| **Namespace meta** | `io.sovra.meta.1`: un catálogo reservado donde Sovra guarda, firmados, datos que necesita y que ISO no contempla (como la posición en la lista de revocación). |
+| **OID4VCI** | *OpenID for Verifiable Credential Issuance*. El protocolo para emitir una credencial a una wallet: es lo que hay detrás del QR de oferta (`openid-credential-offer://`). |
+| **OID4VP** | *OpenID for Verifiable Presentations*. El protocolo para pedirle una credencial a una wallet: es lo que hay detrás del QR de verificación (`openid4vp://`). |
+| **SD-JWT VC** | El formato de credencial por defecto, basado en JSON. Permite que el ciudadano muestre solo algunos campos. Los documentos firmados también usan este formato. |
+| **SovraChain** | La cadena de bloques pública donde se registran las identidades de los emisores, los tipos de credencial, las revocaciones y las firmas de los documentos. |
+| **`tx_hash`** | El identificador de la transacción en la cadena donde quedó anclada la firma de un documento. |
+| **vct** | *Verifiable Credential Type*. El tipo de una credencial SD-JWT. Es igual al `credential_type` del esquema. |
+| **Verificador** (*verifier*) | Tu organización o un tercero: pide ciertos datos y comprueba que la credencial sea auténtica, vigente y no revocada. |
+| **Visibilidad** | Si un documento es `public` o `private`. Controla quién puede leerlo por la API, no las copias ya entregadas. |
+| **vp_token** | Lo que la wallet envía al verificador al presentar una credencial SD-JWT: los campos elegidos más el KB-JWT. |
+| **Wallet** | La app del teléfono donde el ciudadano guarda sus credenciales. |
+| **Webhook** | Un aviso automático que Sovra le manda a tu servidor cuando algo termina, por ejemplo cuando el ciudadano acepta una credencial. Ver [Webhooks](/webhooks/). |
+| **Workspace** | Tu espacio de trabajo en Sovra: tiene su propio DID, sus llaves, esquemas, API keys y webhooks, aislados de los demás. |
+| **`x5chain`** | La cadena de certificados que viaja dentro de un mDoc firmado con el tipo oficial de ISO, y que prueba quién lo firmó. |

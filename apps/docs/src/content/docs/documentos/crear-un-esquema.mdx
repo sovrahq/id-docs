@@ -1,0 +1,135 @@
+---
+title: "Crear un esquema de documento"
+description: "Cómo crear el molde de un documento firmado: qué campos lleva, cómo se dibuja la hoja y cuándo queda listo para emitir."
+sidebar:
+  order: 1
+  label: "Crear un esquema"
+---
+
+Un **esquema** es el molde del documento: qué campos (claims) lleva, cuánto dura y, si querés, cómo se dibuja la hoja. Sin un esquema de kind `document` no podés emitir. Pensalo bien antes de la primera emisión: el esquema queda dentro de la firma de cada documento.
+
+Lo que comparten todos los esquemas (identificadores, versionado, borrado) está en [Esquemas](/conceptos/esquemas/). Necesitás un workspace aprovisionado y una API key: ver [Primeros pasos](/primeros-pasos/).
+
+## Crear el esquema
+
+Lo podés crear desde el dashboard o por API. **El dashboard es el camino recomendado**, porque es el único lugar donde se diseña la hoja (el layout).
+
+<Tabs syncKey="camino-esquema">
+<TabItem label="Dashboard">
+
+En el menú **Schemas**, el asistente tiene cuatro pasos: **Metadata → Claims → Layout → Review**.
+
+- **Metadata:** en **Type** elegí **`Document`**. Completá el nombre (de ahí sale el `schema_id`, que vas a usar al emitir), el **Credential type** (el tipo del documento en PascalCase, por ejemplo `ConstanciaDeEstudios`) y la **Validity** (`1y`, `6m`, `30d`).
+- **Claims:** una fila por campo, con **claim key**, **label**, **type** (`string`, `number`, `date` o `boolean`) y **required**.
+- **Layout:** el editor visual de la hoja. Ver [El layout](#el-layout).
+- **Review:** el resumen antes de guardar.
+
+</TabItem>
+<TabItem label="API">
+
+Mandá los mismos datos a [`POST /api/v1/issuer/schemas`](/api/create-schema/), con `"kind": "document"`. Acá el `schema_id` lo elegís vos. Por API no se puede definir el layout.
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "constancia_de_estudios",
+    "credential_type": "EnrollmentCertificate",
+    "name": "Constancia de estudios",
+    "kind": "document",
+    "validity_period": null,
+    "claims": [
+      {"key": "nombre",  "type": "string", "required": true,  "label": "Nombre"},
+      {"key": "carrera", "type": "string", "required": true,  "label": "Carrera"},
+      {"key": "fecha",   "type": "date",   "required": false, "label": "Fecha"}
+    ]
+  }'
+```
+
+Responde `201 Created` con el esquema en `registration_status: "pending"`.
+
+</TabItem>
+</Tabs>
+
+<Aside type="caution" title="Tiene que ser de kind document">
+
+Un esquema de kind `credential` no sirve para documentos: la emisión responde `422 wrong_schema_kind`. Por API, si omitís `kind`, el esquema nace `credential`.
+
+</Aside>
+
+Al cargar los claims, tené en cuenta:
+
+- **El `key` es lo que queda firmado.** Es el nombre del campo que tu código y cualquier renderizador van a buscar. Una errata queda en todos los documentos de esa versión. El `label` es solo una etiqueta.
+- **`required` solo pide que el campo esté al emitir.** Si falta, la emisión responde `422 missing_claims`.
+- **Lo que no declares, no se firma.** Las claves que el esquema no conoce se descartan en silencio al emitir.
+
+<Details title="Detalles de un esquema de kind document por API">
+
+| Campo | Qué cambia para un documento |
+|---|---|
+| `kind` | **`"document"`.** Sin este campo el esquema nace `credential`. |
+| `format` | Queda en `vc+sd-jwt`, el default. **`mso_mdoc` no admite `kind: document`.** |
+| `validity_period` | La clave **tiene que estar presente**, aunque sea en `null`: omitirla es un `422`. `null` emite documentos que no vencen, lo habitual en una constancia. |
+| `disclosable` | No tiene efecto: un documento no tiene holder que negocie divulgación. Todos los claims van a la vista. |
+
+El **Credential type** viaja como `vct` dentro del documento firmado, y es contra ese valor que se comprueba on-chain si el emisor está autorizado. Es sensible a mayúsculas.
+
+En `vc+sd-jwt` el `type` de cada claim es indicativo: no se rechaza un valor por no coincidir.
+
+La lista completa de campos del objeto Schema está en [Esquemas](/conceptos/esquemas/) y en la [referencia de API](/api/list-schemas/).
+
+</Details>
+
+## Esperá el registro on-chain
+
+<Aside type="danger" title="Un esquema recién creado todavía no sirve para emitir">
+
+Su tipo se registra en la cadena en segundo plano. Mientras está en `registration_status: "pending"`, emitir responde **`409 schema_registration_pending`**.
+
+</Aside>
+
+Recién con `registered` podés emitir. Si queda en `failed`, `registration_error` dice por qué y hay que crear el esquema de nuevo. **No hay webhook de registro**: consultá [`GET /api/v1/issuer/schemas`](/api/list-schemas/).
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  | jq '.schemas[] | select(.kind == "document") | {schema_id, version, registration_status}'
+```
+
+## El layout
+
+El layout es el diseño de la hoja A4. En el paso **Layout** del asistente arrastrás los claims sobre la hoja (cada uno como **Label**, el texto fijo, y **Value**, el dato) y sumás títulos, textos, líneas, cajas, imágenes o una imagen de fondo. **Preview** muestra la hoja con datos de ejemplo.
+
+- **Es opcional.** Sin layout el documento se emite y se verifica igual; lo que perdés es la hoja para dibujar.
+- **No está firmado.** Define cómo se ve el documento, no qué dice.
+- **Solo se diseña en el dashboard.** No hay endpoints para el layout. Las versiones nuevas del esquema lo heredan.
+
+Quien recibe el documento lo obtiene en [`GET /api/v1/documents/{id}`](/api/documents/retrieve/). Cómo dibujarlo está en [Renderizado](/documentos/renderizado/).
+
+<Details title="Más sobre el layout">
+
+- La hoja mide 794 × 1123 px (la proporción A4 a 96 dpi), y el layout de un documento tiene un techo de **3 MB**.
+- Del lado del emisor, el layout aparece en el campo `layout` de `GET /api/v1/issuer/schemas`, **solo en el listado**.
+- El layout no es lo mismo que el **diseño** (`PUT /schemas/{schema_id}/design`): el diseño es cómo se ve una tarjeta en la wallet, y no aplica a un documento.
+
+</Details>
+
+<Details title="Versionado y borrado de un esquema de documento">
+
+- **Editar publica una versión nueva** (`v1 → v2`). Los documentos ya emitidos siguen válidos con su versión, y al emitir Sovra usa siempre la más reciente de ese `schema_id`.
+- **No pueden cambiar entre versiones** el Schema ID, el Credential type, el `kind` ni el `format`.
+- Por API, la revisión es `PUT /api/v1/issuer/schemas/{schema_id}` con un `base_version` (la versión desde la que empezaste a editar). `claims` va entero, no como parche. Si alguien publicó otra versión mientras editabas, responde `409 schema_revision_conflict`.
+- **Borrar** (`DELETE /api/v1/issuer/schemas/{id}`) toma el **UUID** de una versión, no el `schema_id`, y borra todas las versiones. Se rechaza con `409 schema_in_use` si alguna tiene documentos emitidos.
+
+Las reglas generales están en [Esquemas](/conceptos/esquemas/).
+
+</Details>
+
+## Checklist
+
+Antes de [emitir](/documentos/emitir/):
+
+- [ ] El esquema es de kind **`document`** y anotaste su **`schema_id`** (el slug, no el UUID).
+- [ ] Está en **`registration_status: "registered"`**.
+- [ ] Los `key` de los claims están sin erratas y sabés cuáles son `required`.
+- [ ] *(Opcional)* Diseñaste el layout, si vas a dibujar la hoja.

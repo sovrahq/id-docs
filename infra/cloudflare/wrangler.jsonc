@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "sovra-id-docs",
+  "compatibility_date": "2026-11-18",
+  // Las rutas se resuelven desde este archivo: sirve el build estático de apps/docs.
+  "assets": {
+    "directory": "../../apps/docs/dist",
+    "not_found_handling": "404-page"
+  }
+}

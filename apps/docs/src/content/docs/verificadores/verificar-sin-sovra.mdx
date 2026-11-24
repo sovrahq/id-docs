@@ -1,0 +1,354 @@
+---
+title: "Verificar sin Sovra"
+description: "Verificar presentaciones SD-JWT VC y mDoc por tu cuenta con @sovrahq/verification-sdk, leyendo directamente SovraChain, sin la API de Sovra."
+sidebar:
+  order: 3
+  label: "Verificar sin Sovra"
+---
+
+Todo lo que hace falta para verificar una credencial (el emisor, su llave, la lista
+de confianza y el mapa de revocación) está publicado en SovraChain. Así que podés
+verificar **por tu cuenta**, con el SDK y acceso RPC a la cadena: sin llamar a la API
+de Sovra, sin cuenta de Sovra y sin depender de su disponibilidad.
+
+Las comprobaciones criptográficas son **las mismas** que hace la verificación
+hospedada. Lo que cambia es quién las corre y quién arma la solicitud.
+
+## Cuándo conviene
+
+**Usá la verificación hospedada** ([SD-JWT VC](/verificadores/sd-jwt-vc/verificar/),
+[mDoc](/verificadores/mdoc/verificar/)) para la integración típica: mostrás un QR y
+esperás el resultado. Son dos llamadas HTTP y un webhook, y Sovra se encarga del
+nonce, el QR y la recepción.
+
+**Verificá sin Sovra** cuando:
+
+- tu organización solo verifica y no tiene cuenta de Sovra, o un tercero quiere
+  verificar credenciales que emitiste;
+- no podés depender de la disponibilidad de un tercero;
+- verificás en un entorno aislado, con RPC pero sin API keys;
+- operás un lector de mDL de terceros (la lista de confianza que vale es la de la
+  autoridad, no la de Sovra);
+- querés auditar una credencial o presentación que ya guardaste.
+
+A cambio, te toca más trabajo: generás vos el nonce y la audiencia, armás la
+solicitud OID4VP y recibís la presentación en tu propia `response_uri`. Se pueden
+combinar: hospedada en el flujo interactivo y SDK para re-auditar.
+
+## Qué necesitás
+
+- **La presentación** que produjo la wallet: para SD-JWT VC, el SD-JWT con sus
+  disclosures y el KB-JWT (la prueba firmada por el titular); para mDoc, el
+  `DeviceResponse` en base64url.
+- **Acceso RPC a SovraChain** y las direcciones de los registros (en la tabla de
+  abajo).
+- **Solo para mDoc con docType ISO**: los certificados raíz de las autoridades que
+  aceptás (ver [Anclas de confianza](#anclas-de-confianza)).
+
+Instalá el SDK, que sirve para los dos formatos:
+
+```bash
+npm install @sovrahq/verification-sdk
+```
+
+<Details title="Direcciones de SovraChain (test y producción)">
+
+| | Test | Producción |
+|---|---|---|
+| RPC | `https://rpc.testnet.sovra.io` | `https://rpc.sovra.io` |
+| Chain ID | `65536101` | `65536001` |
+| DID Registry | `0xB9A2c855376ED79966e5f4956D3BfD21ef80d96E` | `0x3829184dB00Ae8C7a6c72104A2Ede879F6F25e78` |
+| Issuer Registry | `0x9723B2586332b973AA18a8b82E6675DA73490Bd0` | `0x290eAc1114B66D14a4b911CEE6D571ddC0f254C8` |
+| Revocation Registry | `0xfF6B907900D099bD771B09Dd6Aaf65397166D5c7` | `0xEF9DaDA18C3f46147FD1Ed7a3C1F0ba37ac9d6F7` |
+
+Confirmá estas direcciones con el equipo de Sovra antes de desplegar: un redeploy de
+contratos las cambia.
+
+</Details>
+
+## Verificar una presentación
+
+<Tabs syncKey="formato">
+<TabItem label="SD-JWT VC">
+
+```ts
+import { verify } from "@sovrahq/verification-sdk";
+
+const resultado = await verify(vpToken, {
+  // Vinculan la presentación a esta interacción: sin ellos, una presentación
+  // vieja podría reproducirse.
+  expectedNonce: nonceQueGeneraste,
+  expectedAudience: audienceQueGeneraste,
+
+  l2RpcUrl: "https://rpc.sovra.io",
+  didRegistryAddress: "0x3829184dB00Ae8C7a6c72104A2Ede879F6F25e78",
+  issuerRegistryAddress: "0x290eAc1114B66D14a4b911CEE6D571ddC0f254C8",
+  revocationRegistryAddress: "0xEF9DaDA18C3f46147FD1Ed7a3C1F0ba37ac9d6F7",
+  checkRevocation: true,
+});
+
+if (resultado.valid) {
+  console.log("Claims divulgados:", resultado.claims);
+} else {
+  console.warn("Inválida:", resultado.errorCode, resultado.error);
+}
+```
+
+</TabItem>
+<TabItem label="mDoc">
+
+```ts
+import { verifyMdoc } from "@sovrahq/verification-sdk";
+
+const resultado = await verifyMdoc(deviceResponseB64u, {
+  // Los mismos valores que usaste en la solicitud a la wallet.
+  clientId: clientIdEmitido,
+  nonce: nonceGenerado,
+  responseUri: "https://verificador.ejemplo/oid4vp/response",
+
+  l2RpcUrl: "https://rpc.sovra.io",
+  didRegistryAddress: "0x…",
+  issuerRegistryAddress: "0x…",
+  revocationRegistryAddress: "0x…",
+  trustAnchors: pemBundleDeLaAutoridad, // solo para docType ISO
+  checkRevocation: true,
+});
+
+if (resultado.valid) {
+  console.log("Elementos divulgados:", resultado.claims);
+} else {
+  console.warn("Inválido:", resultado.errorCode, resultado.error);
+}
+```
+
+En mDoc, las claves de `claims` llevan el namespace adelante
+(`"org.iso.18013.5.1.family_name"`), igual que en la verificación hospedada. Si
+`clientId`, `nonce` o `responseUri` no son exactamente los de la solicitud, el error
+no dice «nonce inválido» sino `DEVICE_AUTH_INVALID`.
+
+</TabItem>
+</Tabs>
+
+Si `resultado.valid` es `true`, la credencial pasó todas las comprobaciones y
+`claims` trae solo lo que el titular compartió. Si es `false`, `errorCode` dice qué
+falló.
+
+<Aside type="danger" title="offlineMode no verifica nada">
+
+La opción `offlineMode` saltea **todas** las lecturas on-chain: sin firma del emisor,
+sin lista de confianza, sin prueba del holder. Solo comprueba la estructura y puede
+devolver `valid: true` para una credencial que nadie firmó. Es para demos y tests,
+nunca para producción. Un resultado así viene con `trustNotVerified: true`:
+**chequealo siempre** antes de confiar en un `valid: true`.
+
+</Aside>
+
+<Details title="Todas las opciones de verify() y verifyMdoc()">
+
+**`verify()` (SD-JWT VC):**
+
+| Opción | Obligatoria | Descripción |
+|---|---|---|
+| `expectedNonce` | Sí | El nonce que generaste para esta interacción. |
+| `expectedAudience` | Sí | El identificador del verificador para esta interacción. |
+| `l2RpcUrl` | Sí | Endpoint RPC de los registros. |
+| `didRegistryAddress` | Sí | Dirección del DID Registry. |
+| `issuerRegistryAddress` | Sí | Dirección del Issuer Registry (lista de confianza). |
+| `revocationRegistryAddress` | — | Necesaria si `checkRevocation` está activo. |
+| `holderRpcUrl` | — | Solo si las cuentas de holders viven en otra cadena que los registros. Default: `l2RpcUrl`. |
+| `maxClockSkew` | — | Tolerancia horaria en segundos. Default `60`. |
+| `checkRevocation` | — | Consulta el mapa on-chain. |
+| `offlineMode` | — | Ver la advertencia de arriba. |
+
+**`verifyMdoc()` (mDoc)** acepta las mismas opciones **sin** `expectedNonce` ni
+`expectedAudience`, y **con** estas:
+
+| Opción | Obligatoria | Descripción |
+|---|---|---|
+| `clientId` | Sí | El `client_id` enviado en la solicitud de autorización. |
+| `nonce` | Sí | El nonce de un solo uso de esa misma solicitud. |
+| `responseUri` | Sí | La `response_uri` a la que se envió la presentación. |
+| `trustAnchors` | Para ISO | Raíces IACA aceptadas: `Uint8Array[]` en DER, o un bundle PEM. |
+
+`clientId`, `nonce` y `responseUri` entran en el *session transcript*, lo que vincula
+la presentación a un verificador y a una interacción. Por eso un valor incorrecto se
+ve como firma inválida (`DEVICE_AUTH_INVALID`).
+
+</Details>
+
+<Details title="Qué devuelve el SDK">
+
+```ts
+interface VerificationResult {
+  valid: boolean;
+  error?: string;
+  errorCode?: ErrorCode;
+  claims?: Record<string, unknown>;  // solo lo que el holder divulgó
+  issuer?: string;
+  holder?: string;
+  credentialType?: string;           // en SD-JWT VC, el vct
+  issuedAt?: number;
+  expiresAt?: number;
+  offlineMode?: boolean;             // solo SD-JWT VC
+  trustNotVerified?: boolean;        // solo SD-JWT VC; true → el resultado NO prueba nada
+  revocationChecked?: boolean;
+}
+```
+
+</Details>
+
+## Anclas de confianza
+
+Solo importan en **mDoc con docType ISO** (`org.iso.18013.5.1.mDL`). Ahí la
+credencial no lleva la dirección del emisor: se lo identifica por una cadena de
+certificados, que el SDK valida contra las raíces que vos le pasás en
+`trustAnchors`. Con el docType que genera Sovra (`io.sovra.…`) o en SD-JWT VC, el
+emisor se resuelve en el Issuer Registry y `trustAnchors` se ignora o no existe.
+
+```ts
+import { readFileSync } from "node:fs";
+
+// Un bundle PEM con todas las raíces IACA que tu organización acepta.
+const trustAnchors = readFileSync("./iaca-roots.pem", "utf8");
+```
+
+<Aside type="caution" title="No hay valor por defecto">
+
+Qué autoridades merecen confianza lo decide el verificador: no se puede deducir de
+la credencial, que es justamente lo que se está comprobando. Sin `trustAnchors`, un
+mDoc con docType ISO no pasa la verificación.
+
+</Aside>
+
+<Details title="Qué se exige a la cadena de certificados, y cómo inspeccionarla">
+
+Sobre la cadena se aplica el perfil del Anexo B de ISO 18013-5: el certificado hoja
+debe incorporar la EKU `1.0.18013.5.1.2` (`id-mdlDS`), no puede ser CA, y su validez
+no puede superar los **457 días**. Ambas constantes se exportan como
+`OID_MDL_DOCUMENT_SIGNER` y `MAX_DOCUMENT_SIGNER_DAYS`.
+
+Una cadena validada acredita la autoridad emisora y el subject del document signer,
+pero no menciona ninguna dirección de Sovra. Por eso la dirección del emisor viaja
+además en un namespace interno de la credencial (`io.sovra.meta.1`). El trámite del
+lado del emisor está en [Habilitar mDL ISO](/verificadores/mdoc/habilitar-mdl-iso/).
+
+Para examinar una cadena en lugar de solo aceptarla o rechazarla:
+
+```ts
+import {
+  parseCertificate,
+  pemToDer,
+  validateDocumentSignerChain,
+  CertificateError,
+  MAX_DOCUMENT_SIGNER_DAYS,
+  OID_MDL_DOCUMENT_SIGNER,
+} from "@sovrahq/verification-sdk";
+
+const der = pemToDer(pem);
+const cert = parseCertificate(der);
+
+console.log(cert.subject);          // { country, state, organization, commonName }
+console.log(cert.notBefore, cert.notAfter);
+```
+
+</Details>
+
+## Consultar solo la revocación
+
+Si ya validaste la credencial por otro medio y solo querés saber si sigue vigente:
+
+```ts
+import { checkRevocation } from "@sovrahq/verification-sdk";
+
+const revocada = await checkRevocation(
+  "https://rpc.sovra.io",
+  "0xEF9DaDA18C3f46147FD1Ed7a3C1F0ba37ac9d6F7", // revocation registry
+  issuerAddress,   // dirección del emisor (del DID: did:sovra:0x<address>)
+  79328,           // statusListIndex, del claim credentialStatus
+  0,               // 0 = revocación, 1 = suspensión
+);
+```
+
+Los dos datos salen de la credencial: el claim `credentialStatus` trae el índice, y
+el `iss` trae el DID del emisor, cuyo sufijo `0x…` es la dirección. También podés
+descargar la lista firmada desde `GET /api/v1/status/{issuer_did}/{purpose}` (ver
+[Lista de revocación](/api/get-revocation-status-list/)), aunque eso sí depende de la
+API de Sovra.
+
+<Details title="Qué comprueba el SDK, paso a paso">
+
+Es la misma cascada que corre la verificación hospedada.
+
+**`verify()` (SD-JWT VC):**
+
+1. Parsea la presentación SD-JWT.
+2. Decodifica el JWT del emisor (`iss`, `sub`, `vct`, `cnf`, `exp`, `iat`, `_sd`).
+3. Resuelve el DID del emisor → llave pública de `assertionMethod` (DID Registry).
+4. Verifica la firma del emisor (ES256).
+5. Comprueba que el emisor sea de confianza (`IssuerRegistry.isTrusted()`).
+6. Verifica cada disclosure contra los digests `_sd`.
+7. Comprueba la expiración.
+8. Comprueba la revocación (si `checkRevocation`).
+9. Resuelve el DID del holder → passkeys activas de su cuenta on-chain.
+10. Verifica el KB-JWT (assertion WebAuthn o ES256 crudo).
+11. Valida `aud`, `nonce`, `iat` y `sd_hash` del KB-JWT.
+12. Devuelve el resultado.
+
+**`verifyMdoc()` (mDoc):**
+
+1. Analiza el `DeviceResponse` (CBOR).
+2. Extrae el docType, el MSO y el namespace `io.sovra.meta.1`.
+3. Resuelve el emisor: por la dirección del docType, o por el `x5chain` contra
+   `trustAnchors`.
+4. Verifica la firma del `issuerAuth` (`COSE_Sign1`, ES256).
+5. Comprueba que el `docType` del MSO firmado coincida con el del documento.
+6. Comprueba que el emisor figure como de confianza en el Issuer Registry.
+7. Recalcula el hash de cada elemento divulgado y lo contrasta con `valueDigests`.
+8. Exige el namespace meta completo, y que su `issuer_address` coincida con el emisor
+   resuelto.
+9. Comprueba `validFrom` y `validUntil` aplicando la tolerancia horaria.
+10. Comprueba la revocación por `status_list_index`, si `checkRevocation` está
+    habilitado.
+11. Resuelve el DID del holder para obtener las passkeys activas de su cuenta
+    on-chain, y exige que la `deviceKey` del MSO esté entre ellas.
+12. Verifica la firma de device authentication contra el session transcript armado
+    con `clientId`, `nonce` y `responseUri`.
+
+</Details>
+
+<Details title="Códigos de error del SDK">
+
+| Código | Significado |
+|---|---|
+| `PARSE_ERROR` | La presentación no parsea. |
+| `NOT_A_DOCUMENT` | Se esperaba un documento firmado y no lo es. |
+| `NOT_ANCHORED` | La firma del documento no está anclada on-chain. |
+| `ISSUER_SIG_INVALID` | La firma del emisor no valida. |
+| `ISSUER_NOT_FOUND` | El DID del emisor no resuelve. En mDoc, también: la dirección no está en el registro, o el `x5chain` no encadena a ninguna de las `trustAnchors`. |
+| `ISSUER_NOT_TRUSTED` | El emisor no está en la lista de confianza. |
+| `ISSUER_DEACTIVATED` | El emisor fue desactivado. |
+| `DISCLOSURE_MISMATCH` | Una disclosure no corresponde a ningún digest `_sd`. |
+| `CREDENTIAL_EXPIRED` | Pasó el `exp` (en mDoc, fuera de la ventana `validFrom` / `validUntil`). |
+| `CREDENTIAL_REVOKED` | El bit de revocación está en 1. |
+| `HOLDER_NOT_FOUND` | La cuenta del holder no resuelve. |
+| `HOLDER_DEACTIVATED` | La cuenta del holder fue desactivada. |
+| `KB_JWT_MISSING` | La presentación no trae prueba del holder. |
+| `KB_PASSKEY_SIG_INVALID` | La firma de la passkey no valida. |
+| `KB_NONCE_MISMATCH` | El nonce no coincide con `expectedNonce`. |
+| `KB_AUDIENCE_MISMATCH` | La audiencia no coincide con `expectedAudience`. |
+| `KB_SD_HASH_MISMATCH` | El `sd_hash` no coincide con las disclosures. |
+| `KB_EXPIRED` | La prueba del holder está vencida. |
+| `IAT_INVALID` | `iat` fuera de la tolerancia horaria. |
+| `SUBJECT_KEY_MISMATCH` | El `sub` no coincide con `cnf.kid`. En mDoc: la `deviceKey` del MSO no está entre las passkeys activas del holder. |
+| `INVALID_ADDRESS` | Una dirección de contrato no es válida. |
+
+Solo de mDoc:
+
+| Código | Significado |
+|---|---|
+| `MDOC_PARSE_ERROR` | El `DeviceResponse` no se analiza como CBOR o no tiene la estructura requerida. |
+| `MSO_DIGEST_MISMATCH` | Un elemento divulgado no coincide con su digest en `valueDigests`. |
+| `DEVICE_AUTH_INVALID` | La firma de device authentication no valida. Suele deberse a un `clientId`, `nonce` o `responseUri` distinto del usado en la solicitud. |
+| `DOCTYPE_MISMATCH` | El docType no es el esperado. |
+
+</Details>

@@ -1,0 +1,235 @@
+---
+title: "Crear un esquema SD-JWT VC"
+description: "Crear el esquema de una credencial SD-JWT VC desde el dashboard o por API, elegir bien sus campos y, si querés, diseñar la tarjeta."
+sidebar:
+  order: 1
+  label: "Crear el esquema"
+---
+
+Un **esquema** es el molde de una credencial: qué campos lleva y cuánto tiempo vale.
+Sin esquema no se emite nada, y cada credencial queda firmada con el esquema que tenía
+al emitirse. Por eso conviene pensarlo bien antes de la primera emisión.
+
+Esta página cubre lo propio de SD-JWT VC, el formato por defecto. Lo que vale para
+cualquier esquema (identificadores, versiones, borrado) está en
+[Esquemas](/conceptos/esquemas/).
+
+## Crear el esquema
+
+<Tabs syncKey="camino">
+<TabItem label="Dashboard">
+
+Es el camino más simple, y te muestra una vista previa de la tarjeta. Entrá a
+**Schemas → New schema** y completá:
+
+- **Name**: el nombre visible. De acá sale el `schema_id`.
+- **Credential type**: el tipo de credencial que reconoce el verificador. Distingue
+  mayúsculas.
+- **Validity period**: cuánto vive la credencial, por ejemplo `10y`, `6m` o `30d`. Si
+  no se entiende el valor, se usa 1 año sin avisar.
+- **Kind**: **`credential`** para emitir a una wallet. Para documentos firmados, ver
+  [Documentos](/documentos/).
+- **Claims**: los campos, cada uno con `key`, `label`, `type` y `required`.
+
+El `schema_id` se arma a partir del nombre: minúsculas, todo lo que no sea letra o
+número pasa a `_`, y se corta a 24 caracteres. "Licencia de Conducir" queda
+`licencia_de_conducir`. **Es el valor que vas a usar para emitir**: confirmalo en el
+listado de esquemas antes de ponerlo en tu código.
+
+</TabItem>
+<TabItem label="API">
+
+Útil para crear esquemas desde tu código o un script de despliegue. Acá **el
+`schema_id` lo elegís vos**:
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "licencia_de_conducir",
+    "credential_type": "DrivingLicence",
+    "name": "Licencia de Conducir",
+    "validity_period": "10y",
+    "claims": [
+      {"key": "full_name",      "type": "string", "required": true,  "disclosable": true, "label": "Nombre"},
+      {"key": "licence_number", "type": "string", "required": true,  "disclosable": true, "label": "N° de licencia"},
+      {"key": "categoria",      "type": "string", "required": false, "disclosable": true, "label": "Categoría"}
+    ]
+  }'
+```
+
+Dos cosas que suelen fallar:
+
+- **`validity_period` tiene que estar siempre.** Si no querés vencimiento, mandá
+  `null`; omitir la clave da `422`.
+- **`credential_type` no se puede cambiar nunca más**, ni en una revisión.
+
+La respuesta es `201` con el esquema en `registration_status: "pending"`. Todos los
+campos del request y de la respuesta están en la
+[referencia de API](/api/create-schema/).
+
+<Details title="Campos del request y errores frecuentes">
+
+| Campo | Obligatorio | Qué tener en cuenta |
+|---|---|---|
+| `schema_id` | Sí | Único en el workspace. Un duplicado se reporta como `validation_error` **sobre `issuer_id`**, con `has already been taken`, no sobre `schema_id`. |
+| `credential_type` | Sí | El `vct` del SD-JWT y el id del tipo on-chain. Inmutable. |
+| `name` | Sí | Nombre para mostrar. |
+| `claims` | Sí | Ver [Los claims](#los-claims). También se acepta `{"claims": [...]}`. |
+| `validity_period` | La clave tiene que estar | `1y`, `6m`, `30d` (patrón `^[1-9]\d*(y\|m\|d)$`), o `null` para que no venza. |
+| `kind` | No | `credential` (default) o `document`. |
+| `format` | No | `vc+sd-jwt` (default) o `mso_mdoc`. Inmutable. Para mDoc, ver [Esquema mDoc](/credenciales/mdoc/esquema/). |
+
+La respuesta de creación trae el `id` (el UUID de la versión) pero **no trae `version`
+ni `layout`**: esos aparecen solo en el listado. Los errores de creación
+(`409 workspace_not_provisioned`, `422 validation_error`, entre otros) están en
+[Errores de credenciales](/errores/credenciales/).
+
+</Details>
+
+</TabItem>
+</Tabs>
+
+## Esperar el registro on-chain
+
+Al crearlo, el tipo de credencial se registra en SovraChain en segundo plano. El
+esquema pasa por estos estados:
+
+- **`pending`**: el registro está en curso. Todavía no podés emitir.
+- **`registered`**: listo para emitir.
+- **`failed`**: el registro no se pudo hacer (`registration_error` dice por qué). Hay
+  que crear el esquema de nuevo.
+
+<Aside type="danger" title="Un esquema recién creado todavía no sirve para emitir">
+
+Mientras esté en `pending`, cualquier oferta con ese esquema devuelve
+`409 schema_registration_pending`. **No hay webhook de registro**: consultá
+`GET /api/v1/issuer/schemas` hasta ver `registered`.
+
+</Aside>
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/schemas" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  | jq '.schemas[] | {schema_id, version, registration_status}'
+```
+
+## Los claims
+
+Cada claim tiene un `key` (el nombre del campo), un `type` (`string`, `number`, `date`,
+`boolean`, entre otros), y dos marcas: `required` (tiene que venir al emitir, o la
+oferta falla con `422 missing_claims`) y `disclosable` (el ciudadano puede elegir no
+mostrarlo).
+
+Antes de cargar el primero, tené en cuenta:
+
+- **El `key` es para siempre.** Es el nombre real del campo dentro de la credencial y
+  lo que un verificador tiene que pedir, letra por letra. El `label` es solo decorativo
+  y no viaja en la credencial. Usá `snake_case` y revisá la ortografía: un `fist_name`
+  con errata obliga a todos los verificadores a pedir `fist_name`.
+- **Por API, `disclosable` no viene activado.** El dashboard marca todos los campos como
+  divulgables; por API, si no mandás `disclosable: true`, el ciudadano no puede
+  retenerlo.
+- **Un campo agregado después no alcanza a lo ya emitido.** Cada credencial queda con el
+  esquema con el que se firmó.
+- **Menos es más**: apuntá a unos 12 claims, para que el QR de la wallet no se vuelva
+  difícil de escanear.
+
+<Details title="Todos los tipos y campos de un claim">
+
+| Campo | Obligatorio | Qué hace |
+|---|---|---|
+| `key` | Sí | El nombre del campo en la credencial y en los mapas `claims`. |
+| `type` | Sí | `string`, `uri`, `integer`, `boolean`, `number`, `date`, `datetime`, `bytes`, `driving_privileges` o `attachment`. En `vc+sd-jwt` es **indicativo**: no se rechaza un valor por no coincidir, salvo `attachment`. |
+| `required` | No | Si falta al emitir → `422 missing_claims`. |
+| `disclosable` | No | El holder puede retenerlo al presentar. |
+| `label` | No | Etiqueta legible, para la wallet. No se persiste en la credencial. |
+
+Sobre el tamaño: el JWT del emisor lleva un digest `_sd` de unos 44 caracteres por
+**cada** claim divulgable, revele el holder uno o todos. Un esquema de 30 campos infla
+el QR de respuesta de la wallet más de un kilobyte incluso cuando se comparte un solo
+dato, y un QR muy denso se vuelve difícil de escanear.
+
+</Details>
+
+### Adjuntar un PDF
+
+Un claim de tipo `attachment` lleva un PDF como `data:application/pdf;base64,…`. Puede
+haber **uno solo por esquema**, de **hasta 560.000 bytes** decodificado, y tiene que ser
+`disclosable` (solo en esquemas `vc+sd-jwt` de kind `credential`). El PDF llega a la
+wallet, pero **no viaja en el webhook**: ahí llega solo su tamaño y tipo. El paso a
+paso está en [Adjuntos](/credenciales/sd-jwt-vc/adjuntos/).
+
+## El diseño de la tarjeta (opcional)
+
+Podés definir cómo se ve la credencial en la wallet: título, subtítulo, qué campos
+mostrar, colores e imágenes. Si no definís nada, se emite igual y la wallet usa su
+estilo por defecto.
+
+Se configura con `PUT /api/v1/issuer/schemas/{schema_id}/design`, que actúa sobre la
+última versión del esquema. **Reemplaza el diseño entero**: lo que no mandás, no queda.
+
+```bash
+curl -s -X PUT "$BASE_URL/api/v1/issuer/schemas/licencia_de_conducir/design" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Licencia de Conducir",
+    "display": {
+      "title": {"text": "Licencia de Conducir"},
+      "subtitle": {"path": ["$.full_name"], "fallback": "Titular"},
+      "properties": [{"label": "N° de licencia", "path": ["$.licence_number"]}]
+    },
+    "styles": {
+      "background": {"color": "#112233"},
+      "text": {"color": "#ffffff"}
+    }
+  }'
+```
+
+Cada texto de la tarjeta es un literal (`text`) o un campo del esquema (`path`, como
+`["$.full_name"]`), nunca los dos. Leer y borrar el diseño se hace desde el dashboard.
+
+<Details title="El body del diseño, la respuesta y sus errores">
+
+| Campo | Obligatorio | Restricciones | Descripción |
+|---|---|---|---|
+| `name` | Sí | | Nombre para mostrar. |
+| `description` | No | | |
+| `display` | Sí, al crear | Mappings | La cara de la tarjeta: `title`, `subtitle` y `description` (un mapping cada uno) y `properties`, un array de mappings. |
+| `styles` | Sí, al crear | `thumbnail.uri` y `hero.uri` hasta 256 KB, `uri` obligatoria; `background.color` y `text.color` en `#rrggbb` | El aspecto: `thumbnail`, `hero` (`{uri, alt}`), `background`, `text` (`{color}`). |
+| `back` | No | `{display, styles}`, mismas reglas | El dorso de la tarjeta. |
+
+Un **mapping** es `{text, path, schema, fallback, label}` y tiene que tener
+**exactamente uno** de `text` y `path`. El `path` tiene la forma `["$.<claim_key>"]` y
+tiene que nombrar un claim que el esquema declare.
+
+Lo que se guarda termina siendo el `output_descriptor` del Credential Manifest de DIF,
+que es lo que lee la wallet.
+
+**La respuesta** es `200 OK` (también al crearlo, no `201`) con el objeto Design: su
+`id`, el `credential_schema_id` (el UUID de la versión del esquema, no el `schema_id`),
+lo que mandaste normalizado (cada mapping con todos sus campos, en `null` donde no hay
+valor) y un `version` que sube en cada actualización.
+
+**Errores:** `404 schema_not_found` si no hay esquema con ese `schema_id`, y
+`422 validation_error` casi siempre por un mapping con `text` y `path` a la vez (o
+ninguno), un `path` mal formado, colores que no son `#rrggbb`, imágenes de más de
+256 KB o `display` y `styles` faltantes al crear.
+
+</Details>
+
+## Revisar o borrar el esquema
+
+Editar un esquema crea una **versión nueva**, que hereda el diseño. Las credenciales ya
+emitidas siguen con su versión. Un esquema que ya se usó no se puede borrar
+(`409 schema_in_use`). El detalle está en [Esquemas](/conceptos/esquemas/).
+
+## Antes de emitir
+
+- [ ] Anotaste el **`schema_id`** (el slug, no el UUID).
+- [ ] El esquema está en **`registered`**.
+- [ ] Los `key` están en `snake_case` y sin erratas.
+- [ ] Lo que el ciudadano debería poder retener está en `disclosable: true`.
+- [ ] Solo es `required` lo que de verdad no puede faltar.
+
+Listo: seguí con [Emitir](/credenciales/sd-jwt-vc/emitir/).

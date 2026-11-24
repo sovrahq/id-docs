@@ -1,0 +1,191 @@
+---
+title: "Renderizado de la hoja"
+description: "Cómo dibujar la hoja A4 de un documento firmado a partir del JSON público: el layout, los tipos de elemento, de dónde salen los valores y el boilerplate de referencia."
+sidebar:
+  order: 5
+  label: "Renderizado"
+---
+
+La [lectura pública](/documentos/visibilidad-y-entrega/#leer-un-documento-la-zona-pública) de un documento trae un `layout`: las instrucciones para dibujar la hoja A4 con el diseño del emisor. **Dibujarla es trabajo de tu aplicación**: la API te da los datos, no la hoja. Para no empezar de cero hay un [boilerplate de referencia](#boilerplate-de-referencia).
+
+El layout se diseña en el dashboard, al [crear el esquema](/documentos/crear-un-esquema/#el-layout).
+
+## Qué tenés que dibujar
+
+1. **Los elementos del layout**, en el orden en que vienen.
+2. **Los valores de los campos**, sacados del `credential`.
+3. **Una franja de procedencia** al pie: quién emitió, la transacción on-chain, el digest y un QR con el `credential`. Es lo que le permite a quien tiene la hoja ir a verificarla en vez de creerle.
+
+## Las tres cosas que el JSON no trae
+
+| Lo que falta | De dónde sale |
+|---|---|
+| **Los valores de los campos** | `schema.claims[]` trae solo definiciones. Los valores están **dentro del `credential`**. |
+| **El `digest`** | Se calcula: es el SHA-256 de `header.payload` del `credential`. |
+| **El ancho de cada elemento** | El layout trae `x` e `y`, no el ancho. Se deriva: `page.width - 48 - x`. |
+
+## El objeto `layout`
+
+Tiene dos partes: `page`, con el tamaño de la hoja (**794 × 1123 px**, la proporción A4 a 96 dpi), y `elements`, la lista de cosas a dibujar. Cada elemento trae su `type`, su posición (`x`, `y`) y su estilo (`size`, `color`, `bold`, `align`).
+
+```json
+{
+  "page": { "width": 794, "height": 1123 },
+  "elements": [
+    { "id": "title", "type": "text", "value": "Document Example",
+      "x": 283, "y": 56, "size": 26, "bold": true, "color": "#111827" },
+    { "id": "emt25542s1", "type": "field", "bind": "date",
+      "x": 648, "y": 128, "size": 14, "color": "#111827" }
+  ]
+}
+```
+
+**No hay `z-index`: el orden del array es el orden de pintado.** Un `box` de fondo va antes que lo que se apoya encima. Y el layout **no está firmado**: es presentación, y puede cambiar sin que el documento cambie.
+
+| `type` | Qué dibuja |
+|---|---|
+| `text` | Su `value`: títulos, etiquetas. |
+| `field` | El valor del claim que dice su `bind`. |
+| `line` | Una regla de 1 px. |
+| `box` | Un rectángulo de fondo, con `radius` opcional. |
+| `image` | Un logo o un sello, en `src` como data URI. |
+
+Si llega un `type` desconocido, dibujá su `value` como texto: mejor dibujar algo que romper el renderizador.
+
+## Los valores salen del `credential`
+
+<Aside type="caution" title="Una hoja solo puede mostrar lo que cubre la firma">
+
+Leé los valores del `credential` y de ningún otro lado. Es lo único firmado de la respuesta: `schema`, `issuer`, `layout` y `anchor` los podría haber cambiado cualquiera en el camino.
+
+</Aside>
+
+Recorré las keys del esquema y tomá cada valor del payload del `credential`. Filtrando en esa dirección, los claims internos del JWT (`iss`, `vct`, `jti`, `iat`, `exp`) nunca llegan a la hoja.
+
+<Details title="Cómo leer los valores del credential (código)">
+
+Abrir el `credential`:
+
+```js
+const [jwt] = credential.split("~");
+const [header, payload, signature] = jwt.split(".");
+const signingInput = `${header}.${payload}`;   // sobre esto se firma y se ancla
+```
+
+Cada segmento es **base64url** (`-` y `_` en vez de `+` y `/`, sin padding). En el navegador, `atob` solo entiende base64 común, así que hay que traducir esos dos caracteres, y pasar por `Uint8Array` + `TextDecoder` para que los acentos y las eñes salgan bien:
+
+```js
+function decodeSegment(segment) {
+  const base64 = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const bytes  = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+```
+
+Filtrar por las keys del esquema, no por las del payload:
+
+```js
+const claims = {};
+for (const claim of schema.claims) {
+  if (claim.key in payload) claims[claim.key] = payload[claim.key];
+}
+```
+
+Así, un layout que bindea a `iss` dibuja vacío en lugar de filtrar el emisor por la ventana.
+
+</Details>
+
+<Details title="Cómo calcular el digest">
+
+El digest anclado on-chain es el SHA-256 del *signing input* (`header.payload`), que ya tenés:
+
+```js
+export async function digestOf(signingInput) {
+  const bytes = new TextEncoder().encode(signingInput);
+  const hash  = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+```
+
+Se calcula sobre `header.payload`, **no** sobre el `credential` completo: incluir la firma o la `~` da otro hash, que no coincide con nada de lo que hay en la cadena. Al compararlo con el `digest` que devuelve la emisión, compará en minúsculas e ignorando un eventual prefijo `0x`.
+
+</Details>
+
+<Details title="La geometría: cómo calcular el ancho">
+
+El ancho se calcula con un margen de 48 px:
+
+```js
+const MARGIN = 48;
+const room  = Math.max(0, page.width - MARGIN - element.x);
+const width = element.width
+  ? `width:${Math.min(element.width, room)}px`
+  : `max-width:${room}px`;
+```
+
+`room` es el espacio desde la `x` del elemento hasta el margen derecho, y hace que un texto largo corte en el margen en vez de salirse de la hoja. El título en `x = 283` da `794 - 48 - 283 = 463`, o sea `max-width: 463px`.
+
+Un ancho fijo mantiene la caja quieta sea cual sea el valor. Sin uno, el elemento se ajusta a su texto, y dos documentos del mismo esquema quedan maquetados distinto.
+
+</Details>
+
+<Details title="El saneo, regla por regla">
+
+El layout lo controla el emisor, pero termina en atributos `style` y nodos del DOM. **Un layout roto u hostil tiene que costar un elemento, nunca la página.**
+
+| Regla | Sin ella |
+|---|---|
+| `color` solo si matchea `/^#[0-9a-fA-F]{3,8}$/` | Un valor como `"#fff; position:fixed; top:0"` despega el elemento de la hoja. |
+| `src` solo `data:image/(png\|jpeg);base64,…` | Un `src: "javascript:…"`, o una URL a un tracker. |
+| Lo que no es objeto en `elements[]` se descarta | Un `null` en el array tira la página entera. |
+| `align` solo `left` / `center` / `right` | Cualquier string entra al CSS. |
+| `page.width` / `page.height` tienen que ser números | Un `"794"` string rompe la aritmética del margen. |
+| Todo texto se escapa | Un claim con `<img src=x onerror=…>` se ejecuta. |
+| El texto entra por `textContent`, nunca por `innerHTML` | El escapado pasa a ser la única defensa en vez de la segunda. |
+
+</Details>
+
+<Details title="La franja de procedencia y el QR, en detalle">
+
+La franja no es un elemento del layout, y **el emisor no la puede mover ni sacar**: si fuera opcional, el documento no serviría para verificar nada.
+
+| Fila | Qué lleva |
+|---|---|
+| **Issued by** | `issuer.name` · `issuer.did`. El nombre no está firmado; el DID sí (sale de `iss`). Van juntos: el nombre es lo que un humano reconoce y el DID es lo que se puede comprobar. |
+| **Transaction** | El `tx_hash`, enlazado al explorer y con el hash completo escrito, para que en papel también se pueda seguir. Sin `tx_hash`: escribí `not anchored` y no inventes un link. |
+| **Digest** | El calculado, o `unavailable`. |
+| **QR** | El **`credential` completo**, no un link a la página. |
+
+**Por qué el QR lleva el credential:** quien tiene la hoja escanea y verifica la firma contra la cadena, y si el servicio desapareció el QR impreso sigue sirviendo. Un link solo prueba que el servicio está en línea.
+
+El costo es tamaño: el `credential` del ejemplo pesa 520 bytes, que es la **versión 15** del QR (77 × 77 módulos); un link pesaría ~90 bytes. El techo en corrección nivel **L** es ~2953 bytes. Arriba de eso, devolvé `null` en vez de lanzar: perder el QR es mejor que perder la página. Dibujalo a varias veces el tamaño de display, en PNG (un SVG es un `<rect>` por módulo), para que impreso quede nítido.
+
+**Degradar sin romper.** Leer el `credential` no debería lanzar nunca:
+
+| Qué falla | Qué se pierde | Qué se sigue viendo |
+|---|---|---|
+| El `credential` no parsea | Los `field` y el digest (`unavailable`) | Los `text` del layout y la franja |
+| El QR no entra | El QR | Toda la hoja |
+| El documento no está anclado | El link al explorer | `not anchored` en la franja |
+| Un elemento no pasa el saneo | Ese elemento | El resto de la página |
+
+Registrá lo que se degradó: una hoja sin QR se ve casi igual a una completa, y el QR es justamente la parte que permite no creerle a la página.
+
+</Details>
+
+## Boilerplate de referencia
+
+El repositorio **`document-render-boilerplate`** dibuja la hoja A4 a partir del JSON de `GET /api/v1/documents/{id}`, en HTML + CSS + JS vanilla, sin build ni dependencias. Incluye el saneo de esta página y 20 tests, uno de ellos un golden que compara la salida byte a byte.
+
+Lo que **no** hace:
+
+- **No verifica la firma.** Dibuja lo que dice el `credential`, así que un documento adulterado se ve igual que uno legítimo. Para eso está la [verificación](/documentos/verificacion/).
+- **No emite.** Emitir requiere la API key, que no puede vivir en el navegador.
+
+<Aside type="caution" title="La zona emisor no se puede llamar desde el navegador">
+
+El preflight de `/api/v1/issuer/...` no devuelve `Access-Control-Allow-Origin`, así que el navegador bloquea la llamada; y una API key en un `.js` queda a la vista de cualquiera. Usá un proxy en tu servidor, con una lista explícita de rutas permitidas. La zona pública (`GET /api/v1/documents/{id}`) sí se puede llamar directo.
+
+</Aside>

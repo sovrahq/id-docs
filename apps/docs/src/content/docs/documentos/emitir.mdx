@@ -1,0 +1,229 @@
+---
+title: "Emitir documentos"
+description: "Cómo emitir un documento firmado con una sola llamada, esperar a que quede anclado y qué guardar de la respuesta."
+sidebar:
+  order: 2
+  label: "Emitir"
+---
+
+Emitir es **una sola llamada**: Sovra valida los datos contra el esquema, los firma con tu llave y responde al instante. El anclaje on-chain (el registro de la firma en la cadena) corre después, en segundo plano. Hasta que termine, el documento todavía no se puede entregar.
+
+Necesitás un esquema de kind `document` en estado `registered` ([Crear un esquema](/documentos/crear-un-esquema/)) y una API key ([Primeros pasos](/primeros-pasos/)).
+
+## La llamada
+
+```bash
+curl -s -X POST "$BASE_URL/api/v1/issuer/documents" \
+  -H "Authorization: Bearer $SOVRA_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schema_id": "document_example",
+    "claims": {
+      "date": "20-08-2026",
+      "idDocument": 1234567,
+      "content": "Contenido de Prueba",
+      "isConfidential": false
+    }
+  }'
+```
+
+- **`schema_id`** (obligatorio): el identificador legible del esquema, no su UUID. Se usa su última versión.
+- **`claims`**: un objeto con un valor por cada campo del esquema. Los `required` no pueden faltar. Los valores se firman tal cual: `"42"` y `42` son documentos distintos.
+- **`visibility`**: `"private"` (el default) o `"public"`. Ver [Visibilidad y entrega](/documentos/visibilidad-y-entrega/).
+- **`valid_until`**: una fecha ISO 8601 a futuro, si querés pisar la vigencia del esquema. No mandes `null`: omitilo.
+
+Todos los detalles del request están en la [referencia de API](/api/issue-document/).
+
+## La respuesta
+
+Responde `201 Created` con el documento. Estos son los campos que vas a usar:
+
+| Campo | Qué es |
+|---|---|
+| `credential` | **El documento en sí**: un string firmado que cualquiera puede verificar. |
+| `id` | El identificador del documento, para el enlace público y para cambiar la visibilidad. |
+| `status` | En la emisión es siempre `signed`. Después pasa a `anchored` o `failed`. |
+| `tx_hash` | La transacción del anclaje. `null` hasta que el anclaje confirme. |
+
+```json
+{
+  "id": "63813a91-6986-46bf-9f23-128a6598cd82",
+  "status": "signed",
+  "visibility": "private",
+  "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3Nk…eyJjb250ZW50…~",
+  "tx_hash": null,
+  "…": "…"
+}
+```
+
+<Details title="La respuesta completa, campo por campo">
+
+```json
+{
+  "id": "63813a91-6986-46bf-9f23-128a6598cd82",
+  "status": "signed",
+  "visibility": "private",
+  "credential": "eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3Nk…eyJjb250ZW50…~",
+  "claims": {
+    "date": "20-08-2026",
+    "idDocument": 1234567,
+    "content": "Contenido de Prueba",
+    "isConfidential": false
+  },
+  "digest": "1043…",
+  "tx_hash": null,
+  "signed_at": "2026-08-21T14:12:34Z",
+  "anchored_at": null,
+  "revoked_at": null,
+  "issuer": {
+    "did": "did:sovra:0xb516d2f945db504198d726bda2a01d19ecd3cc23",
+    "name": "Lotería de San Juan",
+    "address": "0xb516d2f945db504198d726bda2a01d19ecd3cc23"
+  },
+  "schema": {
+    "id": "3f2b…",
+    "schema_id": "document_example",
+    "credential_type": "Document",
+    "name": "Document Example",
+    "version": 1,
+    "claims": [ /* … */ ]
+  }
+}
+```
+
+Este objeto (**Document**) es el mismo que devuelven el cambio de visibilidad y cada entrada del listado. La columna **Firmado** dice si el dato está cubierto por la firma (vive dentro del `credential`) o si es una afirmación del servicio. Ver [las dos capas de confianza](/conceptos/documentos-firmados/).
+
+| Campo | Qué es | Firmado |
+|---|---|---|
+| `id` | Identificador del documento. Coincide con el claim `jti` del `credential`, así que una credencial no puede servirse bajo otro id. | Sí (como `jti`) |
+| `status` | `signed`, `anchored`, `failed` o `revoked`. Ver [Estados y revocación](/documentos/estados-y-revocacion/). | No |
+| `visibility` | `public` o `private`. | No |
+| `credential` | El documento: un SD-JWT VC en base64url, autocontenido. | Es la firma |
+| `claims` | Los mismos claims decodificados, por conveniencia. No prueba nada. | Sí, adentro del `credential` |
+| `digest` | SHA-256 (hex) de los bytes que se firmaron. Es la clave bajo la cual la firma queda anclada; la verificación lo recalcula. | No (se recalcula) |
+| `tx_hash` | Hash de la transacción del anclaje. `null` hasta que confirme. | No |
+| `signed_at` | Cuándo se firmó. | Sí (como `iat`) |
+| `anchored_at` | Cuándo quedó anclada la firma. `null` hasta que confirme. | No |
+| `revoked_at` | `null` = vigente. Con fecha, revocado. | No |
+| `issuer.did` | El DID del emisor (`did:sovra:0x…`); con él se resuelve su clave pública on-chain. | Sí (como `iss`) |
+| `issuer.address` | La dirección del emisor en la cadena. | Sí, se deriva de `iss` |
+| `issuer.name` | Nombre visible del emisor. Un verificador no debería usarlo para decidir. | No |
+| `schema.credential_type` | Viaja como `vct` en el documento; contra él se comprueba on-chain si el emisor está autorizado. | Sí (como `vct`) |
+| `schema.id`, `schema_id`, `name`, `version`, `claims[]` | El molde usado: UUID, identificador legible, nombre, versión y definición de cada campo. | No |
+
+</Details>
+
+## Esperá el anclaje antes de entregar
+
+El `201` llega con `status: "signed"` y `tx_hash: null`: la firma existe, pero todavía no está en la cadena. Cuando el anclaje termina, Sovra te manda el webhook [`document.status-changed`](/webhooks/#documentstatus-changed) con el estado final:
+
+- **`anchored`**: listo para entregar. Trae `tx_hash` y `anchored_at`.
+- **`failed`**: el anclaje no confirmó después de 5 intentos. No se puede reintentar: hay que volver a emitirlo.
+
+Si no podés recibir webhooks, consultá [el listado](#listar-los-documentos-del-workspace) hasta ver `anchored`. El ciclo completo está en [Estados y revocación](/documentos/estados-y-revocacion/).
+
+<Aside type="caution" title="Un verificador rechaza todo lo que no esté anchored">
+
+Entregar un documento `signed` es entregar algo que va a fallar la verificación. Guardá el `id`, mostralo como "en proceso" y pasalo a "listo" cuando llegue el webhook.
+
+</Aside>
+
+<Aside type="caution" title="Un timeout de red no significa que no se emitió">
+
+La firma pudo haber terminado igual. Antes de reintentar, buscalo en el listado: si está, reemitir crea un duplicado.
+
+</Aside>
+
+## Qué guardar
+
+**Guardá el `credential`.** Es el documento; todo lo demás se puede volver a pedir. Conviene guardar también el `id` (para el enlace y la visibilidad) y el `tx_hash` cuando llegue por webhook (para enlazar al explorer de la cadena).
+
+## Listar los documentos del workspace
+
+[`GET /api/v1/issuer/documents`](/api/list-documents/) devuelve todos tus documentos, en todos los estados, del más nuevo al más viejo. Cada entrada trae el `credential` completo, así que con una llamada recuperás todo lo emitido.
+
+```bash
+curl -s "$BASE_URL/api/v1/issuer/documents" \
+  -H "Authorization: Bearer $SOVRA_API_KEY"
+```
+
+No tiene paginación ni filtros: si necesitás buscar, indexá de tu lado a partir de este listado. Y si ese índice lo pueden consultar terceros, incluí **solo** los documentos `public`: servir un privado por búsqueda anula la decisión del emisor.
+
+<Details title="Límites y lo que no existe">
+
+**Límites**
+
+| Recurso | Límite |
+|---|---|
+| Cuerpo de un request | 8 MB |
+| Intentos de anclaje de un documento | 5 |
+| Throughput del anclaje | Del orden de 5 documentos por bloque y por nodo |
+| Layout de un documento | 3 MB |
+| Techo de un QR con el `credential` (nivel L) | ~2953 bytes |
+| Tamaño de cada entrada del listado | Un SD-JWT completo (~520 bytes en el ejemplo de esta documentación) |
+
+**Lo que no existe, a propósito**
+
+| No hay | Qué usar en cambio |
+|---|---|
+| Endpoint de verificación | La verificación corre del lado de quien verifica, contra la cadena. Ver [Verificación](/documentos/verificacion/). |
+| Endpoints de layout | El layout se diseña en el dashboard. Ver [Crear un esquema](/documentos/crear-un-esquema/). |
+| Búsqueda, filtros o paginación | `?digest=`, `/by-digest/`, `/search`, `?page` y `?limit` no existen; los query params se ignoran. Indexá a partir del listado. |
+| Endpoint de revocación | La baja se gestiona desde el dashboard. Ver [Estados y revocación](/documentos/estados-y-revocacion/#revocación). |
+| `GET` de un documento propio por la zona emisor | El listado; para uno solo, [la zona pública](/documentos/visibilidad-y-entrega/#leer-un-documento-la-zona-pública). |
+| Reintento del anclaje | Un `failed` se vuelve a emitir. |
+
+</Details>
+
+<Details title="Errores comunes al emitir">
+
+| Respuesta | Causa | Qué revisar |
+|---|---|---|
+| `401 invalid_api_key` | Key desconocida, malformada o revocada, o el header no decía literalmente `Bearer`. | Que diga `Bearer` con **B** mayúscula. |
+| `404 schema_not_found` | No hay esquema con ese `schema_id` en este workspace. | El slug. |
+| `409 workspace_not_provisioned` | El workspace todavía no tiene DID ni claves. | Aprovisionarlo desde el dashboard y esperar el DID. |
+| `409 schema_registration_pending` | El esquema se sigue registrando on-chain. | Esperar unos segundos y reintentar. |
+| `409 schema_registration_failed` | El esquema no pudo registrarse. | Crearlo de nuevo, o pedir ayuda al equipo de Sovra. |
+| `422 wrong_schema_kind` | El esquema es de kind `credential`. | Usar un esquema de documentos. |
+| `422 missing_claims` | Falta un claim requerido. La respuesta lista cuáles. | Los `required` del esquema. |
+| `422 invalid_visibility` | `visibility` no es `public` ni `private`. | El body. |
+| `422 invalid_valid_until` | `valid_until` es `null`, está malformado o en el pasado. | El body, o omitilo. |
+| `422 validation_error` | El documento no pudo guardarse. `details` nombra el campo. | La respuesta. |
+| `500` | Falta `schema_id`, o `claims` no es un objeto. | El body. |
+| `503 chain_not_configured` | No hay registro de firmas configurado: el servicio se niega a firmar algo que no podría anclar. | Contactá al equipo de Sovra. |
+
+El sobre de error es siempre el mismo:
+
+```json
+{ "error": "missing_claims", "details": ["content", "idDocument"] }
+```
+
+La tabla completa está en [Errores de documentos](/errores/documentos/).
+
+</Details>
+
+## Colección de Postman
+
+La [colección de Postman](https://github.com/sovrahq/id-docs/blob/main/docs/resources/sovra-documentos-firmados.postman_collection.json) trae los requests de emitir, cambiar la visibilidad, listar y leer un documento. Configurá `base_url` (sin slash final), `api_key` y `schema_id`; el `document_id` se completa solo al emitir, así que el orden natural es **emitir → cambiar visibilidad → leer**.
+
+<Details title="Qué trae la colección">
+
+| Variable | Valor |
+|---|---|
+| `base_url` | URL base de la API, sin slash final. |
+| `api_key` | La key del workspace. Solo la usan los requests de `/issuer`. **Vaciala antes de exportar o compartir la colección.** |
+| `schema_id` | Id del esquema de kind `document`. |
+| `document_id` | Se autocompleta al emitir. |
+
+| Request | Llamada | Qué testea |
+|---|---|---|
+| Emitir documento | `POST {{base_url}}/api/v1/issuer/documents` | `201` y que `credential` sea un string. |
+| Visibilidad → public / private | `PUT …/issuer/documents/{{document_id}}/visibility/public` o `/private` | `200` y el valor nuevo de `visibility`. |
+| Listar documentos | `GET {{base_url}}/api/v1/issuer/documents` | `200` y que `documents` sea un array. |
+| Obtener documento (sin API key) | `GET {{base_url}}/api/v1/documents/{{document_id}}` | `200` **o** `401`, según si está publicado. |
+
+Un `401` en el último request no es una falla: es la respuesta correcta para un documento privado. Y el test de emisión no comprueba que el documento esté anclado: recién emitido va a estar `signed`.
+
+La colección todavía no incluye los endpoints de esquemas: para crear el esquema por API, usá el `curl` de [Crear un esquema](/documentos/crear-un-esquema/).
+
+</Details>

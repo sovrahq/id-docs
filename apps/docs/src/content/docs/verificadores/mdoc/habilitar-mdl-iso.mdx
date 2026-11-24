@@ -1,0 +1,175 @@
+---
+title: "Habilitar mDL ISO"
+description: "El trámite para emitir licencias de conducir con el docType oficial de ISO: por qué hace falta un certificado, quién hace qué y los tres pasos en la consola."
+sidebar:
+  order: 2
+  label: "Habilitar mDL ISO"
+---
+
+Esta página es **solo** para credenciales con el docType oficial de ISO,
+`org.iso.18013.5.1.mDL`: una licencia de conducir que tiene que poder leerse con
+lectores de terceros, fuera de Sovra.
+
+<Aside type="tip">
+
+**Si usás el docType que genera Sovra** (`io.sovra.…`), no necesitás nada de esto y
+podés emitir de inmediato. Es la opción por defecto y cubre la mayoría de los casos.
+Ver [Crear un esquema mDoc](/credenciales/mdoc/esquema/).
+
+</Aside>
+
+## Por qué hace falta un trámite
+
+Una credencial común de Sovra lleva la dirección del emisor adentro, y cualquiera
+puede buscarla en SovraChain. **Un mDL de ISO no lleva ninguna dirección**: la norma
+no previó un campo para eso.
+
+Entonces el lector sabe quién firmó la licencia por un **certificado**, igual que un
+navegador sabe quién está detrás de un sitio HTTPS. Y ese certificado lo emite una
+**autoridad** reconocida, no Sovra. El trámite es conseguirlo.
+
+## Quién hace qué
+
+- **Sovra** te da la cuenta, prepara la solicitud desde la consola, registra el
+  resultado y te acompaña en cada paso. No es (ni puede ser) la autoridad
+  certificante.
+- **Tu organización** gestiona el trámite con la autoridad y nos acerca el
+  certificado que te devuelve.
+- **La autoridad emisora** firma el certificado. Es un organismo externo: en Europa,
+  la autoridad nacional de tránsito; en América, el que corresponda por jurisdicción.
+
+## Los tres pasos
+
+Todo se hace desde la consola, en **Settings → Driving licence**.
+
+<Steps>
+<Step title="Generar la llave">
+
+Tocá **Create signing key**. Se crea una llave exclusiva para licencias de conducir,
+separada de la que usa el workspace para el resto de las credenciales. Es inmediato.
+
+</Step>
+<Step title="Pedir el certificado a tu autoridad">
+
+En **Ask your authority for a certificate** completás el país (código de dos letras,
+como `MX`, `ES` o `AR`), el nombre del emisor (**Common name**) y, si querés,
+provincia y organización. La consola genera un archivo de solicitud que le mandás a
+la autoridad.
+
+El país **tiene que coincidir con el de la autoridad**, o no va a poder firmar la
+solicitud.
+
+Desde acá el proceso queda fuera de Sovra: los tiempos y requisitos los pone la
+autoridad, y pueden ir de días a meses. Conviene arrancarlo temprano.
+
+</Step>
+<Step title="Registrar el certificado recibido">
+
+La autoridad te devuelve dos archivos:
+
+1. Su **certificado raíz**: mandáselo a Sovra, que lo suma a la lista de confianza.
+2. El **certificado del emisor**: lo cargás en el paso 3 de la consola.
+
+Si todo encaja, aparece la tarjeta **Ready** y ya podés crear esquemas en
+**Schemas → New → mDoc → ISO driving licence** y emitir.
+
+</Step>
+</Steps>
+
+## Cómo saber si quedó habilitado
+
+En **Settings → Driving licence**: con la tarjeta **Ready**, emitís normalmente. Sin
+ella, toda oferta con docType ISO falla con `document_signer_required`.
+
+<Aside type="caution">
+
+La habilitación es **por workspace y por entorno**. Habilitarlo en test no lo
+habilita en producción: para producción repetís el trámite con un certificado válido
+para ese entorno.
+
+</Aside>
+
+## Si algo falla
+
+Si la consola rechaza el certificado, no te dice solo «inválido»: te dice **qué regla
+no se cumple**, con un mensaje como `dsc_profile.country_mismatch`. Mandale ese
+mensaje exacto al equipo de Sovra y te ayudamos a traducirlo en un pedido concreto
+para la autoridad.
+
+<Details title="Qué significa cada rechazo y qué pedirle a la autoridad">
+
+Los mensajes que empiezan con `iaca_profile.` hablan del certificado raíz;
+`dsc_profile.`, del certificado del emisor; `dsc_profile.chain.`, de la relación
+entre ambos.
+
+| Mensaje | Qué pedirle a la autoridad |
+|---|---|
+| `iaca_profile.not_self_signed` | La raíz debe ser autofirmada: se envió una intermedia. |
+| `iaca_profile.basic_constraints` | `CA:TRUE` con `pathlen` 0 o ausente. |
+| `iaca_profile.key_usage` | `keyCertSign` **y** `cRLSign`. |
+| `iaca_profile.expired` | La raíz está vencida. |
+| `dsc_profile.key_usage` | `digitalSignature` y ningún otro. |
+| `dsc_profile.missing_mdl_eku` | Agregar la EKU `1.0.18013.5.1.2`. |
+| `dsc_profile.validity_too_long` | 457 días o menos. |
+| `dsc_profile.country_mismatch` | El país del emisor debe ser idéntico al de la raíz. |
+| `dsc_profile.state_mismatch` | La raíz declara una provincia, así que el emisor debe declarar la misma. |
+| `dsc_profile.is_a_ca` | `CA:FALSE`, o ausencia total de `basicConstraints`. |
+| `dsc_profile.chain.*` | El certificado no fue emitido por la raíz enviada. |
+| `dsc_profile.certifies_another_key` | Debe certificarse la solicitud actual, no una anterior. |
+| `dsc_profile.not_yet_valid` | La fecha de inicio de validez es futura. |
+
+</Details>
+
+Si necesitás dar de baja o reemplazar un emisor ya registrado, escribile al equipo de
+Sovra: no se hace desde la consola. Los esquemas que ya creaste con
+`org.iso.18013.5.1.mDL` se mantienen, pero no emiten hasta que se registre un
+certificado nuevo.
+
+<Details title="Probar sin una autoridad real (desarrollo y pilotos)">
+
+Para desarrollo, demos o pilotos podés hacer de autoridad vos mismo con `openssl`. Los
+certificados se validan con las mismas reglas que los reales, así que el ejercicio
+reproduce el trámite de verdad. Una raíz autogenerada solo la confía quien la generó:
+no la uses en un entorno donde importe la confianza de verificadores reales.
+
+Guardá el archivo de solicitud del paso 2 como `csr.pem`, cambiá `C = ES` por el
+mismo país que pusiste en el paso 2, y ejecutá:
+
+```bash
+cat > iaca.cnf <<'EOF'
+[req]
+distinguished_name = dn
+prompt = no
+x509_extensions = iaca
+[dn]
+C = ES
+CN = Dev IACA
+[iaca]
+basicConstraints = critical,CA:TRUE,pathlen:0
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+EOF
+
+cat > dsc.cnf <<'EOF'
+[dsc]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature
+extendedKeyUsage = critical,1.0.18013.5.1.2
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+EOF
+
+# La raíz, que hace de autoridad. Se envía a Sovra.
+openssl ecparam -name prime256v1 -genkey -noout -out iaca.key
+openssl req -x509 -new -key iaca.key -sha256 -days 3650 -config iaca.cnf -out iaca.pem
+
+# El certificado del emisor, a partir de la solicitud de la consola.
+# Se carga en el paso 3.
+openssl x509 -req -in csr.pem -CA iaca.pem -CAkey iaca.key -CAcreateserial \
+  -days 400 -sha256 -extfile dsc.cnf -extensions dsc -out dsc.pem
+```
+
+Mandale `iaca.pem` a Sovra y cargá `dsc.pem` en el paso 3. Guardá `iaca.key` si vas a
+certificar otros emisores con la misma raíz.
+
+</Details>

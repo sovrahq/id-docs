@@ -1,0 +1,31 @@
+# Construye la imagen del sitio en Cloud Build (x86, como Cloud Run) y la sube a
+# Artifact Registry. El deploy se hace después con `gcloud run deploy`.
+# Uso manual (desde la raíz del repo):
+#   gcloud builds submit --project=sovra-docs --config=infra/gcp/cloudbuild.yaml \
+#     --substitutions=_SITE_URL=https://...
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: docs
+  _SERVICE: sovra-id-docs
+  _SITE_URL: https://example.com
+  _TAG: manual
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_TAG}
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=SITE_URL=${_SITE_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_TAG}
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: [push, "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE}:${_TAG}"]

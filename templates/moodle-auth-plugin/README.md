@@ -29,14 +29,15 @@ Plugin de autenticación de Moodle para que una persona entre **sin usuario ni c
 
 ## La credencial: el esquema en Sovra
 
-El plugin no emite: acepta una credencial de identidad que emite otro workspace (el emisor). Ese esquema
-tiene que cumplir tres cosas, y el resto es libre:
+El plugin no emite: acepta una credencial de identidad que emite otro workspace (el emisor). Con la configuración por
+defecto, ese esquema tiene que cumplir tres cosas, y el resto es libre (los nombres se pueden cambiar en
+«Tipos de credencial aceptados», «Claim del número de documento» y «Claim del tipo de documento»):
 
 | Campo del esquema | Valor | Por qué |
 |---|---|---|
-| `credential_type` | `IdentidadCiudadano` | Viaja como `vct`. El plugin lo pide en el DCQL (`meta.vct_values`, para que la billetera ofrezca esta credencial) y lo compara en el servidor, distinguiendo mayúsculas. **No se puede cambiar después de crear el esquema.** |
+| `credential_type` | `IdentidadCiudadano` | Viaja como `vct`. El plugin lo pide en el DCQL (`meta.vct_values`, para que la billetera ofrezca esta credencial) y lo compara en el servidor, distinguiendo mayúsculas (si «Tipos de credencial aceptados» está vacío, no se controla). **No se puede cambiar después de crear el esquema.** |
 | claim `num_doc` | `string` | El número de documento. Como `string` para no perder los ceros a la izquierda, que sí cuentan. |
-| claim `tipo_doc` | `string`, con el nombre largo | Sólo se pide si se compara el tipo. Valores: los de «Tipos de documento» abajo (`Cédula de ciudadanía`, `PPT`, `Pasaporte`…). |
+| claim `tipo_doc` | `string`, con el nombre largo | Sólo se pide si se compara el tipo. El emisor tiene que usar los nombres de «Tipos de documento» abajo (`Cédula de ciudadanía`, `PPT`, `Pasaporte`…): son los de la credencial de la Alcaldía. Si usa otros, agregar su línea en «Equivalencias de tipos». |
 
 `iss` y `vct` no se declaran: van en todo SD-JWT. El `schema_id` y los demás claims no los usa el plugin, y
 no los pide: sólo sirven para emitir y para lo que muestre la billetera.
@@ -92,7 +93,8 @@ Una oferta de prueba (`POST /api/v1/issuer/credential-offer`), con un documento 
 {"schema_id": "bogota_identidad", "claims": {"tipo_doc": "Cédula de ciudadanía", "num_doc": "10203045"}}
 ```
 
-Después, el DID de ese workspace va en **Emisores permitidos**.
+Después, el DID de ese workspace va en **Emisores permitidos**: en prueba, el del issuer de prueba; en producción, el de la
+Alcaldía (o los dos, uno por línea).
 
 > **Si el sitio ya tenía instalada una versión anterior**, la opción «Tipos de credencial aceptados» quedó
 > guardada como `IdentidadMigrante`: cambiar el valor por defecto no la pisa. Ponerla en `IdentidadCiudadano` (o

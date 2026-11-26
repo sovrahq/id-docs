@@ -20,7 +20,7 @@
 - [x] 4.1 PHPUnit verde en 4.5 y 5.1
 - [x] 4.2 Punta a punta en navegador contra el entorno de test de Sovra (QR real); si no hay credencial de test a mano, dejar el paso listo para escanear
   - Hecho 19/11 en 4.5 y 5.1 con resultados simulados (entra / no encontrada / duplicada / suspendida / emisor ajeno / otro navegador) y, en 4.5, escaneo con una Credencial de Identidad real de Bogotá Preview contra test: entra a la cuenta del documento y, sin esa cuenta, muestra el aviso con el enlace al registro.
-- [x] 4.3 README de instalación en español para Atenea + entrada en `boilerplate/README.md`
+- [x] 4.3 README de instalación en español para Atenea + entrada en `templates/README.md`
 - [x] 4.4 El aviso de cuenta inexistente nombra a la plataforma («No tienes cuenta en Atenea»): ajuste «Nombre de la plataforma», con el nombre corto del sitio si está vacío
 
 ## 5. Revisión del PR #14

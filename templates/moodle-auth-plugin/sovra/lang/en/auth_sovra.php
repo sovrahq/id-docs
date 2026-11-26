@@ -30,7 +30,7 @@ $string['claimdocnumber_desc'] = 'Exact claim name in the credential. Bogotá Id
 $string['claimdoctype'] = 'Document type claim';
 $string['claimdoctype_desc'] = 'Exact claim name in the credential. Bogotá Identity Credential: <code>tipo_doc</code>. Only requested when the type is compared.';
 $string['credentialtypes'] = 'Accepted credential types';
-$string['credentialtypes_desc'] = 'Accepted <code>vct</code> values, comma separated. Identity Credential: <code>IdentidadCiudadano</code>. Empty: any type from an allowed issuer.';
+$string['credentialtypes_desc'] = 'Accepted <code>vct</code> values, comma separated. Bogotá Identity Credential: <code>IdentidadCiudadano</code>. Empty: any type from an allowed issuer.';
 $string['doctypemap'] = 'Document type equivalences';
 $string['doctypemap_desc'] = 'One equivalence per line: <code>value in the credential = value in Moodle</code>. Compared ignoring case and accents. A type with no line is compared as is.';
 $string['document_locked'] = 'Your document number and type cannot be changed from your profile: they are how you log in with the SuperApp. If they are wrong, contact support.';

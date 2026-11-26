@@ -30,7 +30,7 @@ $string['claimdocnumber_desc'] = 'Nombre exacto del claim en la credencial. Cred
 $string['claimdoctype'] = 'Claim del tipo de documento';
 $string['claimdoctype_desc'] = 'Nombre exacto del claim en la credencial. Credencial de Identidad de Bogotá: <code>tipo_doc</code>. Sólo se pide si se compara el tipo.';
 $string['credentialtypes'] = 'Tipos de credencial aceptados';
-$string['credentialtypes_desc'] = 'Valores de <code>vct</code> aceptados, separados por comas. Credencial de Identidad: <code>IdentidadCiudadano</code>. Vacío: cualquier tipo de un emisor permitido.';
+$string['credentialtypes_desc'] = 'Valores de <code>vct</code> aceptados, separados por comas. Credencial de Identidad de Bogotá: <code>IdentidadCiudadano</code>. Vacío: cualquier tipo de un emisor permitido.';
 $string['doctypemap'] = 'Equivalencias de tipos de documento';
 $string['doctypemap_desc'] = 'Una línea por equivalencia: <code>valor en la credencial = valor en Moodle</code>. Se compara sin mayúsculas ni tildes. Un tipo sin línea se compara tal cual.';
 $string['document_locked'] = 'Tu número y tipo de documento no se pueden cambiar desde el perfil: con ellos entras con la SuperApp. Si hay un error, contacta a soporte.';

@@ -167,6 +167,19 @@ final class resolver_test extends \advanced_testcase {
         $this->assertSame([resolver::OK, (int) $user->id], resolver::resolve($this->claims('52111222')));
     }
 
+    public function test_sigla_con_las_equivalencias_por_defecto(): void {
+        // IdentidadCiudadano trae la sigla de Atenea; las equivalencias de nombre largo no la tocan.
+        $this->use_profile_fields();
+        set_config('matchdoctype', 1, 'auth_sovra');
+        set_config('doctypemap', "Cédula de ciudadanía = CC\nCédula de extranjería = CE\nPasaporte = PA\nPPT = PPT\n"
+            . "PEP = PEP\nSalvoconducto = SC", 'auth_sovra');
+        $cc = $this->create_person_profile('52111222', 'CC');
+        $ppt = $this->create_person_profile('7001234', 'PPT');
+        $this->assertSame([resolver::OK, (int) $cc->id], resolver::resolve($this->claims('52111222', ['tipo_doc' => 'CC'])));
+        $this->assertSame([resolver::OK, (int) $ppt->id], resolver::resolve($this->claims('7001234', ['tipo_doc' => 'ppt'])));
+        $this->assertSame([resolver::NOT_FOUND, null], resolver::resolve($this->claims('52111222', ['tipo_doc' => 'CE'])));
+    }
+
     public function test_campo_de_perfil_inexistente(): void {
         global $DB;
         set_config('documentfield', 'profile_field_noexiste', 'auth_sovra');

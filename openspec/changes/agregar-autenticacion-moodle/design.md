@@ -1,6 +1,6 @@
 ## Context
 
-Atenea corre Moodle 4.5 LTS y evalúa 5.x. Ya usa nuestro `local_sovracred` para emitir. La Credencial de Identidad de Bogotá la emite el workspace de la Alcaldía (`vct` = `IdentidadCiudadano`, antes `IdentidadMigrante`, cambiado el 26/11/2026; claims `tipo_doc` y `num_doc`, con `tipo_doc` en texto: «Cédula de ciudadanía», «PPT», «Pasaporte», …). Atenea verifica con **su propio** workspace (API key de verificador). Faltan datos de Atenea (campo del documento, formato, tipo, duplicados, URL de registro): todo eso es configuración.
+Atenea corre Moodle 4.5 LTS y evalúa 5.x. Ya usa nuestro `local_sovracred` para emitir. La Credencial de Identidad de Bogotá la emite el workspace de la Alcaldía (`vct` = `IdentidadCiudadano`, antes `IdentidadMigrante`, cambiado el 26/11/2026; claims `tipo_doc` y `num_doc`, con `tipo_doc` con la sigla de Atenea: `CC`, `PPT`, `PA`, …; la credencial anterior, `IdentidadMigrante`, lo traía en texto: «Cédula de ciudadanía», «PPT», «Pasaporte», …). Atenea verifica con **su propio** workspace (API key de verificador). Faltan datos de Atenea (campo del documento, formato, tipo, duplicados, URL de registro): todo eso es configuración.
 
 ## Goals / Non-Goals
 

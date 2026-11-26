@@ -167,6 +167,34 @@ final class resolver_test extends \advanced_testcase {
         $this->assertSame([resolver::OK, (int) $user->id], resolver::resolve($this->claims('52111222')));
     }
 
+    public function test_siglas_con_las_equivalencias_que_trae_el_plugin(): void {
+        // IdentidadCiudadano trae la sigla de Atenea. Con el valor por defecto de «Equivalencias de tipos» (el de
+        // settings.php, sin pisarlo), cada sigla entra a su cuenta.
+        $gen = $this->getDataGenerator();
+        $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'numero_documento', 'name' => 'Número']);
+        $gen->create_custom_profile_field(['datatype' => 'text', 'shortname' => 'tipo_documento', 'name' => 'Tipo']);
+        set_config('documentfield', 'profile_field_numero_documento', 'auth_sovra');
+        set_config('documenttypefield', 'profile_field_tipo_documento', 'auth_sovra');
+        set_config('matchdoctype', 1, 'auth_sovra');
+        $this->assertStringContainsString('Cédula de ciudadanía = CC', (string) get_config('auth_sovra', 'doctypemap'));
+
+        $siglas = ['RC', 'PPT', 'CC', 'TI', 'CE', 'PTP', 'PEP', 'PIP', 'NES', 'PA', 'NIT', 'SC'];
+        foreach ($siglas as $i => $sigla) {
+            $numero = (string) (60000000 + $i);
+            $user = $this->create_atenea_person($numero, $sigla);
+            $this->assertSame([resolver::OK, (int) $user->id],
+                resolver::resolve($this->claims($numero, ['tipo_doc' => strtolower($sigla)])), $sigla);
+        }
+
+        // Otro tipo no entra, sea o no una línea de las equivalencias (PPT sí, CE no).
+        $cc = $this->create_atenea_person('52111222', 'CC');
+        $this->assertSame([resolver::NOT_FOUND, null], resolver::resolve($this->claims('52111222', ['tipo_doc' => 'PPT'])));
+        // El mismo número con dos tipos: la sigla elige la cuenta.
+        $ce = $this->create_atenea_person('52111222', 'CE');
+        $this->assertSame([resolver::OK, (int) $ce->id], resolver::resolve($this->claims('52111222', ['tipo_doc' => 'CE'])));
+        $this->assertSame([resolver::OK, (int) $cc->id], resolver::resolve($this->claims('52111222', ['tipo_doc' => 'CC'])));
+    }
+
     public function test_campo_de_perfil_inexistente(): void {
         global $DB;
         set_config('documentfield', 'profile_field_noexiste', 'auth_sovra');

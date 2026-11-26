@@ -36,8 +36,8 @@ defecto, ese esquema tiene que cumplir tres cosas, y el resto es libre (los nomb
 | Campo del esquema | Valor | Por qué |
 |---|---|---|
 | `credential_type` | `IdentidadCiudadano` | Viaja como `vct`. El plugin lo pide en el DCQL (`meta.vct_values`, para que la billetera ofrezca esta credencial) y lo compara en el servidor, distinguiendo mayúsculas (si «Tipos de credencial aceptados» está vacío, no se controla). **No se puede cambiar después de crear el esquema.** |
-| claim `num_doc` | `string` | El número de documento. Como `string` para no perder los ceros a la izquierda, que sí cuentan. |
-| claim `tipo_doc` | `string`, con el nombre largo | Sólo se pide si se compara el tipo. El emisor tiene que usar los nombres de «Tipos de documento» abajo (`Cédula de ciudadanía`, `PPT`, `Pasaporte`…): son los de la credencial de la Alcaldía. Si usa otros, agregar su línea en «Equivalencias de tipos». |
+| claim `num_doc` | `string`, sólo dígitos | El número de documento, como lo guarda Atenea (sólo números). Como `string` para no perder los ceros a la izquierda, que sí cuentan. |
+| claim `tipo_doc` | `string`, con la **sigla de Atenea** | Sólo se pide si se compara el tipo. Valores: `RC`, `PPT`, `CC`, `TI`, `CE`, `PTP`, `PEP`, `PIP`, `NES`, `PA`, `NIT`, `SC`, los mismos que guarda `profile_field_tipo_documento`. Una sigla se compara directo, sin distinguir mayúsculas ni tildes, así que no necesita línea en «Equivalencias de tipos». |
 
 `iss` y `vct` no se declaran: van en todo SD-JWT. El `schema_id` y los demás claims no los usa el plugin, y
 no los pide: sólo sirven para emitir y para lo que muestre la billetera.
@@ -48,7 +48,7 @@ no los pide: sólo sirven para emitir y para lo que muestre la billetera.
 {
   "schema_id": "bogota_identidad",
   "credential_type": "IdentidadCiudadano",
-  "name": "Credencial de Identidad",
+  "name": "Bogota Identidad",
   "validity_period": "1y",
   "claims": [
     {"key": "tipo_doc", "type": "string", "required": true, "disclosable": true, "label": "Tipo de documento"},
@@ -57,20 +57,20 @@ no los pide: sólo sirven para emitir y para lo que muestre la billetera.
 }
 ```
 
-**Opción 2 — con datos básicos de la persona**, para que la credencial sirva también fuera de Moodle:
+**Opción 2 — con datos básicos de la persona** (la publicada en el issuer de prueba), para que la credencial sirva también fuera de Moodle:
 
 ```json
 {
   "schema_id": "bogota_identidad",
   "credential_type": "IdentidadCiudadano",
-  "name": "Credencial de Identidad",
+  "name": "Bogota Identidad",
   "validity_period": "1y",
   "claims": [
     {"key": "tipo_doc",         "type": "string", "required": true,  "disclosable": true, "label": "Tipo de documento"},
     {"key": "num_doc",          "type": "string", "required": true,  "disclosable": true, "label": "Número de documento"},
-    {"key": "nombres",          "type": "string", "required": true,  "disclosable": true, "label": "Nombres"},
-    {"key": "apellidos",        "type": "string", "required": true,  "disclosable": true, "label": "Apellidos"},
-    {"key": "fecha_nacimiento", "type": "date",   "required": false, "disclosable": true, "label": "Fecha de nacimiento"},
+    {"key": "nombres",          "type": "string", "required": false, "disclosable": true, "label": "Nombres"},
+    {"key": "apellidos",        "type": "string", "required": false, "disclosable": true, "label": "Apellidos"},
+    {"key": "fecha_nacimiento", "type": "string", "required": false, "disclosable": true, "label": "Fecha de nacimiento (AAAA-MM-DD)"},
     {"key": "nacionalidad",     "type": "string", "required": false, "disclosable": true, "label": "Nacionalidad"}
   ]
 }
@@ -90,7 +90,7 @@ curl -s "$SOVRA_API_URL/api/v1/issuer/schemas" -H "Authorization: Bearer $SOVRA_
 Una oferta de prueba (`POST /api/v1/issuer/credential-offer`), con un documento que exista en Moodle:
 
 ```json
-{"schema_id": "bogota_identidad", "claims": {"tipo_doc": "Cédula de ciudadanía", "num_doc": "10203045"}}
+{"schema_id": "bogota_identidad", "claims": {"tipo_doc": "CC", "num_doc": "10203045"}}
 ```
 
 Después, el DID de ese workspace va en **Emisores permitidos**: en prueba, el del issuer de prueba; en producción, el de la
@@ -125,7 +125,7 @@ No hace falta bloquear los campos del documento: el plugin no deja que la person
 | Campo con el número de documento | `profile_field_numero_documento` | Atenea: sólo números, obligatorio y único. La persona no lo puede cambiar desde su perfil |
 | Comparar también el tipo de documento | **Sí** | Ver «Tipos de documento» abajo: evita que un número de otro tipo entre a una cuenta ajena |
 | Campo con el tipo de documento | `profile_field_tipo_documento` | Siglas: RC, PPT, CC, TI, CE, PTP, PEP, PIP, NES, PA, NIT, SC |
-| Equivalencias de tipos | El valor por defecto (abajo) | La credencial trae el nombre largo; Atenea guarda la sigla |
+| Equivalencias de tipos | El valor por defecto (abajo) | `IdentidadCiudadano` ya trae la sigla y no las usa; sirven para la credencial anterior (`IdentidadMigrante`), que trae el nombre largo, sólo si ese tipo sigue en «Tipos de credencial aceptados» |
 | Métodos de autenticación aceptados | `manual`, `email`, `sovra` | Los de las cuentas existentes |
 | Permitir administradores del sitio | No | Recomendado |
 | Página de registro | `https://academia.agenciaatenea.gov.co/registrarse/` | |
@@ -136,7 +136,11 @@ como el de Moodle: `1.020.304-5` y `10203045` coinciden. Los ceros a la izquierd
 
 ### Tipos de documento (Atenea)
 
-La Credencial de Identidad trae el tipo con su nombre largo (`tipo_doc`); Atenea guarda la sigla. Equivalencias por defecto:
+`IdentidadCiudadano` trae en `tipo_doc` la misma sigla que guarda Atenea (`CC`, `PPT`, `PA`…), así que se compara
+directo. La credencial anterior (`IdentidadMigrante`) trae en cambio el nombre largo; para ella son las
+equivalencias por defecto, que no afectan a las siglas. Sólo se usan si `IdentidadMigrante` sigue en «Tipos de
+credencial aceptados»; si no, esa credencial se rechaza antes (`typenotallowed`). Una sigla en la credencial no
+encuentra una cuenta que guarde el nombre largo: las equivalencias van sólo de la credencial a Moodle.
 
 ```
 Cédula de ciudadanía = CC
@@ -149,12 +153,12 @@ Salvoconducto = SC
 
 **Comparar el tipo importa aunque en Atenea el número sea único:** el número es único dentro de Atenea, pero la credencial puede traer un número de otro tipo de documento que coincida con el de una cuenta ajena (por ejemplo, un documento extranjero con los mismos dígitos que una cédula). Comparando el tipo, eso da «No tienes cuenta en Atenea» en lugar de abrir la cuenta equivocada.
 
-Dos tipos de la credencial **no tienen sigla en Atenea** y quedan sin equivalencia a propósito, así que esas personas ven «No tienes cuenta en Atenea»:
+Dos tipos de la credencial anterior **no tienen sigla en Atenea** y quedan sin equivalencia a propósito, así que esas personas ven «No tienes cuenta en Atenea»:
 
 - **PEP Tutor**: el permiso es otro documento que el PEP; equipararlo a `PEP` sólo si Atenea confirma que lo registra así.
 - **DNI del país de origen**: es un documento extranjero sin equivalente en la lista de Atenea.
 
-Los tipos de Atenea sin contraparte en la credencial (RC, TI, PTP, PIP, NES, NIT) no necesitan línea.
+Los tipos de Atenea sin contraparte en esa credencial (RC, TI, PTP, PIP, NES, NIT) no necesitan línea.
 
 ### Limitaciones conocidas
 
